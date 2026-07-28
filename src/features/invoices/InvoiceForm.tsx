@@ -1,20 +1,30 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
 import { SearchableSelect } from '../../components/SearchableSelect'
 import { useClients, useProjects } from '../../lib/queries/masters'
-import { useCreateInvoice } from '../../lib/queries/invoices'
+import { useCreateInvoice, useUpdateInvoice } from '../../lib/queries/invoices'
 import { parseINR } from '../../lib/calc/format'
 import { clientLabel } from '../../lib/labels'
+import type { Database } from '../../types/database'
+
+type Invoice = Database['public']['Tables']['invoices']['Row']
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
 }
 
-export function InvoiceForm() {
+export function InvoiceForm({
+  editingInvoice,
+  onDoneEditing,
+}: {
+  editingInvoice: Invoice | null
+  onDoneEditing: () => void
+}) {
   const { data: clients } = useClients()
   const { data: projects } = useProjects()
   const createInvoice = useCreateInvoice()
+  const updateInvoice = useUpdateInvoice()
 
   const [clientId, setClientId] = useState('')
   const [projectId, setProjectId] = useState('')
@@ -24,16 +34,52 @@ export function InvoiceForm() {
   const [tdsPct, setTdsPct] = useState('0')
   const [dueDays, setDueDays] = useState('')
   const [status, setStatus] = useState<'draft' | 'sent'>('draft')
+  const [invoiceDate, setInvoiceDate] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
   const visibleProjects = projects?.filter((p) => p.status === 'active' && (!clientId || p.client_id === clientId))
-  const invoiceDatePreview = status === 'sent' ? todayStr() : '— (not sent yet)'
+
+  useEffect(() => {
+    if (!editingInvoice) return
+    setClientId(editingInvoice.client_id)
+    setProjectId(editingInvoice.project_id ?? '')
+    setInvoiceNumber(editingInvoice.invoice_number ?? '')
+    setAmount(String(editingInvoice.amount))
+    setGstPct(String(editingInvoice.gst_pct ?? 0))
+    setTdsPct(String(editingInvoice.tds_pct ?? 0))
+    setDueDays(editingInvoice.due_days != null ? String(editingInvoice.due_days) : '')
+    setStatus(editingInvoice.status)
+    setInvoiceDate(editingInvoice.invoice_date ?? '')
+    setFormError(null)
+  }, [editingInvoice])
+
+  function resetForm() {
+    setClientId('')
+    setProjectId('')
+    setInvoiceNumber('')
+    setAmount('0')
+    setGstPct('0')
+    setTdsPct('0')
+    setDueDays('')
+    setStatus('draft')
+    setInvoiceDate('')
+  }
 
   function handleClientChange(id: string) {
     setClientId(id)
     const proj = projects?.find((p) => p.id === projectId)
     if (id && proj?.client_id !== id) setProjectId('')
+  }
+
+  function handleStatusChange(next: 'draft' | 'sent') {
+    setStatus(next)
+    if (next === 'sent' && !invoiceDate) setInvoiceDate(todayStr())
+  }
+
+  function handleCancel() {
+    resetForm()
+    onDoneEditing()
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -45,7 +91,7 @@ export function InvoiceForm() {
     }
     setSubmitting(true)
     try {
-      await createInvoice.mutateAsync({
+      const patch = {
         client_id: clientId,
         project_id: projectId || null,
         invoice_number: invoiceNumber.trim() || null,
@@ -54,18 +100,17 @@ export function InvoiceForm() {
         tds_pct: Number(tdsPct) || 0,
         due_days: dueDays ? Number(dueDays) : null,
         status,
-        invoice_date: status === 'sent' ? todayStr() : null,
-      })
-      setClientId('')
-      setProjectId('')
-      setInvoiceNumber('')
-      setAmount('0')
-      setGstPct('0')
-      setTdsPct('0')
-      setDueDays('')
-      setStatus('draft')
+        invoice_date: status === 'sent' ? invoiceDate || todayStr() : null,
+      }
+      if (editingInvoice) {
+        await updateInvoice.mutateAsync({ id: editingInvoice.id, patch })
+        onDoneEditing()
+      } else {
+        await createInvoice.mutateAsync(patch)
+      }
+      resetForm()
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Could not add invoice.')
+      setFormError(err instanceof Error ? err.message : 'Could not save invoice.')
     } finally {
       setSubmitting(false)
     }
@@ -110,7 +155,11 @@ export function InvoiceForm() {
           </div>
           <div className="field inv-invoice-date">
             <label>Invoice date</label>
-            <input type="text" value={invoiceDatePreview} disabled />
+            {status === 'sent' ? (
+              <input type="date" required value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} />
+            ) : (
+              <input type="text" value="— (not sent yet)" disabled />
+            )}
           </div>
         </div>
 
@@ -148,16 +197,23 @@ export function InvoiceForm() {
         <div className="field-row inv-row5">
           <div className="field inv-status">
             <label>Status</label>
-            <select value={status} onChange={(e) => setStatus(e.target.value as typeof status)}>
+            <select value={status} onChange={(e) => handleStatusChange(e.target.value as typeof status)}>
               <option value="draft">Draft</option>
               <option value="sent">Sent</option>
             </select>
           </div>
           <div className="field inv-submit">
             <label>&nbsp;</label>
-            <Button type="submit" disabled={submitting}>
-              {submitting ? 'Adding…' : 'Add invoice'}
-            </Button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Button type="submit" disabled={submitting}>
+                {submitting ? 'Saving…' : editingInvoice ? 'Save changes' : 'Add invoice'}
+              </Button>
+              {editingInvoice && (
+                <Button type="button" variant="secondary" onClick={handleCancel}>
+                  Cancel
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </form>

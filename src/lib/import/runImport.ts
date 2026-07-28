@@ -3,11 +3,17 @@ import {
   SHEET_PROJECTS,
   SHEET_INVOICES,
   SHEET_PAYMENTS,
+  SHEET_VENDOR_BILLS,
+  SHEET_VENDOR_BILL_PAYMENTS,
+  SHEET_EXPENSES,
   SHEET_LOANS,
   SHEET_LOAN_PAYMENTS,
   COLUMNS_PROJECTS,
   COLUMNS_INVOICES,
   COLUMNS_PAYMENTS,
+  COLUMNS_VENDOR_BILLS,
+  COLUMNS_VENDOR_BILL_PAYMENTS,
+  COLUMNS_EXPENSES,
   COLUMNS_LOANS,
   COLUMNS_LOAN_PAYMENTS,
 } from './sheets'
@@ -63,11 +69,29 @@ function paymentModeOf(v: unknown): 'UPI' | 'Cash' | 'Bank' | null {
   return s === 'UPI' || s === 'Cash' || s === 'Bank' ? s : null
 }
 
+function vendorBillPaymentModeOf(v: unknown): 'UPI' | 'NEFT' | 'Cash' | null {
+  const s = str(v)
+  return s === 'UPI' || s === 'NEFT' || s === 'Cash' ? s : null
+}
+
+function expenseCategoryOf(v: unknown): 'General' | 'Purchase' | 'Project' {
+  const s = str(v).toLowerCase()
+  if (s === 'general') return 'General'
+  if (s === 'purchase') return 'Purchase'
+  if (s === 'project') return 'Project'
+  throw new Error('Category must be General, Purchase, or Project')
+}
+
+function yesNo(v: unknown): boolean {
+  return str(v).toLowerCase() === 'yes'
+}
+
 /** Parses the uploaded workbook and writes every row it can, sheet by sheet
- * (Projects → Invoices → Payments Received → Loans → Loan Payments), so
- * later sheets can resolve the Clients/Projects/Invoices/Loans earlier
- * sheets just created. One bad row is reported and skipped, not fatal to
- * the rest of the file. */
+ * (Projects → Invoices → Payments Received → Vendor Bills → Vendor Bill
+ * Payments → Expenses → Loans → Loan Payments), so later sheets can resolve
+ * the Clients/Projects/Vendors/Invoices/Bills/Loans earlier sheets just
+ * created. One bad row is reported and skipped, not fatal to the rest of
+ * the file. */
 export async function runImport(file: File): Promise<ImportResultRow[]> {
   // SheetJS has two known CVEs (prototype pollution, ReDoS), both only
   // reachable via XLSX.read/readFile on untrusted input. This *is* that read
@@ -91,6 +115,7 @@ export async function runImport(file: File): Promise<ImportResultRow[]> {
   // need one lookup-or-create each.
   const clientCache = new Map<string, string>()
   const projectCache = new Map<string, string>()
+  const vendorCache = new Map<string, string>()
 
   const { data: existingClients, error: clientsErr } = await supabase.from('clients').select('id, name')
   if (clientsErr) throw clientsErr
@@ -99,6 +124,10 @@ export async function runImport(file: File): Promise<ImportResultRow[]> {
   const { data: existingProjects, error: projectsErr } = await supabase.from('projects').select('id, name, client_id')
   if (projectsErr) throw projectsErr
   existingProjects?.forEach((p) => projectCache.set(`${p.client_id}::${p.name.trim().toLowerCase()}`, p.id))
+
+  const { data: existingVendors, error: vendorsErr } = await supabase.from('vendors').select('id, name')
+  if (vendorsErr) throw vendorsErr
+  existingVendors?.forEach((v) => vendorCache.set(v.name.trim().toLowerCase(), v.id))
 
   async function resolveClientId(name: string): Promise<string> {
     const key = name.trim().toLowerCase()
@@ -121,6 +150,16 @@ export async function runImport(file: File): Promise<ImportResultRow[]> {
       .single()
     if (error) throw error
     projectCache.set(key, data.id)
+    return data.id
+  }
+
+  async function resolveVendorId(name: string): Promise<string> {
+    const key = name.trim().toLowerCase()
+    const cached = vendorCache.get(key)
+    if (cached) return cached
+    const { data, error } = await supabase.from('vendors').insert({ name: name.trim() }).select('id').single()
+    if (error) throw error
+    vendorCache.set(key, data.id)
     return data.id
   }
 
@@ -241,7 +280,126 @@ export async function runImport(file: File): Promise<ImportResultRow[]> {
     }
   }
 
-  // ---- 4. Loans ----
+  // ---- 4. Vendor Bills ----
+  const billRefMap = new Map<string, string>()
+  for (const [i, row] of sheetRows(SHEET_VENDOR_BILLS).entries()) {
+    const rowNum = i + 2
+    if (isBlankRow(row)) continue
+    try {
+      const reference = str(row[COLUMNS_VENDOR_BILLS[0]])
+      const vendorName = str(row[COLUMNS_VENDOR_BILLS[1]])
+      const amount = num(row[COLUMNS_VENDOR_BILLS[6]])
+      if (!vendorName) throw new Error('Vendor Name is required')
+      if (amount === null) throw new Error('Bill Value ex GST is required')
+
+      const vendorId = await resolveVendorId(vendorName)
+      const clientName = str(row[COLUMNS_VENDOR_BILLS[4]])
+      const projectName = str(row[COLUMNS_VENDOR_BILLS[5]])
+      const clientId = clientName ? await resolveClientId(clientName) : null
+      const projectId = clientId && projectName ? await resolveProjectId(clientId, projectName) : null
+
+      const { data, error } = await supabase
+        .from('vendor_bills')
+        .insert({
+          vendor_id: vendorId,
+          date: toDateStr(row[COLUMNS_VENDOR_BILLS[2]]),
+          description: str(row[COLUMNS_VENDOR_BILLS[3]]) || null,
+          client_id: clientId,
+          project_id: projectId,
+          amount,
+          gst_pct: num(row[COLUMNS_VENDOR_BILLS[7]]) ?? 0,
+        })
+        .select('id')
+        .single()
+      if (error) throw error
+
+      if (reference) billRefMap.set(reference.toLowerCase(), data.id)
+      results.push({ sheet: SHEET_VENDOR_BILLS, row: rowNum, status: 'ok', message: `Created bill from ${vendorName}` })
+    } catch (err) {
+      results.push({ sheet: SHEET_VENDOR_BILLS, row: rowNum, status: 'error', message: err instanceof Error ? err.message : String(err) })
+    }
+  }
+
+  // ---- 5. Vendor Bill Payments ----
+  for (const [i, row] of sheetRows(SHEET_VENDOR_BILL_PAYMENTS).entries()) {
+    const rowNum = i + 2
+    if (isBlankRow(row)) continue
+    try {
+      const reference = str(row[COLUMNS_VENDOR_BILL_PAYMENTS[0]])
+      const date = toDateStr(row[COLUMNS_VENDOR_BILL_PAYMENTS[1]])
+      const amount = num(row[COLUMNS_VENDOR_BILL_PAYMENTS[2]])
+      if (!reference) throw new Error('Bill Reference is required')
+      if (!date) throw new Error('Payment Date is required')
+      if (amount === null) throw new Error('Amount is required')
+
+      const billId = billRefMap.get(reference.toLowerCase())
+      if (!billId) throw new Error(`Bill Reference "${reference}" not found on the Vendor Bills sheet in this file`)
+
+      const { error } = await supabase.from('vendor_bill_payments').insert({
+        bill_id: billId,
+        date,
+        amount,
+        payment_mode: vendorBillPaymentModeOf(row[COLUMNS_VENDOR_BILL_PAYMENTS[3]]),
+        reference: str(row[COLUMNS_VENDOR_BILL_PAYMENTS[4]]) || null,
+      })
+      if (error) throw error
+      results.push({ sheet: SHEET_VENDOR_BILL_PAYMENTS, row: rowNum, status: 'ok', message: `Recorded payment against bill "${reference}"` })
+    } catch (err) {
+      results.push({ sheet: SHEET_VENDOR_BILL_PAYMENTS, row: rowNum, status: 'error', message: err instanceof Error ? err.message : String(err) })
+    }
+  }
+
+  // ---- 6. Expenses ----
+  for (const [i, row] of sheetRows(SHEET_EXPENSES).entries()) {
+    const rowNum = i + 2
+    if (isBlankRow(row)) continue
+    try {
+      const category = expenseCategoryOf(row[COLUMNS_EXPENSES[0]])
+      const tags = str(row[COLUMNS_EXPENSES[1]])
+      const amount = num(row[COLUMNS_EXPENSES[6]])
+      const date = toDateStr(row[COLUMNS_EXPENSES[7]])
+      if (!tags) throw new Error('Tags are required')
+      if (amount === null) throw new Error('Amount is required')
+      if (!date) throw new Error('Date is required')
+
+      let vendorId: string | null = null
+      let clientId: string | null = null
+      let projectId: string | null = null
+      let costCenter: string | null = null
+
+      if (category === 'Purchase') {
+        const vendorName = str(row[COLUMNS_EXPENSES[3]])
+        if (!vendorName) throw new Error('Vendor Name is required for Purchase')
+        vendorId = await resolveVendorId(vendorName)
+      } else if (category === 'Project') {
+        const clientName = str(row[COLUMNS_EXPENSES[4]])
+        const projectName = str(row[COLUMNS_EXPENSES[5]])
+        if (!projectName) throw new Error('Project Name is required for Project')
+        clientId = clientName ? await resolveClientId(clientName) : null
+        projectId = clientId ? await resolveProjectId(clientId, projectName) : null
+      } else {
+        costCenter = str(row[COLUMNS_EXPENSES[2]]) || null
+      }
+
+      const { error } = await supabase.from('expenses').insert({
+        type: category,
+        description: tags,
+        cost_center: costCenter,
+        vendor_id: vendorId,
+        project_id: projectId,
+        amount,
+        date,
+        payment_mode: paymentModeOf(row[COLUMNS_EXPENSES[8]]),
+        reimbursable: yesNo(row[COLUMNS_EXPENSES[9]]),
+      })
+      if (error) throw error
+      results.push({ sheet: SHEET_EXPENSES, row: rowNum, status: 'ok', message: `Created ${category} expense` })
+    } catch (err) {
+      results.push({ sheet: SHEET_EXPENSES, row: rowNum, status: 'error', message: err instanceof Error ? err.message : String(err) })
+    }
+  }
+
+  // ---- 7. Loans ----
   const loanRefMap = new Map<string, string>()
   for (const [i, row] of sheetRows(SHEET_LOANS).entries()) {
     const rowNum = i + 2
@@ -277,7 +435,7 @@ export async function runImport(file: File): Promise<ImportResultRow[]> {
     }
   }
 
-  // ---- 5. Loan Payments ----
+  // ---- 8. Loan Payments ----
   for (const [i, row] of sheetRows(SHEET_LOAN_PAYMENTS).entries()) {
     const rowNum = i + 2
     if (isBlankRow(row)) continue

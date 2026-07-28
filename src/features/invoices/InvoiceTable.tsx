@@ -7,8 +7,11 @@ import { gstAmt, tdsAmt, netPayable, totalPaid, dueAmount, effectiveDueDate, eff
 import type { DateRange } from '../../lib/calc/period'
 import { InvoicePaymentForm } from './InvoicePaymentForm'
 import { clientLabel } from '../../lib/labels'
+import type { Database } from '../../types/database'
 
-export function InvoiceTable() {
+type Invoice = Database['public']['Tables']['invoices']['Row']
+
+export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void }) {
   const [range, setRange] = useState<DateRange | null>(null)
   const { data: invoices, isLoading } = useInvoices(range)
   const { data: payments } = useInvoicePayments()
@@ -112,6 +115,9 @@ export function InvoiceTable() {
                           Record payment
                         </button>
                       )}
+                      <button type="button" className="pay-btn" onClick={() => onEdit(inv)}>
+                        Edit
+                      </button>
                       <button type="button" className="btn danger-link" onClick={() => deleteInvoice.mutate(inv.id)}>
                         Remove
                       </button>

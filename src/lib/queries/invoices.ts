@@ -4,6 +4,7 @@ import type { DateRange } from '../calc/period'
 import type { Database } from '../../types/database'
 
 type InvoiceInsert = Database['public']['Tables']['invoices']['Insert']
+type InvoiceUpdate = Database['public']['Tables']['invoices']['Update']
 type InvoicePaymentInsert = Database['public']['Tables']['invoice_payments']['Insert']
 
 export function useInvoices(range: DateRange | null) {
@@ -27,6 +28,20 @@ export function useCreateInvoice() {
       const { data, error } = await supabase.from('invoices').insert(invoice).select().single()
       if (error) throw error
       return data
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['invoices'] })
+      qc.invalidateQueries({ queryKey: ['dashboard-kpis'] })
+    },
+  })
+}
+
+export function useUpdateInvoice() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, patch }: { id: string; patch: InvoiceUpdate }) => {
+      const { error } = await supabase.from('invoices').update(patch).eq('id', id)
+      if (error) throw error
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['invoices'] })

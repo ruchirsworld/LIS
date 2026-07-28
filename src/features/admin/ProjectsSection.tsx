@@ -3,7 +3,7 @@ import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
 import { SearchableSelect } from '../../components/SearchableSelect'
 import { useClients, useProjects, useCostCenters } from '../../lib/queries/masters'
-import { useCreateProject, useDeleteProject } from '../../lib/queries/admin'
+import { useCreateProject, useUpdateProject, useDeleteProject } from '../../lib/queries/admin'
 import { fmt, parseINR } from '../../lib/calc/format'
 import { clientLabel } from '../../lib/labels'
 
@@ -16,8 +16,10 @@ export function ProjectsSection() {
   const { data: projects, isLoading } = useProjects()
   const { data: costCenters } = useCostCenters()
   const createProject = useCreateProject()
+  const updateProject = useUpdateProject()
   const deleteProject = useDeleteProject()
 
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [clientId, setClientId] = useState('')
   const [status, setStatus] = useState<'active' | 'completed'>('active')
@@ -38,9 +40,37 @@ export function ProjectsSection() {
 
   useEffect(() => {
     if (!costCenter && costCenters && costCenters.length > 0) {
-      setCostCenter(costCenters[0].name)
+      const projectsCostCenter = costCenters.find((cc) => cc.name.trim().toLowerCase() === 'projects')
+      setCostCenter((projectsCostCenter ?? costCenters[0]).name)
     }
   }, [costCenters, costCenter])
+
+  function resetForm() {
+    setEditingId(null)
+    setName('')
+    setClientId('')
+    setStatus('active')
+    setCostCenter(costCenters?.[0]?.name ?? '')
+    setBudget('0')
+    setValueExGst('0')
+    setSameAsClient(true)
+    setProjectLocation('')
+    setStartDate(todayStr())
+  }
+
+  function startEdit(p: NonNullable<typeof projects>[number]) {
+    setEditingId(p.id)
+    setName(p.name)
+    setClientId(p.client_id)
+    setStatus(p.status as 'active' | 'completed')
+    setCostCenter(p.cost_center ?? '')
+    setBudget(p.budget != null ? String(p.budget) : '0')
+    setValueExGst(p.value_ex_gst != null ? String(p.value_ex_gst) : '0')
+    setSameAsClient(p.same_as_client_address)
+    setProjectLocation(p.project_location ?? '')
+    setStartDate(p.start_date ?? todayStr())
+    setFormError(null)
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -55,7 +85,7 @@ export function ProjectsSection() {
     }
     setSubmitting(true)
     try {
-      await createProject.mutateAsync({
+      const patch = {
         name: name.trim(),
         client_id: clientId,
         status,
@@ -65,18 +95,15 @@ export function ProjectsSection() {
         project_location: projectLocation.trim() || null,
         same_as_client_address: sameAsClient,
         start_date: startDate || null,
-      })
-      setName('')
-      setClientId('')
-      setStatus('active')
-      setCostCenter(costCenters?.[0]?.name ?? '')
-      setBudget('0')
-      setValueExGst('0')
-      setSameAsClient(true)
-      setProjectLocation('')
-      setStartDate(todayStr())
+      }
+      if (editingId) {
+        await updateProject.mutateAsync({ id: editingId, patch })
+      } else {
+        await createProject.mutateAsync(patch)
+      }
+      resetForm()
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Could not add project.')
+      setFormError(err instanceof Error ? err.message : 'Could not save project.')
     } finally {
       setSubmitting(false)
     }
@@ -155,10 +182,15 @@ export function ProjectsSection() {
           />
         </div>
 
-        <div className="field full">
+        <div className="field full" style={{ display: 'flex', gap: 8 }}>
           <Button type="submit" disabled={submitting}>
-            {submitting ? 'Adding…' : 'Add project'}
+            {submitting ? 'Saving…' : editingId ? 'Save changes' : 'Add project'}
           </Button>
+          {editingId && (
+            <Button type="button" variant="secondary" onClick={resetForm}>
+              Cancel
+            </Button>
+          )}
         </div>
       </form>
 
@@ -215,6 +247,9 @@ export function ProjectsSection() {
                   <td>{p.end_date ?? '—'}</td>
                   <td>{p.status}</td>
                   <td>
+                    <button type="button" className="pay-btn" onClick={() => startEdit(p)}>
+                      Edit
+                    </button>
                     <button type="button" className="btn danger-link" onClick={() => deleteProject.mutate(p.id)}>
                       Remove
                     </button>
