@@ -1,6 +1,8 @@
 import { useVendors } from '../../lib/queries/masters'
 import { useDeleteVendor } from '../../lib/queries/admin'
 import { useAuth } from '../../lib/auth'
+import { SortableTh } from '../../components/SortableTh'
+import { useSort } from '../../lib/useSort'
 import type { Database } from '../../types/database'
 
 type Vendor = Database['public']['Tables']['vendors']['Row']
@@ -11,18 +13,28 @@ export function VendorTable({ onEdit }: { onEdit: (vendor: Vendor) => void }) {
   const { data: vendors, isLoading } = useVendors()
   const deleteVendor = useDeleteVendor()
 
+  const { sorted: sortedVendors, sortKey, direction, toggleSort } = useSort(vendors, {
+    id: (v) => v.display_id,
+    name: (v) => v.name,
+    category: (v) => v.category,
+    contact: (v) => v.contact_person,
+    phone: (v) => v.phone,
+    gstpan: (v) => v.gstpan,
+    address: (v) => v.address,
+  })
+
   return (
     <div className="table-scroll">
       <table className="data">
         <thead>
           <tr>
-            <th>ID</th>
-            <th>Vendor</th>
-            <th>Category</th>
-            <th>Contact person</th>
-            <th>Phone</th>
-            <th>GST/PAN</th>
-            <th>Address</th>
+            <SortableTh label="ID" sortKey="id" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+            <SortableTh label="Vendor" sortKey="name" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+            <SortableTh label="Category" sortKey="category" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+            <SortableTh label="Contact person" sortKey="contact" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+            <SortableTh label="Phone" sortKey="phone" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+            <SortableTh label="GST/PAN" sortKey="gstpan" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+            <SortableTh label="Address" sortKey="address" activeKey={sortKey} direction={direction} onSort={toggleSort} />
             <th></th>
           </tr>
         </thead>
@@ -34,14 +46,14 @@ export function VendorTable({ onEdit }: { onEdit: (vendor: Vendor) => void }) {
               </td>
             </tr>
           )}
-          {!isLoading && (!vendors || vendors.length === 0) && (
+          {!isLoading && (!sortedVendors || sortedVendors.length === 0) && (
             <tr>
               <td colSpan={8} className="empty-row">
                 No vendors yet
               </td>
             </tr>
           )}
-          {vendors?.map((v) => (
+          {sortedVendors?.map((v) => (
             <tr key={v.id}>
               <td>{v.display_id ?? '—'}</td>
               <td>{v.name}</td>

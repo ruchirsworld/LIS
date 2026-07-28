@@ -1,10 +1,23 @@
 import { useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui'
+import { SortableTh } from '../../components/SortableTh'
+import { useSort } from '../../lib/useSort'
 import { useClients } from '../../lib/queries/masters'
 import { useCreateClient, useUpdateClient, useDeleteClient } from '../../lib/queries/admin'
 
 export function ClientsSection() {
   const { data: clients, isLoading } = useClients()
+  const { sorted: sortedClients, sortKey, direction, toggleSort } = useSort(clients, {
+    id: (c) => c.display_id,
+    name: (c) => c.name,
+    code: (c) => c.client_code,
+    address: (c) => c.address_line1,
+    city: (c) => c.city,
+    state: (c) => c.state,
+    pincode: (c) => c.pincode,
+    gst: (c) => c.gst,
+    email: (c) => c.email,
+  })
   const createClient = useCreateClient()
   const updateClient = useUpdateClient()
   const deleteClient = useDeleteClient()
@@ -147,15 +160,15 @@ export function ClientsSection() {
         <table className="data">
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Client</th>
-              <th>Client code</th>
-              <th>Address</th>
-              <th>City</th>
-              <th>State</th>
-              <th>Pin code</th>
-              <th>GST</th>
-              <th>Email</th>
+              <SortableTh label="ID" sortKey="id" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Client" sortKey="name" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Client code" sortKey="code" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Address" sortKey="address" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="City" sortKey="city" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="State" sortKey="state" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Pin code" sortKey="pincode" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="GST" sortKey="gst" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Email" sortKey="email" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <th></th>
             </tr>
           </thead>
@@ -174,7 +187,7 @@ export function ClientsSection() {
                 </td>
               </tr>
             )}
-            {clients?.map((c) => (
+            {sortedClients?.map((c) => (
               <tr key={c.id}>
                 <td>{c.display_id ?? '—'}</td>
                 <td>{c.name}</td>

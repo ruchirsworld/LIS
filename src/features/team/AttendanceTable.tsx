@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { PeriodFilter } from '../../components/PeriodFilter'
+import { SortableTh } from '../../components/SortableTh'
+import { useSort } from '../../lib/useSort'
 import { useAttendance, useDeleteAttendance } from '../../lib/queries/team'
 import { useEmployees } from '../../lib/queries/masters'
 import { useAuth } from '../../lib/auth'
@@ -21,6 +23,21 @@ export function AttendanceTable() {
   const { data: employees } = useEmployees()
   const deleteAttendance = useDeleteAttendance()
 
+  const employeeNameOf = (a: NonNullable<typeof attendance>[number]) =>
+    employees?.find((e) => e.id === a.employee_id)?.name ?? ''
+
+  const { sorted: sortedAttendance, sortKey, direction, toggleSort } = useSort(
+    attendance,
+    {
+      id: (a) => a.display_id,
+      employee: (a) => employeeNameOf(a),
+      date: (a) => a.date,
+      status: (a) => a.status,
+      notes: (a) => a.notes,
+    },
+    'date'
+  )
+
   return (
     <details className="toggle-section" open>
       <summary>Attendance records</summary>
@@ -33,11 +50,11 @@ export function AttendanceTable() {
         <table className="data">
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Employee</th>
-              <th>Date</th>
-              <th>Status</th>
-              <th>Notes</th>
+              <SortableTh label="ID" sortKey="id" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Employee" sortKey="employee" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Date" sortKey="date" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Status" sortKey="status" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Notes" sortKey="notes" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <th></th>
             </tr>
           </thead>
@@ -56,12 +73,12 @@ export function AttendanceTable() {
                 </td>
               </tr>
             )}
-            {attendance?.map((a) => {
-              const emp = employees?.find((e) => e.id === a.employee_id)
+            {sortedAttendance?.map((a) => {
+              const empName = employeeNameOf(a)
               return (
                 <tr key={a.id}>
                   <td>{a.display_id ?? '—'}</td>
-                  <td>{emp ? emp.name : '—'}</td>
+                  <td>{empName || '—'}</td>
                   <td>{a.date}</td>
                   <td>{STATUS_LABEL[a.status] ?? a.status}</td>
                   <td>{a.notes ?? '—'}</td>

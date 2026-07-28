@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui'
 import { SearchableSelect } from '../../components/SearchableSelect'
+import { SortableTh } from '../../components/SortableTh'
+import { useSort } from '../../lib/useSort'
 import { useProfiles, useCreateUser, useUpdateProfile, useDeleteUser, type Profile } from '../../lib/queries/admin'
 import { useEmployees } from '../../lib/queries/masters'
 import { useAuth } from '../../lib/auth'
@@ -14,6 +16,12 @@ export function UsersSection() {
   const createUser = useCreateUser()
   const updateProfile = useUpdateProfile()
   const deleteUser = useDeleteUser()
+
+  const { sorted: sortedProfiles, sortKey, direction, toggleSort } = useSort(profiles, {
+    name: (p) => p.name,
+    phone: (p) => p.phone,
+    role: (p) => p.role,
+  })
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [name, setName] = useState('')
@@ -168,9 +176,9 @@ export function UsersSection() {
         <table className="data">
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Phone</th>
-              <th>Role</th>
+              <SortableTh label="Name" sortKey="name" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Phone" sortKey="phone" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Role" sortKey="role" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <th></th>
             </tr>
           </thead>
@@ -182,14 +190,14 @@ export function UsersSection() {
                 </td>
               </tr>
             )}
-            {!isLoading && (!profiles || profiles.length === 0) && (
+            {!isLoading && (!sortedProfiles || sortedProfiles.length === 0) && (
               <tr>
                 <td colSpan={4} className="empty-row">
                   No users yet
                 </td>
               </tr>
             )}
-            {profiles?.map((p) => (
+            {sortedProfiles?.map((p) => (
               <tr key={p.id}>
                 <td>{p.name}</td>
                 <td>{p.phone ?? '—'}</td>

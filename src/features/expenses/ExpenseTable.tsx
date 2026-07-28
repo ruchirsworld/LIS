@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { PeriodFilter } from '../../components/PeriodFilter'
+import { SortableTh } from '../../components/SortableTh'
+import { useSort } from '../../lib/useSort'
 import { useExpenses, useDeleteExpense } from '../../lib/queries/expenses'
 import { useProjects, useClients, useVendors } from '../../lib/queries/masters'
 import { fmt } from '../../lib/calc/format'
@@ -15,6 +17,27 @@ export function ExpenseTable() {
   const { data: vendors } = useVendors()
   const deleteExpense = useDeleteExpense()
 
+  const projLabelOf = (e: NonNullable<typeof expenses>[number]) => {
+    const project = projects?.find((p) => p.id === e.project_id)
+    const client = project ? clients?.find((c) => c.id === project.client_id) : null
+    return project ? `${project.name} — ${clientLabel(client)}` : ''
+  }
+  const vendorNameOf = (e: NonNullable<typeof expenses>[number]) => {
+    const vendor = e.vendor_id ? vendors?.find((v) => v.id === e.vendor_id) : null
+    return vendor?.name ?? ''
+  }
+
+  const { sorted: sortedExpenses, sortKey, direction, toggleSort } = useSort(expenses, {
+    id: (e) => e.display_id,
+    description: (e) => e.description,
+    type: (e) => e.type,
+    project: (e) => projLabelOf(e),
+    costCenter: (e) => e.cost_center,
+    amount: (e) => e.amount,
+    vendor: (e) => vendorNameOf(e),
+    reimbursable: (e) => (e.reimbursable ? 1 : 0),
+  })
+
   return (
     <details className="toggle-section" open>
       <summary>Expense records</summary>
@@ -27,15 +50,15 @@ export function ExpenseTable() {
         <table className="data">
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Description</th>
-              <th>Type</th>
-              <th>Project / client</th>
-              <th>Cost center</th>
+              <SortableTh label="ID" sortKey="id" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Description" sortKey="description" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Type" sortKey="type" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Project / client" sortKey="project" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Cost center" sortKey="costCenter" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <th>Location</th>
-              <th style={{ textAlign: 'right' }}>Amount</th>
-              <th>Vendor</th>
-              <th>Reimb.</th>
+              <SortableTh label="Amount" sortKey="amount" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+              <SortableTh label="Vendor" sortKey="vendor" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Reimb." sortKey="reimbursable" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <th>Receipt</th>
               <th></th>
             </tr>
@@ -55,18 +78,16 @@ export function ExpenseTable() {
                 </td>
               </tr>
             )}
-            {expenses?.map((e) => {
-              const project = projects?.find((p) => p.id === e.project_id)
-              const client = project ? clients?.find((c) => c.id === project.client_id) : null
-              const projLabel = project ? `${project.name} — ${clientLabel(client)}` : '—'
-              const vendor = e.vendor_id ? vendors?.find((v) => v.id === e.vendor_id) : null
+            {sortedExpenses?.map((e) => {
+              const projLabel = projLabelOf(e)
+              const vendorName = vendorNameOf(e)
 
               return (
                 <tr key={e.id}>
                   <td>{e.display_id ?? '—'}</td>
                   <td>{e.description}</td>
                   <td>{e.type}</td>
-                  <td>{projLabel}</td>
+                  <td>{projLabel || '—'}</td>
                   <td>{e.cost_center ?? '—'}</td>
                   <td>
                     {e.geo_lat != null && e.geo_lng != null ? (
@@ -82,7 +103,7 @@ export function ExpenseTable() {
                     )}
                   </td>
                   <td className="amt">{fmt(e.amount)}</td>
-                  <td>{vendor ? vendor.name : '—'}</td>
+                  <td>{vendorName || '—'}</td>
                   <td>{e.reimbursable ? 'Yes' : 'No'}</td>
                   <td>{e.receipt_path ? <ReceiptLink path={e.receipt_path} /> : '—'}</td>
                   <td>

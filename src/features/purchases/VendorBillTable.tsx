@@ -1,5 +1,7 @@
 import { Fragment, useState } from 'react'
 import { PeriodFilter } from '../../components/PeriodFilter'
+import { SortableTh } from '../../components/SortableTh'
+import { useSort } from '../../lib/useSort'
 import { useVendorBills, useVendorBillPayments, useDeleteVendorBill } from '../../lib/queries/purchases'
 import { useVendors, useProjects, useClients } from '../../lib/queries/masters'
 import { fmt } from '../../lib/calc/format'
@@ -24,6 +26,36 @@ export function VendorBillTable() {
   const visibleBills = categoryFilter
     ? bills?.filter((b) => vendors?.find((v) => v.id === b.vendor_id)?.category === categoryFilter)
     : bills
+
+  const vendorNameOf = (b: NonNullable<typeof bills>[number]) => vendors?.find((v) => v.id === b.vendor_id)?.name ?? ''
+  const clientNameOf = (b: NonNullable<typeof bills>[number]) => {
+    const client = b.client_id ? clients?.find((c) => c.id === b.client_id) : null
+    return clientLabel(client)
+  }
+  const projectNameOf = (b: NonNullable<typeof bills>[number]) => {
+    const project = b.project_id ? projects?.find((p) => p.id === b.project_id) : null
+    return project?.name ?? ''
+  }
+  const paidOf = (b: NonNullable<typeof bills>[number]) => billPaid(payments?.filter((p) => p.bill_id === b.id) ?? [])
+  const dueOf = (b: NonNullable<typeof bills>[number]) => billDue(b, payments?.filter((p) => p.bill_id === b.id) ?? [])
+
+  const { sorted: sortedBills, sortKey, direction, toggleSort } = useSort(
+    visibleBills,
+    {
+      id: (b) => b.display_id,
+      vendor: (b) => vendorNameOf(b),
+      description: (b) => b.description,
+      client: (b) => clientNameOf(b),
+      project: (b) => projectNameOf(b),
+      date: (b) => b.date,
+      amount: (b) => b.amount,
+      gst: (b) => billGstAmt(b),
+      total: (b) => billTotal(b),
+      paid: (b) => paidOf(b),
+      due: (b) => dueOf(b),
+    },
+    'date'
+  )
 
   return (
     <details className="toggle-section" open>
@@ -55,17 +87,17 @@ export function VendorBillTable() {
         <table className="data">
           <thead>
             <tr>
-              <th>Ref ID</th>
-              <th>Vendor</th>
-              <th>Description</th>
-              <th>Client</th>
-              <th>Project</th>
-              <th>Date</th>
-              <th style={{ textAlign: 'right' }}>Amount</th>
-              <th style={{ textAlign: 'right' }}>GST</th>
-              <th style={{ textAlign: 'right' }}>Total</th>
-              <th style={{ textAlign: 'right' }}>Paid</th>
-              <th style={{ textAlign: 'right' }}>Due</th>
+              <SortableTh label="Ref ID" sortKey="id" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Vendor" sortKey="vendor" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Description" sortKey="description" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Client" sortKey="client" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Project" sortKey="project" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Date" sortKey="date" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Amount" sortKey="amount" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+              <SortableTh label="GST" sortKey="gst" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+              <SortableTh label="Total" sortKey="total" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+              <SortableTh label="Paid" sortKey="paid" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+              <SortableTh label="Due" sortKey="due" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
               <th>Receipt</th>
               <th></th>
             </tr>
@@ -78,14 +110,14 @@ export function VendorBillTable() {
                 </td>
               </tr>
             )}
-            {!isLoading && (!visibleBills || visibleBills.length === 0) && (
+            {!isLoading && (!sortedBills || sortedBills.length === 0) && (
               <tr>
                 <td colSpan={13} className="empty-row">
                   No vendor bills in this period
                 </td>
               </tr>
             )}
-            {visibleBills?.map((b) => {
+            {sortedBills?.map((b) => {
               const vendor = vendors?.find((v) => v.id === b.vendor_id)
               const client = b.client_id ? clients?.find((c) => c.id === b.client_id) : null
               const project = b.project_id ? projects?.find((p) => p.id === b.project_id) : null

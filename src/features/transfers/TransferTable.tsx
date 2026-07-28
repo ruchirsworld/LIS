@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { PeriodFilter } from '../../components/PeriodFilter'
+import { SortableTh } from '../../components/SortableTh'
+import { useSort } from '../../lib/useSort'
 import { useTransfers, useDeleteTransfer } from '../../lib/queries/transfers'
 import { useBankAccounts } from '../../lib/queries/masters'
 import { fmt } from '../../lib/calc/format'
@@ -16,6 +18,19 @@ export function TransferTable() {
     return accounts?.find((a) => a.id === id)?.name ?? '—'
   }
 
+  const { sorted: sortedTransfers, sortKey, direction, toggleSort } = useSort(
+    transfers,
+    {
+      id: (t) => t.display_id,
+      from: (t) => accountName(t.from_account_id),
+      to: (t) => accountName(t.to_account_id),
+      date: (t) => t.date,
+      amount: (t) => t.amount,
+      notes: (t) => t.notes,
+    },
+    'date'
+  )
+
   return (
     <details className="toggle-section" open>
       <summary>Transfer records</summary>
@@ -28,12 +43,12 @@ export function TransferTable() {
         <table className="data">
           <thead>
             <tr>
-              <th>ID</th>
-              <th>From</th>
-              <th>To</th>
-              <th>Date</th>
-              <th style={{ textAlign: 'right' }}>Amount</th>
-              <th>Notes</th>
+              <SortableTh label="ID" sortKey="id" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="From" sortKey="from" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="To" sortKey="to" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Date" sortKey="date" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Amount" sortKey="amount" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+              <SortableTh label="Notes" sortKey="notes" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <th></th>
             </tr>
           </thead>
@@ -45,14 +60,14 @@ export function TransferTable() {
                 </td>
               </tr>
             )}
-            {!isLoading && (!transfers || transfers.length === 0) && (
+            {!isLoading && (!sortedTransfers || sortedTransfers.length === 0) && (
               <tr>
                 <td colSpan={7} className="empty-row">
                   No transfers in this period
                 </td>
               </tr>
             )}
-            {transfers?.map((t) => (
+            {sortedTransfers?.map((t) => (
               <tr key={t.id}>
                 <td>{t.display_id ?? '—'}</td>
                 <td>{accountName(t.from_account_id)}</td>

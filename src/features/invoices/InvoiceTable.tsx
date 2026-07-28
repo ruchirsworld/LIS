@@ -1,5 +1,7 @@
 import { Fragment, useState } from 'react'
 import { PeriodFilter } from '../../components/PeriodFilter'
+import { SortableTh } from '../../components/SortableTh'
+import { useSort } from '../../lib/useSort'
 import { useInvoices, useInvoicePayments, useDeleteInvoice, useCycleInvoiceStatus } from '../../lib/queries/invoices'
 import { useClients, useProjects } from '../../lib/queries/masters'
 import { fmt } from '../../lib/calc/format'
@@ -21,6 +23,31 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
   const cycleStatus = useCycleInvoiceStatus()
   const [payFormId, setPayFormId] = useState<string | null>(null)
 
+  const clientNameOf = (inv: Invoice) => clientLabel(clients?.find((c) => c.id === inv.client_id))
+  const projectNameOf = (inv: Invoice) => (inv.project_id ? projects?.find((p) => p.id === inv.project_id)?.name : '') ?? ''
+  const paidOf = (inv: Invoice) => totalPaid(payments?.filter((p) => p.invoice_id === inv.id) ?? [])
+  const dueOf = (inv: Invoice) => dueAmount(inv, payments?.filter((p) => p.invoice_id === inv.id) ?? [])
+
+  const { sorted: sortedInvoices, sortKey, direction, toggleSort } = useSort(
+    invoices,
+    {
+      id: (inv) => inv.display_id,
+      invoiceNo: (inv) => inv.invoice_number,
+      client: (inv) => clientNameOf(inv),
+      project: (inv) => projectNameOf(inv),
+      invoiceDate: (inv) => inv.invoice_date,
+      dueDate: (inv) => effectiveDueDate(inv),
+      amount: (inv) => inv.amount,
+      gst: (inv) => gstAmt(inv),
+      tds: (inv) => tdsAmt(inv),
+      netPayable: (inv) => netPayable(inv),
+      paid: (inv) => paidOf(inv),
+      due: (inv) => dueOf(inv),
+      status: (inv) => effectiveStatus(inv, payments?.filter((p) => p.invoice_id === inv.id) ?? []),
+    },
+    'invoiceDate'
+  )
+
   return (
     <details className="toggle-section" open>
       <summary>Invoice records</summary>
@@ -33,19 +60,19 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
         <table className="data">
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Invoice no.</th>
-              <th>Client</th>
-              <th>Project</th>
-              <th>Invoice date</th>
-              <th>Due date</th>
-              <th style={{ textAlign: 'right' }}>Amount</th>
-              <th style={{ textAlign: 'right' }}>GST</th>
-              <th style={{ textAlign: 'right' }}>TDS</th>
-              <th style={{ textAlign: 'right' }}>Net payable</th>
-              <th style={{ textAlign: 'right' }}>Paid</th>
-              <th style={{ textAlign: 'right' }}>Due</th>
-              <th>Status</th>
+              <SortableTh label="ID" sortKey="id" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Invoice no." sortKey="invoiceNo" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Client" sortKey="client" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Project" sortKey="project" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Invoice date" sortKey="invoiceDate" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Due date" sortKey="dueDate" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Amount" sortKey="amount" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+              <SortableTh label="GST" sortKey="gst" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+              <SortableTh label="TDS" sortKey="tds" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+              <SortableTh label="Net payable" sortKey="netPayable" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+              <SortableTh label="Paid" sortKey="paid" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+              <SortableTh label="Due" sortKey="due" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+              <SortableTh label="Status" sortKey="status" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <th></th>
             </tr>
           </thead>
@@ -57,14 +84,14 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
                 </td>
               </tr>
             )}
-            {!isLoading && (!invoices || invoices.length === 0) && (
+            {!isLoading && (!sortedInvoices || sortedInvoices.length === 0) && (
               <tr>
                 <td colSpan={14} className="empty-row">
                   No invoices in this period
                 </td>
               </tr>
             )}
-            {invoices?.map((inv) => {
+            {sortedInvoices?.map((inv) => {
               const client = clients?.find((c) => c.id === inv.client_id)
               const project = inv.project_id ? projects?.find((p) => p.id === inv.project_id) : null
               const invPayments = payments?.filter((p) => p.invoice_id === inv.id) ?? []

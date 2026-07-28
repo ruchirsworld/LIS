@@ -2,6 +2,8 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
 import { SearchableSelect } from '../../components/SearchableSelect'
+import { SortableTh } from '../../components/SortableTh'
+import { useSort } from '../../lib/useSort'
 import { useClients, useProjects, useCostCenters } from '../../lib/queries/masters'
 import { useCreateProject, useUpdateProject, useDeleteProject } from '../../lib/queries/admin'
 import { fmt, parseINR } from '../../lib/calc/format'
@@ -31,6 +33,22 @@ export function ProjectsSection() {
   const [projectLocation, setProjectLocation] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  const clientNameOf = (p: NonNullable<typeof projects>[number]) => clientLabel(clients?.find((c) => c.id === p.client_id))
+
+  const { sorted: sortedProjects, sortKey, direction, toggleSort } = useSort(projects, {
+    id: (p) => p.display_id,
+    name: (p) => p.name,
+    client: (p) => clientNameOf(p),
+    location: (p) => p.project_location,
+    costCenter: (p) => p.cost_center,
+    budget: (p) => p.budget,
+    value: (p) => p.value_ex_gst,
+    startDate: (p) => p.start_date,
+    endDate: (p) => p.end_date,
+    status: (p) => p.status,
+  })
 
   useEffect(() => {
     if (!sameAsClient) return
@@ -70,6 +88,20 @@ export function ProjectsSection() {
     setProjectLocation(p.project_location ?? '')
     setStartDate(p.start_date ?? todayStr())
     setFormError(null)
+  }
+
+  async function handleDelete(id: string) {
+    setDeleteError(null)
+    try {
+      await deleteProject.mutateAsync(id)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      setDeleteError(
+        message.includes('foreign key constraint') || message.includes('violates')
+          ? 'Cannot remove this project — it still has expenses, invoices, vendor bills, or team tracker entries linked to it. Remove those first, or mark the project as Completed instead of deleting it.'
+          : message
+      )
+    }
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -200,20 +232,26 @@ export function ProjectsSection() {
         </div>
       )}
 
+      {deleteError && (
+        <div className="note" style={{ color: 'var(--red)' }}>
+          {deleteError}
+        </div>
+      )}
+
       <div className="table-scroll">
         <table className="data">
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Project</th>
-              <th>Client</th>
-              <th>Project location</th>
-              <th>Cost center</th>
-              <th style={{ textAlign: 'right' }}>Budget</th>
-              <th style={{ textAlign: 'right' }}>Total value</th>
-              <th>Start date</th>
-              <th>End date</th>
-              <th>Status</th>
+              <SortableTh label="ID" sortKey="id" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Project" sortKey="name" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Client" sortKey="client" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Project location" sortKey="location" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Cost center" sortKey="costCenter" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Budget" sortKey="budget" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+              <SortableTh label="Total value" sortKey="value" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+              <SortableTh label="Start date" sortKey="startDate" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="End date" sortKey="endDate" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Status" sortKey="status" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <th></th>
             </tr>
           </thead>
@@ -225,14 +263,14 @@ export function ProjectsSection() {
                 </td>
               </tr>
             )}
-            {!isLoading && (!projects || projects.length === 0) && (
+            {!isLoading && (!sortedProjects || sortedProjects.length === 0) && (
               <tr>
                 <td colSpan={11} className="empty-row">
                   No projects yet — add your first one above
                 </td>
               </tr>
             )}
-            {projects?.map((p) => {
+            {sortedProjects?.map((p) => {
               const client = clients?.find((c) => c.id === p.client_id)
               return (
                 <tr key={p.id}>
@@ -250,7 +288,7 @@ export function ProjectsSection() {
                     <button type="button" className="pay-btn" onClick={() => startEdit(p)}>
                       Edit
                     </button>
-                    <button type="button" className="btn danger-link" onClick={() => deleteProject.mutate(p.id)}>
+                    <button type="button" className="btn danger-link" onClick={() => handleDelete(p.id)}>
                       Remove
                     </button>
                   </td>

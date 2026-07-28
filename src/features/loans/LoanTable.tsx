@@ -1,5 +1,7 @@
 import { Fragment, useState } from 'react'
 import { PeriodFilter } from '../../components/PeriodFilter'
+import { SortableTh } from '../../components/SortableTh'
+import { useSort } from '../../lib/useSort'
 import { useLoans, useLoanPayments, useDeleteLoan } from '../../lib/queries/loans'
 import { fmt } from '../../lib/calc/format'
 import { loanPrincipalPaid, loanInterestPaid, loanOutstanding, monthlyInterestDue } from '../../lib/calc/loans'
@@ -15,6 +17,26 @@ export function LoanTable() {
   const deleteLoan = useDeleteLoan()
   const [payFormId, setPayFormId] = useState<string | null>(null)
 
+  const paymentsOf = (l: NonNullable<typeof loans>[number]) => payments?.filter((p) => p.loan_id === l.id) ?? []
+
+  const { sorted: sortedLoans, sortKey, direction, toggleSort } = useSort(
+    loans,
+    {
+      id: (l) => l.display_id,
+      type: (l) => LOAN_TYPE_LABEL[l.loan_type] ?? l.loan_type,
+      lender: (l) => l.lender,
+      dateTaken: (l) => l.date_taken,
+      interestPaymentDate: (l) => l.interest_payment_date,
+      principal: (l) => l.principal,
+      roi: (l) => l.roi_pct,
+      principalPaid: (l) => loanPrincipalPaid(paymentsOf(l)),
+      interestPaid: (l) => loanInterestPaid(paymentsOf(l)),
+      outstanding: (l) => loanOutstanding(l, paymentsOf(l)),
+      monthlyInterest: (l) => monthlyInterestDue(l, paymentsOf(l)),
+    },
+    'dateTaken'
+  )
+
   return (
     <details className="toggle-section" open>
       <summary>Loan records</summary>
@@ -27,17 +49,17 @@ export function LoanTable() {
         <table className="data">
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Type</th>
-              <th>Lender</th>
-              <th>Date taken</th>
-              <th>Interest payment date</th>
-              <th style={{ textAlign: 'right' }}>Principal</th>
-              <th style={{ textAlign: 'right' }}>ROI</th>
-              <th style={{ textAlign: 'right' }}>Principal repaid</th>
-              <th style={{ textAlign: 'right' }}>Interest paid</th>
-              <th style={{ textAlign: 'right' }}>Outstanding</th>
-              <th style={{ textAlign: 'right' }}>Monthly interest</th>
+              <SortableTh label="ID" sortKey="id" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Type" sortKey="type" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Lender" sortKey="lender" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Date taken" sortKey="dateTaken" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Interest payment date" sortKey="interestPaymentDate" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Principal" sortKey="principal" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+              <SortableTh label="ROI" sortKey="roi" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+              <SortableTh label="Principal repaid" sortKey="principalPaid" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+              <SortableTh label="Interest paid" sortKey="interestPaid" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+              <SortableTh label="Outstanding" sortKey="outstanding" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+              <SortableTh label="Monthly interest" sortKey="monthlyInterest" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
               <th></th>
             </tr>
           </thead>
@@ -49,14 +71,14 @@ export function LoanTable() {
                 </td>
               </tr>
             )}
-            {!isLoading && (!loans || loans.length === 0) && (
+            {!isLoading && (!sortedLoans || sortedLoans.length === 0) && (
               <tr>
                 <td colSpan={12} className="empty-row">
                   No loans in this period
                 </td>
               </tr>
             )}
-            {loans?.map((l) => {
+            {sortedLoans?.map((l) => {
               const loanPayments = payments?.filter((p) => p.loan_id === l.id) ?? []
               const principalPaid = loanPrincipalPaid(loanPayments)
               const interestPaid = loanInterestPaid(loanPayments)

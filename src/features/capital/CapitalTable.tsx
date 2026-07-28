@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { PeriodFilter } from '../../components/PeriodFilter'
+import { SortableTh } from '../../components/SortableTh'
+import { useSort } from '../../lib/useSort'
 import { useCapitalTx, useDeleteCapitalTx } from '../../lib/queries/capital'
 import { usePartners } from '../../lib/queries/masters'
 import { fmt } from '../../lib/calc/format'
@@ -10,6 +12,21 @@ export function CapitalTable() {
   const { data: tx, isLoading } = useCapitalTx(range)
   const { data: partners } = usePartners()
   const deleteTx = useDeleteCapitalTx()
+
+  const partnerNameOf = (t: NonNullable<typeof tx>[number]) => partners?.find((p) => p.id === t.partner_id)?.name ?? ''
+
+  const { sorted: sortedTx, sortKey, direction, toggleSort } = useSort(
+    tx,
+    {
+      id: (t) => t.display_id,
+      partner: (t) => partnerNameOf(t),
+      type: (t) => t.type,
+      date: (t) => t.date,
+      amount: (t) => t.amount,
+      notes: (t) => t.notes,
+    },
+    'date'
+  )
 
   return (
     <details className="toggle-section" open>
@@ -23,12 +40,12 @@ export function CapitalTable() {
         <table className="data">
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Partner</th>
-              <th>Type</th>
-              <th>Date</th>
-              <th style={{ textAlign: 'right' }}>Amount</th>
-              <th>Notes</th>
+              <SortableTh label="ID" sortKey="id" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Partner" sortKey="partner" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Type" sortKey="type" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Date" sortKey="date" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Amount" sortKey="amount" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+              <SortableTh label="Notes" sortKey="notes" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <th></th>
             </tr>
           </thead>
@@ -40,14 +57,14 @@ export function CapitalTable() {
                 </td>
               </tr>
             )}
-            {!isLoading && (!tx || tx.length === 0) && (
+            {!isLoading && (!sortedTx || sortedTx.length === 0) && (
               <tr>
                 <td colSpan={7} className="empty-row">
                   No capital entries in this period
                 </td>
               </tr>
             )}
-            {tx?.map((t) => {
+            {sortedTx?.map((t) => {
               const partner = partners?.find((p) => p.id === t.partner_id)
               return (
                 <tr key={t.id}>

@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
+import { SortableTh } from '../../components/SortableTh'
+import { useSort } from '../../lib/useSort'
 import { useEmployees } from '../../lib/queries/masters'
 import { useEmployeeSensitive, useCreateEmployee, useUpdateEmployee, useDeleteEmployee } from '../../lib/queries/admin'
 import { fmt, parseINR } from '../../lib/calc/format'
@@ -18,6 +20,20 @@ export function EmployeesSection() {
   const createEmployee = useCreateEmployee()
   const updateEmployee = useUpdateEmployee()
   const deleteEmployee = useDeleteEmployee()
+
+  const sensitiveOf = (emp: NonNullable<typeof employees>[number]) => sensitive?.find((row) => row.employee_id === emp.id)
+
+  const { sorted: sortedEmployees, sortKey, direction, toggleSort } = useSort(employees, {
+    id: (emp) => emp.display_id,
+    name: (emp) => emp.name,
+    designation: (emp) => emp.designation,
+    phone: (emp) => emp.phone,
+    aadhar: (emp) => sensitiveOf(emp)?.aadhar,
+    pan: (emp) => sensitiveOf(emp)?.pan,
+    monthlySalary: (emp) => emp.monthly_salary,
+    fuelAllowance: (emp) => emp.fuel_allowance,
+    otherAllowance: (emp) => emp.other_allowance,
+  })
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [name, setName] = useState('')
@@ -162,15 +178,15 @@ export function EmployeesSection() {
         <table className="data">
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Name</th>
-              <th>Designation</th>
-              <th>Phone</th>
-              <th>Aadhar</th>
-              <th>PAN</th>
-              <th style={{ textAlign: 'right' }}>Monthly salary</th>
-              <th style={{ textAlign: 'right' }}>Fuel allowance</th>
-              <th style={{ textAlign: 'right' }}>Other allowance</th>
+              <SortableTh label="ID" sortKey="id" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Name" sortKey="name" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Designation" sortKey="designation" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Phone" sortKey="phone" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Aadhar" sortKey="aadhar" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="PAN" sortKey="pan" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Monthly salary" sortKey="monthlySalary" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+              <SortableTh label="Fuel allowance" sortKey="fuelAllowance" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+              <SortableTh label="Other allowance" sortKey="otherAllowance" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
               <th></th>
             </tr>
           </thead>
@@ -182,15 +198,15 @@ export function EmployeesSection() {
                 </td>
               </tr>
             )}
-            {!isLoading && (!employees || employees.length === 0) && (
+            {!isLoading && (!sortedEmployees || sortedEmployees.length === 0) && (
               <tr>
                 <td colSpan={10} className="empty-row">
                   No employees yet
                 </td>
               </tr>
             )}
-            {employees?.map((emp) => {
-              const s = sensitive?.find((row) => row.employee_id === emp.id)
+            {sortedEmployees?.map((emp) => {
+              const s = sensitiveOf(emp)
               return (
                 <tr key={emp.id}>
                   <td>{emp.display_id ?? '—'}</td>

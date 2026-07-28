@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
+import { SortableTh } from '../../components/SortableTh'
+import { useSort } from '../../lib/useSort'
 import { useBankAccounts } from '../../lib/queries/masters'
 import { useCreateBankAccount, useUpdateBankAccount, useDeleteBankAccount } from '../../lib/queries/admin'
 import { fmt, parseINR } from '../../lib/calc/format'
@@ -10,6 +12,12 @@ export function BankAccountsSection() {
   const createAccount = useCreateBankAccount()
   const updateAccount = useUpdateBankAccount()
   const deleteAccount = useDeleteBankAccount()
+
+  const { sorted: sortedAccounts, sortKey, direction, toggleSort } = useSort(accounts, {
+    name: (a) => a.name,
+    accountNumber: (a) => a.account_number,
+    openingBalance: (a) => a.opening_balance,
+  })
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [name, setName] = useState('')
@@ -106,9 +114,9 @@ export function BankAccountsSection() {
         <table className="data">
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Account number</th>
-              <th style={{ textAlign: 'right' }}>Opening balance</th>
+              <SortableTh label="Name" sortKey="name" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Account number" sortKey="accountNumber" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Opening balance" sortKey="openingBalance" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
               <th></th>
             </tr>
           </thead>
@@ -120,14 +128,14 @@ export function BankAccountsSection() {
                 </td>
               </tr>
             )}
-            {!isLoading && (!accounts || accounts.length === 0) && (
+            {!isLoading && (!sortedAccounts || sortedAccounts.length === 0) && (
               <tr>
                 <td colSpan={4} className="empty-row">
                   No bank accounts yet — add your first one above
                 </td>
               </tr>
             )}
-            {accounts?.map((a) => (
+            {sortedAccounts?.map((a) => (
               <tr key={a.id}>
                 <td>{a.name}</td>
                 <td>{a.account_number ?? '—'}</td>

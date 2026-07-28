@@ -1,5 +1,7 @@
 import { Fragment, useState } from 'react'
 import { PeriodFilter } from '../../components/PeriodFilter'
+import { SortableTh } from '../../components/SortableTh'
+import { useSort } from '../../lib/useSort'
 import { useTeamTracker, useDeleteTeamTracker, useTeamTrackerPayments } from '../../lib/queries/team'
 import { useProjects } from '../../lib/queries/masters'
 import { fmt } from '../../lib/calc/format'
@@ -18,6 +20,27 @@ export function TeamTrackerTable() {
   const deleteEntry = useDeleteTeamTracker()
   const [payFormId, setPayFormId] = useState<string | null>(null)
 
+  const projectNameOf = (t: NonNullable<typeof entries>[number]) => projects?.find((p) => p.id === t.project_id)?.name ?? ''
+  const paidOf = (t: NonNullable<typeof entries>[number]) => ttPaid(payments?.filter((p) => p.team_tracker_id === t.id) ?? [])
+  const dueOf = (t: NonNullable<typeof entries>[number]) => ttDue(t.total, payments?.filter((p) => p.team_tracker_id === t.id) ?? [])
+
+  const { sorted: sortedEntries, sortKey, direction, toggleSort } = useSort(
+    entries,
+    {
+      id: (t) => t.display_id,
+      date: (t) => t.date,
+      supplier: (t) => t.supplier,
+      project: (t) => projectNameOf(t),
+      qty: (t) => t.qty,
+      rate: (t) => t.rate,
+      total: (t) => t.total,
+      paid: (t) => paidOf(t),
+      due: (t) => dueOf(t),
+      remarks: (t) => t.remarks,
+    },
+    'date'
+  )
+
   return (
     <details className="toggle-section" open>
       <summary>Team tracker records</summary>
@@ -30,16 +53,16 @@ export function TeamTrackerTable() {
         <table className="data">
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Date</th>
-              <th>Supplier</th>
-              <th>Project</th>
-              <th style={{ textAlign: 'right' }}>Qty</th>
-              <th style={{ textAlign: 'right' }}>Rate</th>
-              <th style={{ textAlign: 'right' }}>Total</th>
-              <th style={{ textAlign: 'right' }}>Paid</th>
-              <th style={{ textAlign: 'right' }}>Due</th>
-              <th>Remarks</th>
+              <SortableTh label="ID" sortKey="id" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Date" sortKey="date" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Supplier" sortKey="supplier" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Project" sortKey="project" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Qty" sortKey="qty" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+              <SortableTh label="Rate" sortKey="rate" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+              <SortableTh label="Total" sortKey="total" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+              <SortableTh label="Paid" sortKey="paid" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+              <SortableTh label="Due" sortKey="due" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+              <SortableTh label="Remarks" sortKey="remarks" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <th></th>
             </tr>
           </thead>
@@ -58,7 +81,7 @@ export function TeamTrackerTable() {
                 </td>
               </tr>
             )}
-            {entries?.map((t) => {
+            {sortedEntries?.map((t) => {
               const proj = projects?.find((p) => p.id === t.project_id)
               const entryPayments = payments?.filter((p) => p.team_tracker_id === t.id) ?? []
               const paid = ttPaid(entryPayments)
