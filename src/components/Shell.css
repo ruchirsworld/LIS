@@ -1,0 +1,64 @@
+.app-layout {
+  display: flex;
+  align-items: flex-start;
+}
+
+.app-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.wrap {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 32px 20px 80px;
+}
+
+.shell-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.topbar-mark {
+  display: none;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+.topbar-mark img {
+  height: 34px;
+  width: auto;
+  display: block;
+  mix-blend-mode: multiply;
+}
+
+.header-user {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  line-height: 1.25;
+}
+.header-user-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.header-user-designation {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+@media (max-width: 640px) {
+  .wrap {
+    padding: 20px 14px calc(100px + env(safe-area-inset-bottom));
+  }
+  .topbar-mark {
+    display: inline-flex;
+  }
+}

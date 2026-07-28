@@ -1,0 +1,30 @@
+.mobile-fab {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .mobile-fab {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    right: 16px;
+    bottom: calc(100px + env(safe-area-inset-bottom));
+    z-index: 46;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    font-family: inherit;
+    font-size: 30px;
+    font-weight: 400;
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.28);
+  }
+  .mobile-fab:active {
+    filter: brightness(0.92);
+  }
+}

@@ -1,0 +1,928 @@
+/* Shared primitives — ported visual language from the v1.0 prototype,
+   cleaned up into reusable classes instead of one inline stylesheet. */
+
+.card {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+details.toggle-section {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  margin-bottom: 14px;
+}
+details.toggle-section summary {
+  cursor: pointer;
+  padding: 14px 16px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--accent);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+details.toggle-section summary::-webkit-details-marker {
+  display: none;
+}
+details.toggle-section summary::after {
+  content: '+';
+  font-size: 18px;
+  font-weight: 400;
+  color: var(--ink-soft);
+}
+details.toggle-section[open] summary::after {
+  content: '\2212';
+}
+details.toggle-section[open] summary {
+  border-bottom: 1px solid var(--line);
+}
+details.toggle-section > *:not(summary) {
+  padding-left: 16px;
+  padding-right: 16px;
+}
+details.toggle-section .form-row {
+  margin-top: 16px;
+}
+details.toggle-section .note:last-child {
+  padding-bottom: 16px;
+}
+
+.module-header {
+  background: var(--accent);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  padding: 10px 16px;
+  border-radius: 8px;
+  margin-bottom: 18px;
+}
+
+.btn {
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 6px;
+  padding: 9px 18px;
+  cursor: pointer;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+}
+.btn:hover {
+  opacity: 0.9;
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btn.secondary {
+  background: none;
+  border: 1px solid var(--line);
+  color: var(--accent);
+}
+.btn.link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  padding: 0;
+  font-size: 12px;
+}
+.btn.danger-link {
+  background: none;
+  border: none;
+  color: var(--ink-soft);
+  font-size: 13px;
+  padding: 4px 6px;
+}
+.btn.danger-link:hover {
+  color: var(--red);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.field label {
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+.field input,
+.field select {
+  width: 100%;
+  font-size: 14px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+input:focus-visible,
+select:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 1px;
+}
+
+.field input[readonly] {
+  background: color-mix(in srgb, var(--paper-2) 60%, var(--paper));
+  color: var(--ink-soft);
+  cursor: default;
+}
+
+/* Searchable vendor combobox: text input + filtered dropdown, with an
+   optional "+ Add as new vendor" entry when the typed name has no match. */
+.combobox {
+  position: relative;
+}
+.combobox-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16);
+  max-height: 220px;
+  overflow-y: auto;
+}
+.combobox-item {
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--ink);
+  cursor: pointer;
+}
+.combobox-item.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.combobox-item.create {
+  color: var(--accent);
+  font-weight: 500;
+  border-top: 1px solid var(--line);
+  margin-top: 2px;
+  padding-top: 8px;
+}
+.combobox-item.disabled {
+  color: var(--ink-soft);
+  cursor: default;
+}
+
+/* Camera icon's "Take photo" / "Choose from gallery" popover menu. */
+.receipt-upload {
+  position: relative;
+  display: inline-flex;
+}
+.receipt-upload-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 20;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16);
+  min-width: 168px;
+}
+.receipt-upload-menu li {
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--ink);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.receipt-upload-menu li:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.form-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+.form-row .field {
+  flex: 1;
+  min-width: 130px;
+}
+.form-row .field.grow2 {
+  flex: 2;
+}
+
+/* Two-column form grid: predictable alignment, compact on mobile (1 column). */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 16px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+.form-grid > .field,
+.form-grid > .field-row,
+.form-grid > .optional-row {
+  min-width: 0;
+}
+.form-grid .field.full {
+  grid-column: 1 / -1;
+}
+.form-grid .field.row-inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+/* A pair of fields that should always sit side by side, even when .form-grid
+   itself collapses to one column on mobile (e.g. Date + Cost center). */
+.form-grid .field-row {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.form-grid .field-row > .field {
+  flex: 1 1 0%;
+  min-width: 0;
+}
+.form-grid .field-row > .field.field-narrow {
+  flex: 0 0 auto;
+}
+.form-grid .field-row > .field.field-narrow input[type='date'] {
+  width: 140px;
+}
+
+/* Add-transaction Row 4 — Amount/Calculator are a fixed 44px tall (bigger
+   font for currency prominence); sync Date to the same height so the row
+   doesn't look uneven at the bottom. (Loan's row4 uses plain-height
+   Interest/Principal inputs, so it doesn't need this.) */
+.form-grid .exp-row4 .field-narrow input[type='date'] {
+  height: 44px;
+  box-sizing: border-box;
+}
+
+.cc-picker {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+}
+.cc-picker .cc-others-select {
+  width: auto;
+  min-width: 130px;
+}
+.cc-others-select.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Shared icon-button (logout, camera, GPS status, ...) */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: 6px;
+  cursor: pointer;
+  color: var(--ink-soft);
+  border-radius: 6px;
+}
+.icon-btn:hover {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.icon-btn.danger:hover {
+  color: var(--red);
+  background: var(--red-soft);
+}
+.icon-btn.ok {
+  color: var(--green);
+}
+.icon-btn.error {
+  color: var(--red);
+}
+
+/* A thin rule separating optional fields from the rest of the form. */
+.form-grid .form-divider {
+  grid-column: 1 / -1;
+  height: 1px;
+  background: var(--line);
+  border: none;
+  margin: 2px 0;
+}
+
+/* Visually de-emphasized wrapper for optional fields (Row 4: Client/Project) —
+   a faint tint, not a solid block, and tighter than the required rows. */
+.form-grid .optional-row {
+  grid-column: 1 / -1;
+  min-width: 0;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  background: color-mix(in srgb, var(--paper-2) 45%, var(--paper));
+  border-radius: 8px;
+  /* Vertical padding only — zero horizontal inset, so this row's fields land
+     on the exact same left/right edges as every other row's fields. */
+  padding: 6px 0;
+  box-sizing: border-box;
+}
+.form-grid .optional-row > .field {
+  flex: 1 1 0%;
+  min-width: 0;
+}
+.form-grid .optional-row label {
+  font-size: 10.5px;
+}
+
+/* Vendor row: select takes less width, camera + GPS are comfortably-sized icon buttons. */
+.vendor-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+.vendor-row > .field {
+  flex: 0 1 55%;
+  min-width: 0;
+}
+.vendor-row .icon-btn {
+  border: 1px solid var(--line);
+  height: 44px;
+  width: 44px;
+  flex-shrink: 0;
+}
+
+/* Row 2 (Amount): input grows, calculator button is a fixed-width square. */
+.amount-input {
+  flex: 1 1 0%;
+}
+.calc-btn {
+  width: 44px;
+}
+
+/* Rows pairing a field with its trailing action button (Total value/Add
+   bill, Payment mode/Add payment) — stretch both to the same height so the
+   button never sits shorter or taller than its row partner. */
+.form-grid .vb-row5,
+.form-grid .vbp-row3 {
+  align-items: stretch;
+}
+.form-grid .vb-row5 > .field > :last-child,
+.form-grid .vbp-row3 > .field > :last-child {
+  flex: 1;
+}
+.form-grid .vb-row5 .btn,
+.form-grid .vbp-row3 .btn {
+  width: 100%;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .form-grid .field-row {
+    gap: 8px;
+  }
+  .form-grid .field-row > .field label {
+    font-size: 10px;
+  }
+  .form-grid .field-row > .field input,
+  .form-grid .field-row > .field select {
+    font-size: 12px;
+    padding: 6px 8px;
+  }
+  .form-grid .field-row > .field.field-narrow input[type='date'] {
+    width: 108px;
+    padding: 6px 4px;
+  }
+  .cc-picker {
+    flex-wrap: nowrap;
+    gap: 4px;
+  }
+  .pill-tabs {
+    gap: 3px;
+  }
+  .pill-tabs .pill {
+    padding: 5px 6px;
+    font-size: 10px;
+  }
+  .cc-picker .cc-others-select {
+    min-width: 0;
+    width: 56px;
+    font-size: 10px;
+    padding: 4px 1px;
+  }
+  .form-grid .optional-row {
+    gap: 10px;
+    padding: 5px 0;
+  }
+  .form-grid .optional-row > .field {
+    flex: 0 0 135px;
+  }
+  .form-grid .optional-row > .field label {
+    font-size: 10px;
+  }
+  .form-grid .optional-row > .field select {
+    font-size: 12px;
+    padding: 6px 8px;
+  }
+  .vendor-row {
+    gap: 8px;
+  }
+  .vendor-row > .field select {
+    font-size: 12px;
+    padding: 6px 8px;
+  }
+
+  /* Row 2 (Amount): fixed 200 / gap 10 / 70 split, per exact spec. */
+  .amount-row {
+    gap: 10px;
+  }
+  .amount-input {
+    flex: 0 0 200px;
+    width: 200px;
+  }
+  .calc-btn {
+    flex: 0 0 70px;
+    width: 70px;
+  }
+
+  /* Add-transaction Row 4 (Date + Amount + Calculator) — Amount shares the
+     row with Date now, so it only has ~227px left, not the full row the
+     200/70 split above assumes. Override with a tighter split that fits. */
+  .form-grid .exp-row4 {
+    gap: 8px;
+  }
+  .form-grid .exp-row4 .amount-row {
+    gap: 6px;
+  }
+  .form-grid .exp-row4 .amount-input {
+    flex: 1 1 0%;
+    width: auto;
+    min-width: 0;
+  }
+  .form-grid .exp-row4 .calc-btn {
+    flex: 0 0 40px;
+    width: 40px;
+  }
+
+  /* Row 3 (Type/Tags): fixed 135 / gap 10 / 135 split, per exact spec. */
+  .form-grid .type-tags-row {
+    gap: 10px;
+  }
+  .form-grid .type-tags-row > .field {
+    flex: 0 0 135px;
+  }
+
+  /* Team Tracker create form — exact per-row widths, per spec. */
+  .form-grid .tt-row1,
+  .form-grid .tt-row3,
+  .form-grid .tt-row4,
+  .form-grid .tt-row6 {
+    gap: 10px;
+  }
+  .form-grid .tt-row1 > .field.tt-date {
+    flex: 0 0 110px;
+  }
+  .form-grid .tt-row1 > .field.tt-project {
+    flex: 0 0 160px;
+  }
+  .form-grid .tt-supplier {
+    max-width: 280px;
+  }
+  .form-grid .tt-row3 > .field.tt-qty,
+  .form-grid .tt-row3 > .field.tt-rate {
+    flex: 0 0 135px;
+  }
+  .form-grid .tt-row4 > .field.tt-calc-btn {
+    flex: 0 0 30px;
+  }
+  .form-grid .tt-row4 > .field.tt-other-expenses {
+    flex: 0 0 70px;
+  }
+  .form-grid .tt-row4 > .field.tt-total {
+    flex: 0 0 160px;
+  }
+  .form-grid .tt-log-entry {
+    max-width: 280px;
+  }
+  .form-grid .tt-log-entry .btn {
+    width: 100%;
+  }
+  .form-grid .tt-row6 > .field.tt-amount-paid {
+    flex: 0 0 160px;
+  }
+  .form-grid .tt-row6 > .field.tt-record-btn {
+    flex: 0 0 auto;
+  }
+
+  /* Attendance create form — exact per-row widths, per spec. */
+  .form-grid .at-employee {
+    max-width: 280px;
+  }
+  .form-grid .at-row2 {
+    gap: 10px;
+  }
+  .form-grid .at-row2 > .field.at-date {
+    flex: 0 0 135px;
+  }
+  .form-grid .at-row2 > .field.at-status {
+    flex: 0 0 135px;
+  }
+
+  /* Invoice create form — every row fixed to 135 / gap 10 / 135 = 280px, per spec. */
+  .form-grid .inv-row1,
+  .form-grid .inv-row2,
+  .form-grid .inv-row3,
+  .form-grid .inv-row4,
+  .form-grid .inv-row5 {
+    gap: 10px;
+  }
+  .form-grid .inv-row1 > .field.inv-client,
+  .form-grid .inv-row1 > .field.inv-project,
+  .form-grid .inv-row2 > .field.inv-invoice-number,
+  .form-grid .inv-row2 > .field.inv-invoice-date,
+  .form-grid .inv-row3 > .field.inv-amount,
+  .form-grid .inv-row3 > .field.inv-due-days,
+  .form-grid .inv-row4 > .field.inv-gst,
+  .form-grid .inv-row4 > .field.inv-tds,
+  .form-grid .inv-row5 > .field.inv-status,
+  .form-grid .inv-row5 > .field.inv-submit {
+    flex: 0 0 135px;
+  }
+  .form-grid .inv-row5 > .field.inv-submit .btn {
+    width: 100%;
+  }
+
+  /* Loan create form — 135 / gap 10 / 135 = 280px, per spec. */
+  .form-grid .ln-row2,
+  .form-grid .ln-row3 {
+    gap: 10px;
+  }
+  .form-grid .ln-row2 > .field.ln-principal,
+  .form-grid .ln-row2 > .field.ln-roi,
+  .form-grid .ln-row3 > .field.ln-date-taken,
+  .form-grid .ln-row3 > .field.ln-interest-date {
+    flex: 0 0 135px;
+  }
+
+  /* Record payments (loans) — 135 / gap 10 / 135 = 280px, per spec. */
+  .form-grid .lnp-row1,
+  .form-grid .lnp-row2 {
+    gap: 10px;
+  }
+  .form-grid .lnp-row1 > .field.lnp-lender,
+  .form-grid .lnp-row1 > .field.lnp-date,
+  .form-grid .lnp-row2 > .field.lnp-interest,
+  .form-grid .lnp-row2 > .field.lnp-principal {
+    flex: 0 0 135px;
+  }
+  .form-grid .lnp-submit {
+    max-width: 280px;
+  }
+  .form-grid .lnp-submit .btn {
+    width: 100%;
+  }
+
+  /* Record payments (vendor bills) — 135 / gap 10 / 135 = 280px, per spec. */
+  .form-grid .vbp-bill {
+    max-width: 280px;
+  }
+  .form-grid .vbp-row2 {
+    gap: 10px;
+  }
+  .form-grid .vbp-row2 > .field.vbp-date,
+  .form-grid .vbp-row2 > .field.vbp-amount {
+    flex: 0 0 135px;
+  }
+  .form-grid .vbp-row3 {
+    gap: 10px;
+  }
+  .form-grid .vbp-row3 > .field.vbp-mode {
+    flex: 0 0 125px;
+  }
+  .form-grid .vbp-row3 > .field.vbp-submit {
+    flex: 0 0 145px;
+  }
+  /* Three pills need tighter spacing than the default compact size to fit
+     the 155px allotted to this field. */
+  .form-grid .vbp-mode .pill-tabs {
+    gap: 3px;
+  }
+  .form-grid .vbp-mode .pill-tabs .pill {
+    padding: 5px 5px;
+    font-size: 9.5px;
+  }
+
+  /* Vendor bills — Vendor row and Total/Add-bill row capped to 280px, per spec. */
+  .form-grid .vb-vendor {
+    max-width: 280px;
+  }
+  .form-grid .vb-row5 {
+    gap: 10px;
+  }
+  .form-grid .vb-row5 > .field.vb-total,
+  .form-grid .vb-row5 > .field.vb-submit {
+    flex: 0 0 135px;
+  }
+
+  /* Clients — Client code / GST, 135 / gap 10 / 135 = 280px, per spec. */
+  .form-grid .cl-row {
+    gap: 10px;
+  }
+  .form-grid .cl-row > .field.cl-code,
+  .form-grid .cl-row > .field.cl-gst {
+    flex: 0 0 135px;
+  }
+
+  /* Record receipts (invoices) — Client row and Date/Amount row capped to
+     280px, Add receipt its own 280px row, per spec. */
+  .form-grid .rr-client {
+    max-width: 280px;
+  }
+  .form-grid .rr-row2 {
+    gap: 10px;
+  }
+  .form-grid .rr-row2 > .field.rr-date,
+  .form-grid .rr-row2 > .field.rr-amount {
+    flex: 0 0 135px;
+  }
+  .form-grid .rr-submit {
+    max-width: 280px;
+  }
+  .form-grid .rr-submit .btn {
+    width: 100%;
+  }
+}
+
+.tt-calc-icon-btn {
+  width: 30px;
+  height: 30px;
+  padding: 0 !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.table-scroll {
+  overflow-x: auto;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+}
+table.data {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--paper);
+}
+table.data th {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+  padding: 10px 14px;
+  background: var(--paper-2);
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+table.data td {
+  padding: 11px 14px;
+  font-size: 13.5px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+table.data tr:last-child td {
+  border-bottom: none;
+}
+.amt {
+  font-family: var(--font-mono);
+  text-align: right;
+}
+
+.pay-btn {
+  background: none;
+  border: 1px solid var(--line);
+  color: var(--accent);
+  border-radius: 6px;
+  padding: 4px 9px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  margin-right: 6px;
+}
+.pay-form-row td {
+  background: var(--paper-2);
+  padding: 12px 14px;
+}
+.pay-form {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+.pay-form .field {
+  min-width: 110px;
+}
+.pay-history {
+  font-size: 11px;
+  color: var(--ink-soft);
+  margin-top: 8px;
+}
+.empty-row {
+  padding: 28px 14px;
+  text-align: center;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+.note {
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin-top: 10px;
+}
+
+.pill-tabs {
+  display: flex;
+  gap: 4px;
+}
+.pill-tabs .pill {
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 7px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: var(--paper-2);
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.pill-tabs .pill.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+.pill-tabs .pill:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.row-selected td {
+  background: var(--accent-soft);
+}
+
+/* Active/Completed switch on the Projects "All projects" list. */
+.status-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.status-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.status-switch-track {
+  flex: none;
+  width: 32px;
+  height: 18px;
+  border-radius: 20px;
+  background: var(--line);
+  position: relative;
+  transition: background 0.15s;
+}
+.status-switch-track::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.15s;
+}
+.status-switch input:checked + .status-switch-track {
+  background: var(--accent);
+}
+.status-switch input:checked + .status-switch-track::after {
+  transform: translateX(14px);
+}
+.status-switch input:disabled + .status-switch-track {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.status-switch-label {
+  font-size: 12.5px;
+  min-width: 62px;
+}
+
+/* Add-transaction category toggle — 5 options, wraps on narrow screens. */
+.exp-cat-tabs {
+  flex-wrap: wrap;
+}
+
+.badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 9px;
+  border-radius: 20px;
+  border: none;
+  font-family: inherit;
+}
+.badge.paid {
+  background: var(--green-soft);
+  color: var(--green);
+}
+.badge.sent {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+.badge.draft {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+.badge.overdue {
+  background: var(--red-soft);
+  color: var(--red);
+}
+.row-overdue td {
+  background: var(--red-soft);
+}
+
+.dash-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.dash-card {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px;
+}
+.dash-label {
+  font-size: 11px;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.dash-value {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 500;
+  margin-top: 4px;
+}
+
+@media (max-width: 640px) {
+  .dash-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .dash-card {
+    min-height: 84px;
+    box-sizing: border-box;
+  }
+  .dash-value {
+    font-size: 19px;
+  }
+  .form-row {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 14px;
+  }
+  .form-row .field {
+    min-width: 100%;
+  }
+  .field input,
+  .field select {
+    font-size: 16px;
+    padding: 10px;
+  }
+}
