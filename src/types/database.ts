@@ -277,10 +277,12 @@ export type Database = {
           display_id: string | null
           fuel_allowance: number | null
           id: string
+          left_date: string | null
           monthly_salary: number | null
           name: string
           other_allowance: number | null
           phone: string | null
+          status: string
         }
         Insert: {
           created_at?: string
@@ -289,10 +291,12 @@ export type Database = {
           display_id?: string | null
           fuel_allowance?: number | null
           id?: string
+          left_date?: string | null
           monthly_salary?: number | null
           name: string
           other_allowance?: number | null
           phone?: string | null
+          status?: string
         }
         Update: {
           created_at?: string
@@ -301,10 +305,12 @@ export type Database = {
           display_id?: string | null
           fuel_allowance?: number | null
           id?: string
+          left_date?: string | null
           monthly_salary?: number | null
           name?: string
           other_allowance?: number | null
           phone?: string | null
+          status?: string
         }
         Relationships: [
           {

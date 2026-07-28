@@ -42,6 +42,11 @@ export function SalaryCalculator() {
   const totalDays = daysInMonth(month)
   const cols = canWrite ? 10 : 9
 
+  // Once an employee has left, stop calculating their salary from the
+  // month after they left onward — but still show the month they actually
+  // left in, since they were employed for at least part of it.
+  const visibleEmployees = employees?.filter((emp) => emp.status !== 'left' || (emp.left_date && emp.left_date.slice(0, 7) >= month))
+
   return (
     <details className="toggle-section" open>
       <summary>Salary calculator</summary>
@@ -68,14 +73,14 @@ export function SalaryCalculator() {
             </tr>
           </thead>
           <tbody>
-            {(!employees || employees.length === 0) && (
+            {(!visibleEmployees || visibleEmployees.length === 0) && (
               <tr>
                 <td colSpan={cols} className="empty-row">
                   No employees yet — add one under Admin → Employees.
                 </td>
               </tr>
             )}
-            {employees?.map((emp) => {
+            {visibleEmployees?.map((emp) => {
               const hasSalary = emp.monthly_salary != null
               const salary = Number(emp.monthly_salary || 0)
               const allowances = Number(emp.fuel_allowance || 0) + Number(emp.other_allowance || 0)

@@ -33,6 +33,7 @@ export function EmployeesSection() {
     monthlySalary: (emp) => emp.monthly_salary,
     fuelAllowance: (emp) => emp.fuel_allowance,
     otherAllowance: (emp) => emp.other_allowance,
+    status: (emp) => emp.status,
   })
 
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -44,6 +45,8 @@ export function EmployeesSection() {
   const [monthlySalary, setMonthlySalary] = useState('0')
   const [fuelAllowance, setFuelAllowance] = useState('0')
   const [otherAllowance, setOtherAllowance] = useState('0')
+  const [status, setStatus] = useState<'active' | 'left'>('active')
+  const [leftDate, setLeftDate] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -57,6 +60,8 @@ export function EmployeesSection() {
     setMonthlySalary('0')
     setFuelAllowance('0')
     setOtherAllowance('0')
+    setStatus('active')
+    setLeftDate('')
   }
 
   function startEdit(emp: NonNullable<typeof employees>[number]) {
@@ -70,6 +75,8 @@ export function EmployeesSection() {
     setMonthlySalary(String(emp.monthly_salary ?? 0))
     setFuelAllowance(String(emp.fuel_allowance ?? 0))
     setOtherAllowance(String(emp.other_allowance ?? 0))
+    setStatus(emp.status as 'active' | 'left')
+    setLeftDate(emp.left_date ?? '')
     setFormError(null)
   }
 
@@ -89,6 +96,8 @@ export function EmployeesSection() {
         monthly_salary: parseINR(monthlySalary) || null,
         fuel_allowance: parseINR(fuelAllowance) || null,
         other_allowance: parseINR(otherAllowance) || null,
+        status,
+        left_date: status === 'left' ? leftDate || null : null,
       }
       if (editingId) {
         await updateEmployee.mutateAsync({
@@ -156,6 +165,20 @@ export function EmployeesSection() {
           <CurrencyInput value={otherAllowance} onValueChange={setOtherAllowance} />
         </div>
 
+        <div className="field">
+          <label>Status</label>
+          <select value={status} onChange={(e) => setStatus(e.target.value as typeof status)}>
+            <option value="active">Active</option>
+            <option value="left">Left</option>
+          </select>
+        </div>
+        {status === 'left' && (
+          <div className="field">
+            <label>Left date</label>
+            <input type="date" value={leftDate} onChange={(e) => setLeftDate(e.target.value)} />
+          </div>
+        )}
+
         <div className="field full" style={{ display: 'flex', gap: 8 }}>
           <Button type="submit" disabled={submitting}>
             {submitting ? 'Saving…' : editingId ? 'Save changes' : 'Add employee'}
@@ -187,20 +210,21 @@ export function EmployeesSection() {
               <SortableTh label="Monthly salary" sortKey="monthlySalary" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
               <SortableTh label="Fuel allowance" sortKey="fuelAllowance" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
               <SortableTh label="Other allowance" sortKey="otherAllowance" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+              <SortableTh label="Status" sortKey="status" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <th></th>
             </tr>
           </thead>
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={10} className="empty-row">
+                <td colSpan={11} className="empty-row">
                   Loading…
                 </td>
               </tr>
             )}
             {!isLoading && (!sortedEmployees || sortedEmployees.length === 0) && (
               <tr>
-                <td colSpan={10} className="empty-row">
+                <td colSpan={11} className="empty-row">
                   No employees yet
                 </td>
               </tr>
@@ -218,6 +242,7 @@ export function EmployeesSection() {
                   <td className="amt">{emp.monthly_salary ? fmt(emp.monthly_salary) : '—'}</td>
                   <td className="amt">{emp.fuel_allowance ? fmt(emp.fuel_allowance) : '—'}</td>
                   <td className="amt">{emp.other_allowance ? fmt(emp.other_allowance) : '—'}</td>
+                  <td>{emp.status === 'left' ? `Left${emp.left_date ? ` (${emp.left_date})` : ''}` : 'Active'}</td>
                   <td>
                     <button type="button" className="pay-btn" onClick={() => startEdit(emp)}>
                       Edit
