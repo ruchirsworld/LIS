@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { PeriodFilter } from '../../components/PeriodFilter'
 import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
+import { Button } from '../../components/ui'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
@@ -15,7 +16,8 @@ import { clientLabel } from '../../lib/labels'
 
 export function ExpenseTable() {
   const [range, setRange] = useState<DateRange | null>(null)
-  const { data: expenses, isLoading } = useExpenses(range)
+  const [recentOnly, setRecentOnly] = useState(false)
+  const { data: expenses, isLoading } = useExpenses(recentOnly ? null : range)
   const { data: projects } = useProjects()
   const { data: clients } = useClients()
   const { data: vendors } = useVendors()
@@ -31,7 +33,8 @@ export function ExpenseTable() {
     return vendor?.name ?? ''
   }
 
-  const { sorted: sortedExpenses, sortKey, direction, toggleSort } = useSort(expenses, {
+  const baseExpenses = recentOnly ? expenses?.slice(0, 10) : expenses
+  const { sorted: sortedExpenses, sortKey, direction, toggleSort } = useSort(baseExpenses, {
     id: (e) => e.display_id,
     date: (e) => e.date,
     vendor: (e) => vendorNameOf(e),
@@ -67,8 +70,22 @@ export function ExpenseTable() {
       <summary>Expense records</summary>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 12, marginTop: 16 }}>
-        <PeriodFilter onChange={setRange} allowCustom style={{ marginBottom: 0 }} />
-        <ReportExportButtons title="Expense records" sections={exportSections} range={range} style={{ marginTop: 0 }} />
+        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          {recentOnly ? (
+            <div className="note">Showing the 10 most recent expenses.</div>
+          ) : (
+            <PeriodFilter onChange={setRange} allowCustom style={{ marginBottom: 0 }} />
+          )}
+          <Button type="button" variant="secondary" onClick={() => setRecentOnly((v) => !v)}>
+            {recentOnly ? 'Show all' : 'Recent 10'}
+          </Button>
+        </div>
+        <ReportExportButtons
+          title="Expense records"
+          sections={exportSections}
+          range={recentOnly ? null : range}
+          style={{ marginTop: 0 }}
+        />
       </div>
 
       <div className="table-scroll">
