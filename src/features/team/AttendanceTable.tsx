@@ -4,6 +4,8 @@ import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
+import { ReportExportButtons } from '../reports/ReportExportButtons'
+import type { ExportSection } from '../../lib/export/report'
 import { useAttendance, useDeleteAttendance } from '../../lib/queries/team'
 import { useEmployees } from '../../lib/queries/masters'
 import { useAuth } from '../../lib/auth'
@@ -42,13 +44,29 @@ export function AttendanceTable() {
   )
   const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedAttendance)
 
+  const exportSections: ExportSection[] = [
+    {
+      title: 'Attendance records',
+      columns: ['ID', 'Employee', 'Date', 'Status', 'Notes'],
+      rows: (sortedAttendance ?? []).map((a) => [
+        a.display_id ?? '',
+        employeeNameOf(a),
+        fmtDate(a.date),
+        STATUS_LABEL[a.status] ?? a.status,
+        a.notes ?? '',
+      ]),
+    },
+  ]
+
   return (
     <details className="toggle-section" open>
       <summary>Attendance records</summary>
 
       <div style={{ marginTop: 16 }}>
-        <PeriodFilter onChange={setRange} />
+        <PeriodFilter onChange={setRange} allowCustom />
       </div>
+
+      <ReportExportButtons title="Attendance records" sections={exportSections} range={range} />
 
       <div className="table-scroll">
         <table className="data">

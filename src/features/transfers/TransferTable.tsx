@@ -4,6 +4,8 @@ import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
+import { ReportExportButtons } from '../reports/ReportExportButtons'
+import type { ExportSection } from '../../lib/export/report'
 import { useTransfers, useDeleteTransfer } from '../../lib/queries/transfers'
 import { useBankAccounts } from '../../lib/queries/masters'
 import { fmt, fmtDate } from '../../lib/calc/format'
@@ -34,13 +36,30 @@ export function TransferTable() {
   )
   const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedTransfers)
 
+  const exportSections: ExportSection[] = [
+    {
+      title: 'Transfer records',
+      columns: ['ID', 'From', 'To', 'Date', 'Amount', 'Notes'],
+      rows: (sortedTransfers ?? []).map((t) => [
+        t.display_id ?? '',
+        accountName(t.from_account_id),
+        accountName(t.to_account_id),
+        t.date ? fmtDate(t.date) : '',
+        t.amount,
+        t.notes ?? '',
+      ]),
+    },
+  ]
+
   return (
     <details className="toggle-section" open>
       <summary>Transfer records</summary>
 
       <div style={{ marginTop: 16 }}>
-        <PeriodFilter onChange={setRange} />
+        <PeriodFilter onChange={setRange} allowCustom />
       </div>
+
+      <ReportExportButtons title="Transfer records" sections={exportSections} range={range} />
 
       <div className="table-scroll">
         <table className="data">

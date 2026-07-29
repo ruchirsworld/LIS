@@ -4,6 +4,8 @@ import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
+import { ReportExportButtons } from '../reports/ReportExportButtons'
+import type { ExportSection } from '../../lib/export/report'
 import { useCapitalTx, useDeleteCapitalTx } from '../../lib/queries/capital'
 import { usePartners } from '../../lib/queries/masters'
 import { fmt, fmtDate } from '../../lib/calc/format'
@@ -31,13 +33,30 @@ export function CapitalTable() {
   )
   const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedTx)
 
+  const exportSections: ExportSection[] = [
+    {
+      title: 'Capital records',
+      columns: ['ID', 'Partner', 'Type', 'Date', 'Amount', 'Notes'],
+      rows: (sortedTx ?? []).map((t) => [
+        t.display_id ?? '',
+        partnerNameOf(t),
+        t.type === 'injection' ? 'Injection (in)' : 'Withdrawal (out)',
+        t.date ? fmtDate(t.date) : '',
+        t.amount,
+        t.notes ?? '',
+      ]),
+    },
+  ]
+
   return (
     <details className="toggle-section" open>
       <summary>Capital records</summary>
 
       <div style={{ marginTop: 16 }}>
-        <PeriodFilter onChange={setRange} />
+        <PeriodFilter onChange={setRange} allowCustom />
       </div>
+
+      <ReportExportButtons title="Capital records" sections={exportSections} range={range} />
 
       <div className="table-scroll">
         <table className="data">

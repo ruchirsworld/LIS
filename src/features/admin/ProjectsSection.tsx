@@ -6,6 +6,8 @@ import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
+import { ReportExportButtons } from '../reports/ReportExportButtons'
+import type { ExportSection } from '../../lib/export/report'
 import { useClients, useProjects, useCostCenters } from '../../lib/queries/masters'
 import { useCreateProject, useUpdateProject, useDeleteProject } from '../../lib/queries/admin'
 import { fmt, fmtDate, parseINR } from '../../lib/calc/format'
@@ -52,6 +54,25 @@ export function ProjectsSection() {
     status: (p) => p.status,
   })
   const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedProjects)
+
+  const exportSections: ExportSection[] = [
+    {
+      title: 'Projects',
+      columns: ['ID', 'Project', 'Client', 'Project location', 'Cost center', 'Budget', 'Total value', 'Start date', 'End date', 'Status'],
+      rows: (sortedProjects ?? []).map((p) => [
+        p.display_id ?? '',
+        p.name,
+        clientNameOf(p),
+        p.project_location ?? '',
+        p.cost_center ?? '',
+        p.budget ?? '',
+        p.value_ex_gst ?? '',
+        p.start_date ? fmtDate(p.start_date) : '',
+        p.end_date ? fmtDate(p.end_date) : '',
+        p.status,
+      ]),
+    },
+  ]
 
   useEffect(() => {
     if (!sameAsClient) return
@@ -240,6 +261,8 @@ export function ProjectsSection() {
           {deleteError}
         </div>
       )}
+
+      <ReportExportButtons title="Projects" sections={exportSections} range={null} />
 
       <div className="table-scroll">
         <table className="data">

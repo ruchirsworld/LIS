@@ -4,6 +4,8 @@ import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
+import { ReportExportButtons } from '../reports/ReportExportButtons'
+import type { ExportSection } from '../../lib/export/report'
 import { useTeamTracker, useDeleteTeamTracker, useTeamTrackerPayments } from '../../lib/queries/team'
 import { useProjects } from '../../lib/queries/masters'
 import { fmt, fmtDate } from '../../lib/calc/format'
@@ -44,13 +46,34 @@ export function TeamTrackerTable() {
   )
   const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedEntries)
 
+  const exportSections: ExportSection[] = [
+    {
+      title: 'Team tracker records',
+      columns: ['ID', 'Date', 'Supplier', 'Project', 'Qty', 'Rate', 'Total', 'Paid', 'Due', 'Remarks'],
+      rows: (sortedEntries ?? []).map((t) => [
+        t.display_id ?? '',
+        fmtDate(t.date),
+        t.supplier,
+        projectNameOf(t),
+        t.qty ?? '',
+        t.rate ?? '',
+        t.total ?? '',
+        paidOf(t),
+        dueOf(t),
+        t.remarks ?? '',
+      ]),
+    },
+  ]
+
   return (
     <details className="toggle-section" open>
       <summary>Team tracker records</summary>
 
       <div style={{ marginTop: 16 }}>
-        <PeriodFilter onChange={setRange} />
+        <PeriodFilter onChange={setRange} allowCustom />
       </div>
+
+      <ReportExportButtons title="Team tracker records" sections={exportSections} range={range} />
 
       <div className="table-scroll">
         <table className="data">

@@ -4,6 +4,8 @@ import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
+import { ReportExportButtons } from '../reports/ReportExportButtons'
+import type { ExportSection } from '../../lib/export/report'
 import { useLoans, useLoanPayments, useDeleteLoan } from '../../lib/queries/loans'
 import { fmt, fmtDate } from '../../lib/calc/format'
 import { loanPrincipalPaid, loanInterestPaid, loanOutstanding, monthlyInterestDue } from '../../lib/calc/loans'
@@ -40,13 +42,38 @@ export function LoanTable() {
   )
   const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedLoans)
 
+  const exportSections: ExportSection[] = [
+    {
+      title: 'Loan records',
+      columns: ['ID', 'Type', 'Lender', 'Date taken', 'Interest payment date', 'Principal', 'ROI', 'Principal repaid', 'Interest paid', 'Outstanding', 'Monthly interest'],
+      rows: (sortedLoans ?? []).map((l) => {
+        const loanPayments = paymentsOf(l)
+        return [
+          l.display_id ?? '',
+          LOAN_TYPE_LABEL[l.loan_type] ?? l.loan_type,
+          l.lender,
+          l.date_taken ? fmtDate(l.date_taken) : '',
+          l.interest_payment_date ? fmtDate(l.interest_payment_date) : '',
+          l.principal,
+          l.roi_pct ?? 0,
+          loanPrincipalPaid(loanPayments),
+          loanInterestPaid(loanPayments),
+          loanOutstanding(l, loanPayments),
+          monthlyInterestDue(l, loanPayments),
+        ]
+      }),
+    },
+  ]
+
   return (
     <details className="toggle-section" open>
       <summary>Loan records</summary>
 
       <div style={{ marginTop: 16 }}>
-        <PeriodFilter onChange={setRange} />
+        <PeriodFilter onChange={setRange} allowCustom />
       </div>
+
+      <ReportExportButtons title="Loan records" sections={exportSections} range={range} />
 
       <div className="table-scroll">
         <table className="data">

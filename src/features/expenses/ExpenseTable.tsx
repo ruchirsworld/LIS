@@ -4,6 +4,8 @@ import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
+import { ReportExportButtons } from '../reports/ReportExportButtons'
+import type { ExportSection } from '../../lib/export/report'
 import { useExpenses, useDeleteExpense } from '../../lib/queries/expenses'
 import { useProjects, useClients, useVendors } from '../../lib/queries/masters'
 import { fmt, fmtDate } from '../../lib/calc/format'
@@ -42,13 +44,33 @@ export function ExpenseTable() {
   })
   const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedExpenses)
 
+  const exportSections: ExportSection[] = [
+    {
+      title: 'Expense records',
+      columns: ['ID', 'Date', 'Vendor', 'Description', 'Type', 'Project / client', 'Cost center', 'Amount', 'Reimbursable'],
+      rows: (sortedExpenses ?? []).map((e) => [
+        e.display_id ?? '',
+        fmtDate(e.date),
+        vendorNameOf(e),
+        e.description,
+        e.type,
+        projLabelOf(e),
+        e.cost_center ?? '',
+        e.amount,
+        e.reimbursable ? 'Yes' : 'No',
+      ]),
+    },
+  ]
+
   return (
     <details className="toggle-section" open>
       <summary>Expense records</summary>
 
       <div style={{ marginTop: 16 }}>
-        <PeriodFilter onChange={setRange} />
+        <PeriodFilter onChange={setRange} allowCustom />
       </div>
+
+      <ReportExportButtons title="Expense records" sections={exportSections} range={range} />
 
       <div className="table-scroll">
         <table className="data">

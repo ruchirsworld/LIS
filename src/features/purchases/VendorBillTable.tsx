@@ -4,6 +4,8 @@ import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
+import { ReportExportButtons } from '../reports/ReportExportButtons'
+import type { ExportSection } from '../../lib/export/report'
 import { useVendorBills, useVendorBillPayments, useDeleteVendorBill } from '../../lib/queries/purchases'
 import { useVendors, useProjects, useClients } from '../../lib/queries/masters'
 import { fmt, fmtDate } from '../../lib/calc/format'
@@ -60,13 +62,35 @@ export function VendorBillTable() {
   )
   const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedBills)
 
+  const exportSections: ExportSection[] = [
+    {
+      title: 'Vendor bill records',
+      columns: ['Ref ID', 'Vendor', 'Description', 'Client', 'Project', 'Date', 'Amount', 'GST', 'Total', 'Paid', 'Due'],
+      rows: (sortedBills ?? []).map((b) => [
+        b.display_id ?? '',
+        vendorNameOf(b),
+        b.description ?? '',
+        clientNameOf(b),
+        projectNameOf(b),
+        b.date ? fmtDate(b.date) : '',
+        b.amount,
+        billGstAmt(b),
+        billTotal(b),
+        paidOf(b),
+        dueOf(b),
+      ]),
+    },
+  ]
+
   return (
     <details className="toggle-section" open>
       <summary>Vendor bill records</summary>
 
       <div style={{ marginTop: 16 }}>
-        <PeriodFilter onChange={setRange} />
+        <PeriodFilter onChange={setRange} allowCustom />
       </div>
+
+      <ReportExportButtons title="Vendor bill records" sections={exportSections} range={range} />
 
       {categories.length > 0 && (
         <div className="pill-tabs" style={{ marginTop: 12, flexWrap: 'wrap' }}>

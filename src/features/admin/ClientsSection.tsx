@@ -4,6 +4,8 @@ import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
+import { ReportExportButtons } from '../reports/ReportExportButtons'
+import type { ExportSection } from '../../lib/export/report'
 import { useClients } from '../../lib/queries/masters'
 import { useCreateClient, useUpdateClient, useDeleteClient } from '../../lib/queries/admin'
 
@@ -21,6 +23,23 @@ export function ClientsSection() {
     email: (c) => c.email,
   })
   const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedClients)
+  const exportSections: ExportSection[] = [
+    {
+      title: 'Clients',
+      columns: ['ID', 'Client', 'Client code', 'Address', 'City', 'State', 'Pin code', 'GST', 'Email'],
+      rows: (sortedClients ?? []).map((c) => [
+        c.display_id ?? '',
+        c.name,
+        c.client_code ?? '',
+        c.address_line1 ?? '',
+        c.city ?? '',
+        c.state ?? '',
+        c.pincode ?? '',
+        c.gst ?? '',
+        c.email ?? '',
+      ]),
+    },
+  ]
   const createClient = useCreateClient()
   const updateClient = useUpdateClient()
   const deleteClient = useDeleteClient()
@@ -158,6 +177,8 @@ export function ClientsSection() {
           {formError}
         </div>
       )}
+
+      <ReportExportButtons title="Clients" sections={exportSections} range={null} />
 
       <div className="table-scroll">
         <table className="data">

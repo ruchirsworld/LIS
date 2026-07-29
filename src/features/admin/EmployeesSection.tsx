@@ -5,6 +5,8 @@ import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
+import { ReportExportButtons } from '../reports/ReportExportButtons'
+import type { ExportSection } from '../../lib/export/report'
 import { useEmployees } from '../../lib/queries/masters'
 import { useEmployeeSensitive, useCreateEmployee, useUpdateEmployee, useDeleteEmployee } from '../../lib/queries/admin'
 import { fmt, fmtDate, parseINR } from '../../lib/calc/format'
@@ -38,6 +40,28 @@ export function EmployeesSection() {
     status: (emp) => emp.status,
   })
   const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedEmployees)
+
+  const exportSections: ExportSection[] = [
+    {
+      title: 'Employees',
+      columns: ['ID', 'Name', 'Designation', 'Phone', 'Aadhar', 'PAN', 'Monthly salary', 'Fuel allowance', 'Other allowance', 'Status'],
+      rows: (sortedEmployees ?? []).map((emp) => {
+        const s = sensitiveOf(emp)
+        return [
+          emp.display_id ?? '',
+          emp.name,
+          emp.designation ?? '',
+          emp.phone ?? '',
+          maskAadhar(s?.aadhar),
+          s?.pan ?? '',
+          emp.monthly_salary ?? '',
+          emp.fuel_allowance ?? '',
+          emp.other_allowance ?? '',
+          emp.status === 'left' ? `Left${emp.left_date ? ` (${fmtDate(emp.left_date)})` : ''}` : 'Active',
+        ]
+      }),
+    },
+  ]
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [name, setName] = useState('')
@@ -199,6 +223,8 @@ export function EmployeesSection() {
           {formError}
         </div>
       )}
+
+      <ReportExportButtons title="Employees" sections={exportSections} range={null} />
 
       <div className="table-scroll">
         <table className="data">

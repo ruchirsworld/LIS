@@ -5,6 +5,8 @@ import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
+import { ReportExportButtons } from '../reports/ReportExportButtons'
+import type { ExportSection } from '../../lib/export/report'
 import { useBankAccounts } from '../../lib/queries/masters'
 import { useCreateBankAccount, useUpdateBankAccount, useDeleteBankAccount } from '../../lib/queries/admin'
 import { fmt, parseINR } from '../../lib/calc/format'
@@ -21,6 +23,14 @@ export function BankAccountsSection() {
     openingBalance: (a) => a.opening_balance,
   })
   const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedAccounts)
+
+  const exportSections: ExportSection[] = [
+    {
+      title: 'Bank accounts',
+      columns: ['Name', 'Account number', 'Opening balance'],
+      rows: (sortedAccounts ?? []).map((a) => [a.name, a.account_number ?? '', a.opening_balance]),
+    },
+  ]
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [name, setName] = useState('')
@@ -112,6 +122,8 @@ export function BankAccountsSection() {
           {formError}
         </div>
       )}
+
+      <ReportExportButtons title="Bank accounts" sections={exportSections} range={null} />
 
       <div className="table-scroll">
         <table className="data">

@@ -5,6 +5,8 @@ import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
+import { ReportExportButtons } from '../reports/ReportExportButtons'
+import type { ExportSection } from '../../lib/export/report'
 import { useProfiles, useCreateUser, useUpdateProfile, useDeleteUser, type Profile } from '../../lib/queries/admin'
 import { useEmployees } from '../../lib/queries/masters'
 import { useAuth } from '../../lib/auth'
@@ -25,6 +27,14 @@ export function UsersSection() {
     role: (p) => p.role,
   })
   const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedProfiles)
+
+  const exportSections: ExportSection[] = [
+    {
+      title: 'Users',
+      columns: ['Name', 'Phone', 'Role'],
+      rows: (sortedProfiles ?? []).map((p) => [p.name, p.phone ?? '', ROLE_LABEL[p.role] ?? p.role]),
+    },
+  ]
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [name, setName] = useState('')
@@ -174,6 +184,8 @@ export function UsersSection() {
           {formError}
         </div>
       )}
+
+      <ReportExportButtons title="Users" sections={exportSections} range={null} />
 
       <div className="table-scroll">
         <table className="data">

@@ -4,6 +4,8 @@ import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
+import { ReportExportButtons } from '../reports/ReportExportButtons'
+import type { ExportSection } from '../../lib/export/report'
 import { useInvoices, useInvoicePayments, useDeleteInvoice, useCycleInvoiceStatus } from '../../lib/queries/invoices'
 import { useClients, useProjects } from '../../lib/queries/masters'
 import { fmt, fmtDate } from '../../lib/calc/format'
@@ -51,13 +53,40 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
   )
   const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedInvoices)
 
+  const exportSections: ExportSection[] = [
+    {
+      title: 'Invoice records',
+      columns: ['ID', 'Invoice no.', 'Client', 'Project', 'Invoice date', 'Due date', 'Amount', 'GST', 'TDS', 'Net payable', 'Paid', 'Due', 'Status'],
+      rows: (sortedInvoices ?? []).map((inv) => {
+        const invPayments = payments?.filter((p) => p.invoice_id === inv.id) ?? []
+        return [
+          inv.display_id ?? '',
+          inv.invoice_number ?? '',
+          clientNameOf(inv),
+          projectNameOf(inv),
+          inv.invoice_date ? fmtDate(inv.invoice_date) : '',
+          (() => { const d = effectiveDueDate(inv); return d ? fmtDate(d) : '' })(),
+          inv.amount,
+          gstAmt(inv),
+          tdsAmt(inv),
+          netPayable(inv),
+          totalPaid(invPayments),
+          dueAmount(inv, invPayments),
+          effectiveStatus(inv, invPayments),
+        ]
+      }),
+    },
+  ]
+
   return (
     <details className="toggle-section" open>
       <summary>Invoice records</summary>
 
       <div style={{ marginTop: 16 }}>
-        <PeriodFilter onChange={setRange} />
+        <PeriodFilter onChange={setRange} allowCustom />
       </div>
+
+      <ReportExportButtons title="Invoice records" sections={exportSections} range={range} />
 
       <div className="table-scroll">
         <table className="data">

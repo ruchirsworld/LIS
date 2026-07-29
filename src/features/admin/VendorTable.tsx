@@ -5,6 +5,8 @@ import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
+import { ReportExportButtons } from '../reports/ReportExportButtons'
+import type { ExportSection } from '../../lib/export/report'
 import type { Database } from '../../types/database'
 
 type Vendor = Database['public']['Tables']['vendors']['Row']
@@ -26,8 +28,25 @@ export function VendorTable({ onEdit }: { onEdit: (vendor: Vendor) => void }) {
   })
   const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedVendors)
 
+  const exportSections: ExportSection[] = [
+    {
+      title: 'Vendors',
+      columns: ['ID', 'Vendor', 'Category', 'Contact person', 'Phone', 'GST/PAN', 'Address'],
+      rows: (sortedVendors ?? []).map((v) => [
+        v.display_id ?? '',
+        v.name,
+        v.category ?? '',
+        v.contact_person ?? '',
+        v.phone ?? '',
+        v.gstpan ?? '',
+        v.address ?? '',
+      ]),
+    },
+  ]
+
   return (
     <>
+      <ReportExportButtons title="Vendors" sections={exportSections} range={null} />
       <div className="table-scroll">
       <table className="data">
         <thead>
