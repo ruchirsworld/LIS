@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
 import { useCreateLoanPayment } from '../../lib/queries/loans'
-import { suggestedInterest, type LoanRow, type LoanPaymentRow } from '../../lib/calc/loans'
+import { totalInterestDue, type LoanRow, type LoanPaymentRow } from '../../lib/calc/loans'
 import { fmtPlain, parseINR } from '../../lib/calc/format'
 
 function todayStr() {
@@ -23,7 +23,7 @@ export function LoanPaymentForm({
   const createPayment = useCreateLoanPayment()
   const [date, setDate] = useState(todayStr())
   const [principalPaid, setPrincipalPaid] = useState('0')
-  const [interestPaid, setInterestPaid] = useState(fmtPlain(suggestedInterest(loan, payments).toFixed(2)).replace(/,/g, ''))
+  const [interestPaid, setInterestPaid] = useState(fmtPlain(totalInterestDue(loan, payments).toFixed(2)).replace(/,/g, ''))
   const [reference, setReference] = useState('')
   const [saving, setSaving] = useState(false)
 

@@ -8,7 +8,7 @@ import { useAttendance, useSalaryPayments, useSalaryAdjustments } from '../../li
 import { useCapitalTx } from '../../lib/queries/capital'
 import { fmt } from '../../lib/calc/format'
 import { netPayable } from '../../lib/calc/invoices'
-import { suggestedInterest } from '../../lib/calc/loans'
+import { totalInterestDue } from '../../lib/calc/loans'
 import { salaryDue, salaryAdjustmentsTotal, daysInMonth, monthsInRange } from '../../lib/calc/salary'
 import { partnerNet } from '../../lib/calc/capital'
 import type { DateRange } from '../../lib/calc/reportPeriod'
@@ -42,7 +42,7 @@ export function FinancialSummaryReport({ range }: { range: DateRange | null }) {
   let interestDue = 0
   loans?.forEach((loan) => {
     const payments = loanPayments?.filter((p) => p.loan_id === loan.id) ?? []
-    interestDue += suggestedInterest(loan, payments)
+    interestDue += totalInterestDue(loan, payments)
   })
 
   // Salary is inherently monthly — sum Net payable/Due across every calendar

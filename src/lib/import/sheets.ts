@@ -76,7 +76,7 @@ export const COLUMNS_LOANS = [
   'Principal Amount',
   'Interest Rate % (ROI)',
   'Date Taken (YYYY-MM-DD)',
-  'Interest Payment Date (YYYY-MM-DD)',
+  'Interest Due (Months)',
   'Notes',
 ] as const
 

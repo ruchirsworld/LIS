@@ -4,6 +4,7 @@ import type { DateRange } from '../calc/period'
 import type { Database } from '../../types/database'
 
 type LoanInsert = Database['public']['Tables']['loans']['Insert']
+type LoanUpdate = Database['public']['Tables']['loans']['Update']
 type LoanPaymentInsert = Database['public']['Tables']['loan_payments']['Insert']
 
 export function useLoans(range: DateRange | null) {
@@ -25,6 +26,21 @@ export function useCreateLoan() {
   return useMutation({
     mutationFn: async (loan: LoanInsert) => {
       const { data, error } = await supabase.from('loans').insert(loan).select().single()
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['loans'] })
+      qc.invalidateQueries({ queryKey: ['dashboard-kpis'] })
+    },
+  })
+}
+
+export function useUpdateLoan() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, patch }: { id: string; patch: LoanUpdate }) => {
+      const { data, error } = await supabase.from('loans').update(patch).eq('id', id).select().single()
       if (error) throw error
       return data
     },

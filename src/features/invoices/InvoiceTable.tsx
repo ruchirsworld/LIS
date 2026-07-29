@@ -1,5 +1,6 @@
 import { Fragment, useState } from 'react'
 import { PeriodFilter } from '../../components/PeriodFilter'
+import { SearchableSelect } from '../../components/SearchableSelect'
 import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
 import { useSort } from '../../lib/useSort'
@@ -19,6 +20,7 @@ type Invoice = Database['public']['Tables']['invoices']['Row']
 
 export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void }) {
   const [range, setRange] = useState<DateRange | null>(null)
+  const [clientFilter, setClientFilter] = useState('')
   const { data: invoices, isLoading } = useInvoices(range)
   const { data: payments } = useInvoicePayments()
   const { data: clients } = useClients()
@@ -32,8 +34,10 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
   const paidOf = (inv: Invoice) => totalPaid(payments?.filter((p) => p.invoice_id === inv.id) ?? [])
   const dueOf = (inv: Invoice) => dueAmount(inv, payments?.filter((p) => p.invoice_id === inv.id) ?? [])
 
+  const filteredInvoices = clientFilter ? invoices?.filter((inv) => inv.client_id === clientFilter) : invoices
+
   const { sorted: sortedInvoices, sortKey, direction, toggleSort } = useSort(
-    invoices,
+    filteredInvoices,
     {
       id: (inv) => inv.display_id,
       invoiceNo: (inv) => inv.invoice_number,
@@ -83,7 +87,20 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
       <summary>Invoice records</summary>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 12, marginTop: 16 }}>
-        <PeriodFilter onChange={setRange} allowCustom style={{ marginBottom: 0 }} />
+        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <PeriodFilter onChange={setRange} allowCustom style={{ marginBottom: 0 }} />
+          <div className="field" style={{ maxWidth: 200 }}>
+            <label>Client</label>
+            <SearchableSelect
+              items={clients}
+              value={clientFilter}
+              onChange={setClientFilter}
+              getId={(c) => c.id}
+              getLabel={(c) => clientLabel(c)}
+              placeholder="— All clients —"
+            />
+          </div>
+        </div>
         <ReportExportButtons title="Invoice records" sections={exportSections} range={range} style={{ marginTop: 0 }} />
       </div>
 

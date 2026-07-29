@@ -3,7 +3,7 @@ import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
 import { SearchableSelect } from '../../components/SearchableSelect'
 import { useLoans, useLoanPayments, useCreateLoanPayment } from '../../lib/queries/loans'
-import { loanOutstanding, monthlyInterestDue } from '../../lib/calc/loans'
+import { loanOutstanding, monthlyInterestDue, totalInterestDue } from '../../lib/calc/loans'
 import { fmt, fmtPlain, parseINR } from '../../lib/calc/format'
 
 function todayStr() {
@@ -30,13 +30,14 @@ export function LoanQuickPaymentForm() {
   const selectedLoan = openLoans?.find((l) => l.id === loanId)
   const selectedLoanPayments = payments?.filter((p) => p.loan_id === loanId) ?? []
   const monthlyInterest = selectedLoan ? monthlyInterestDue(selectedLoan, selectedLoanPayments) : 0
+  const interestDue = selectedLoan ? totalInterestDue(selectedLoan, selectedLoanPayments) : 0
 
   function handleLoanChange(id: string) {
     setLoanId(id)
     const loan = openLoans?.find((l) => l.id === id)
     if (loan) {
       const loanPayments = payments?.filter((p) => p.loan_id === id) ?? []
-      setInterestPaid(fmtPlain(monthlyInterestDue(loan, loanPayments).toFixed(2)).replace(/,/g, ''))
+      setInterestPaid(fmtPlain(totalInterestDue(loan, loanPayments).toFixed(2)).replace(/,/g, ''))
     } else {
       setInterestPaid('0')
     }
@@ -93,7 +94,7 @@ export function LoanQuickPaymentForm() {
             />
             {selectedLoan && (
               <div className="note" style={{ marginTop: 2 }}>
-                Monthly interest at current outstanding: {fmt(monthlyInterest)}
+                Monthly interest: {fmt(monthlyInterest)} · Interest due ({selectedLoan.interest_due_months} mo): {fmt(interestDue)}
               </div>
             )}
           </div>

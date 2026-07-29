@@ -421,7 +421,7 @@ export async function runImport(file: File): Promise<ImportResultRow[]> {
           principal,
           roi_pct: roi,
           date_taken: toDateStr(row[COLUMNS_LOANS[5]]),
-          interest_payment_date: toDateStr(row[COLUMNS_LOANS[6]]),
+          interest_due_months: num(row[COLUMNS_LOANS[6]]) ?? 0,
           notes: str(row[COLUMNS_LOANS[7]]) || null,
         })
         .select('id')

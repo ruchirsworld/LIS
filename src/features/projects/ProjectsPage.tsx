@@ -67,6 +67,7 @@ export function ProjectsPage() {
   const costTotal = expenseTotal + vendorBillTotal + manPowerTotal
   const invoicedRevenue = selected ? projectInvoicedRevenue(selected.id, invoices ?? []) : 0
   const receivedRevenue = selected ? projectReceivedRevenue(selected.id, invoices ?? [], invoicePayments ?? []) : 0
+  const balanceDue = invoicedRevenue - receivedRevenue
   const profit = invoicedRevenue - costTotal
   const budget = selected?.budget ?? null
   const budgetRemaining = budget !== null ? budget - costTotal : null
@@ -122,6 +123,7 @@ export function ProjectsPage() {
                 <KpiCard label="Total man power" value={fmt(manPowerTotal)} />
                 <KpiCard label="Total invoice raised" value={fmt(invoicedRevenue)} />
                 <KpiCard label="Amount received" value={fmt(receivedRevenue)} />
+                <KpiCard label="Balance amount due" value={fmt(balanceDue)} />
                 <KpiCard label="Project profit" value={fmt(profit)} />
               </div>
             </details>

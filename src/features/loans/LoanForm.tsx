@@ -12,7 +12,7 @@ export function LoanForm() {
   const [principal, setPrincipal] = useState('0')
   const [roiPct, setRoiPct] = useState('')
   const [dateTaken, setDateTaken] = useState('')
-  const [interestPaymentDate, setInterestPaymentDate] = useState('')
+  const [interestDueMonths, setInterestDueMonths] = useState('0')
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
@@ -32,7 +32,7 @@ export function LoanForm() {
         principal: parseINR(principal),
         roi_pct: Number(roiPct) || 0,
         date_taken: dateTaken || null,
-        interest_payment_date: interestPaymentDate || null,
+        interest_due_months: Number(interestDueMonths) || 0,
         notes: notes.trim() || null,
       })
       setLoanType('private')
@@ -40,7 +40,7 @@ export function LoanForm() {
       setPrincipal('0')
       setRoiPct('')
       setDateTaken('')
-      setInterestPaymentDate('')
+      setInterestDueMonths('0')
       setNotes('')
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Could not add loan.')
@@ -102,18 +102,20 @@ export function LoanForm() {
           </div>
         </div>
 
-        {/* Row 3: Date taken, Interest payment date (recurring reference date, until loan is closed) */}
+        {/* Row 3: Date taken, Interest due in (months) */}
         <div className="field-row ln-row3">
           <div className="field ln-date-taken">
             <label>Date taken</label>
             <input type="date" value={dateTaken} onChange={(e) => setDateTaken(e.target.value)} />
           </div>
           <div className="field ln-interest-date">
-            <label>Interest payment date</label>
+            <label>Interest due in (months)</label>
             <input
-              type="date"
-              value={interestPaymentDate}
-              onChange={(e) => setInterestPaymentDate(e.target.value)}
+              type="number"
+              min="0"
+              step="1"
+              value={interestDueMonths}
+              onChange={(e) => setInterestDueMonths(e.target.value)}
             />
           </div>
         </div>

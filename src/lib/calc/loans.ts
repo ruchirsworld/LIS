@@ -5,6 +5,7 @@ export interface LoanRow {
   principal: number
   roi_pct: number
   date_taken: string | null
+  interest_due_months: number
 }
 
 export interface LoanPaymentRow {
@@ -26,19 +27,6 @@ export function loanOutstanding(loan: LoanRow, payments: LoanPaymentRow[]): numb
 }
 
 /**
- * suggested_interest = outstanding_principal x (roi_pct / 100) x (days_since_last_payment_or_date_taken / 365)
- * Always just a starting suggestion for the repayment form — never enforced.
- */
-export function suggestedInterest(loan: LoanRow, payments: LoanPaymentRow[]): number {
-  const sorted = [...payments].sort((a, b) => a.date.localeCompare(b.date))
-  const lastDate = sorted.length ? sorted[sorted.length - 1].date : loan.date_taken
-  if (!lastDate) return 0
-  const days = Math.max(0, Math.round((Date.now() - new Date(lastDate).getTime()) / 86400000))
-  const outstanding = loanOutstanding(loan, payments)
-  return outstanding * (Number(loan.roi_pct) || 0) / 100 * days / 365
-}
-
-/**
  * Reducing-balance monthly interest: outstanding_principal x (roi_pct / 100) / 12.
  * Both Private Party and Bank loans use this formula — it automatically
  * recalculates as principal is repaid. This is the at-a-glance "interest due
@@ -48,4 +36,13 @@ export function suggestedInterest(loan: LoanRow, payments: LoanPaymentRow[]): nu
 export function monthlyInterestDue(loan: LoanRow, payments: LoanPaymentRow[]): number {
   const outstanding = loanOutstanding(loan, payments)
   return (outstanding * (Number(loan.roi_pct) || 0)) / 100 / 12
+}
+
+/**
+ * Total interest currently owed = monthly interest (above) x the number of
+ * months of interest the admin has marked as due. Stops mattering once the
+ * principal is fully repaid, since monthlyInterestDue then returns 0.
+ */
+export function totalInterestDue(loan: LoanRow, payments: LoanPaymentRow[]): number {
+  return monthlyInterestDue(loan, payments) * (Number(loan.interest_due_months) || 0)
 }
