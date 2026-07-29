@@ -110,6 +110,11 @@ export function ExpenseForm() {
   const topTags = (selectedCategory?.tags ?? []).map((t) => `#${t}`)
 
   const visibleProjects = clientId ? projects?.filter((p) => p.client_id === clientId) : projects
+  const activeProjects = projects?.filter((p) => p.status === 'active')
+  const purchaseSelectedProject = projects?.find((p) => p.id === projectId)
+  const purchaseProjectClient = purchaseSelectedProject
+    ? clients?.find((c) => c.id === purchaseSelectedProject.client_id)
+    : null
   const openLoans = loans?.filter((l) => {
     const payments = loanPayments?.filter((p) => p.loan_id === l.id) ?? []
     return loanOutstanding(l, payments) > 0
@@ -126,7 +131,9 @@ export function ExpenseForm() {
     setVendorId('')
     setVendorCategory(null)
     setClientId('')
-    setProjectId('')
+    // projectId deliberately not reset here — the selected project should
+    // stay put across category switches and repeated entries within the
+    // same session, since users log many transactions against one project.
     setLoanId('')
     setPartnerId('')
     setInterestPaid('0')
@@ -178,7 +185,7 @@ export function ExpenseForm() {
     setCostCenter('')
     setVendorId('')
     setClientId('')
-    setProjectId('')
+    // projectId deliberately not reset — see handleToggleChange.
     setLoanId('')
     setPartnerId('')
     setInterestPaid('0')
@@ -259,7 +266,7 @@ export function ExpenseForm() {
         await createExpense.mutateAsync({
           description: description.trim(),
           type: toggleCategory === 'general' ? 'General' : toggleCategory === 'purchase' ? 'Purchase' : 'Project',
-          project_id: toggleCategory === 'project' ? projectId : null,
+          project_id: toggleCategory === 'project' || toggleCategory === 'purchase' ? projectId || null : null,
           cost_center: toggleCategory === 'general' || toggleCategory === 'project' ? costCenter || null : null,
           vendor_id: toggleCategory === 'purchase' ? vendorId || null : null,
           amount: amt,
@@ -408,6 +415,26 @@ export function ExpenseForm() {
             onChange={(e) => setDescription(e.target.value)}
           />
         </div>
+
+        {toggleCategory === 'purchase' && (
+          <div className="field-row">
+            <div className="field">
+              <label>Project</label>
+              <SearchableSelect
+                items={activeProjects}
+                value={projectId}
+                onChange={setProjectId}
+                getId={(p) => p.id}
+                getLabel={(p) => p.name}
+                placeholder="— Select project (optional) —"
+              />
+            </div>
+            <div className="field">
+              <label>Client</label>
+              <input type="text" value={projectId ? clientLabel(purchaseProjectClient) : '—'} disabled />
+            </div>
+          </div>
+        )}
 
         {topTags.length > 0 && (
           <div style={{ gridColumn: '1 / -1' }}>
