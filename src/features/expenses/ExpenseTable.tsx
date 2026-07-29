@@ -29,12 +29,13 @@ export function ExpenseTable() {
 
   const { sorted: sortedExpenses, sortKey, direction, toggleSort } = useSort(expenses, {
     id: (e) => e.display_id,
+    date: (e) => e.date,
+    vendor: (e) => vendorNameOf(e),
     description: (e) => e.description,
     type: (e) => e.type,
     project: (e) => projLabelOf(e),
     costCenter: (e) => e.cost_center,
     amount: (e) => e.amount,
-    vendor: (e) => vendorNameOf(e),
     reimbursable: (e) => (e.reimbursable ? 1 : 0),
   })
 
@@ -51,13 +52,14 @@ export function ExpenseTable() {
           <thead>
             <tr>
               <SortableTh label="ID" sortKey="id" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Date" sortKey="date" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Vendor" sortKey="vendor" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Description" sortKey="description" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Type" sortKey="type" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Project / client" sortKey="project" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Cost center" sortKey="costCenter" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <th>Location</th>
               <SortableTh label="Amount" sortKey="amount" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
-              <SortableTh label="Vendor" sortKey="vendor" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Reimb." sortKey="reimbursable" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <th>Receipt</th>
               <th></th>
@@ -66,14 +68,14 @@ export function ExpenseTable() {
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={11} className="empty-row">
+                <td colSpan={12} className="empty-row">
                   Loading…
                 </td>
               </tr>
             )}
             {!isLoading && (!expenses || expenses.length === 0) && (
               <tr>
-                <td colSpan={11} className="empty-row">
+                <td colSpan={12} className="empty-row">
                   No expenses in this period
                 </td>
               </tr>
@@ -85,6 +87,8 @@ export function ExpenseTable() {
               return (
                 <tr key={e.id}>
                   <td>{e.display_id ?? '—'}</td>
+                  <td>{e.date}</td>
+                  <td>{vendorName || '—'}</td>
                   <td>{e.description}</td>
                   <td>{e.type}</td>
                   <td>{projLabel || '—'}</td>
@@ -103,7 +107,6 @@ export function ExpenseTable() {
                     )}
                   </td>
                   <td className="amt">{fmt(e.amount)}</td>
-                  <td>{vendorName || '—'}</td>
                   <td>{e.reimbursable ? 'Yes' : 'No'}</td>
                   <td>{e.receipt_path ? <ReceiptLink path={e.receipt_path} /> : '—'}</td>
                   <td>

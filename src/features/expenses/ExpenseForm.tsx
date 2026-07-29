@@ -336,11 +336,29 @@ export function ExpenseForm() {
         )}
 
         {toggleCategory === 'purchase' && (
+          <div className="field-row">
+            <div className="field">
+              <label>Project</label>
+              <SearchableSelect
+                items={activeProjects}
+                value={projectId}
+                onChange={setProjectId}
+                getId={(p) => p.id}
+                getLabel={(p) => p.name}
+                placeholder="— Select project (optional) —"
+              />
+            </div>
+            <div className="field">
+              <label>Client</label>
+              <input type="text" value={projectId ? clientLabel(purchaseProjectClient) : '—'} disabled />
+            </div>
+          </div>
+        )}
+
+        {toggleCategory === 'purchase' && (
           <div className="field full">
             <label>Vendor type</label>
             <VendorCategoryPills categories={vendorCategories} category={vendorCategory} onChange={setVendorCategory} />
-            <label>Vendor</label>
-            <VendorCombobox vendors={filteredVendors} value={vendorId} onChange={setVendorId} allowCreate={canAddVendor} />
           </div>
         )}
 
@@ -404,35 +422,34 @@ export function ExpenseForm() {
           </div>
         )}
 
-        {/* Row 3: Tags */}
-        <div className="field full">
-          <label>Tags</label>
-          <input
-            type="text"
-            required={writesToExpenses}
-            placeholder="Use #tags to make it searchable"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-        </div>
-
-        {toggleCategory === 'purchase' && (
+        {/* Row 3: Tags (alongside Vendor, for Purchase) */}
+        {toggleCategory === 'purchase' ? (
           <div className="field-row">
             <div className="field">
-              <label>Project</label>
-              <SearchableSelect
-                items={activeProjects}
-                value={projectId}
-                onChange={setProjectId}
-                getId={(p) => p.id}
-                getLabel={(p) => p.name}
-                placeholder="— Select project (optional) —"
-              />
+              <label>Vendor</label>
+              <VendorCombobox vendors={filteredVendors} value={vendorId} onChange={setVendorId} allowCreate={canAddVendor} />
             </div>
             <div className="field">
-              <label>Client</label>
-              <input type="text" value={projectId ? clientLabel(purchaseProjectClient) : '—'} disabled />
+              <label>Tags</label>
+              <input
+                type="text"
+                required={writesToExpenses}
+                placeholder="Use #tags to make it searchable"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
             </div>
+          </div>
+        ) : (
+          <div className="field full">
+            <label>Tags</label>
+            <input
+              type="text"
+              required={writesToExpenses}
+              placeholder="Use #tags to make it searchable"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
           </div>
         )}
 
