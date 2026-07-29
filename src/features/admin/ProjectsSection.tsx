@@ -3,10 +3,12 @@ import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
 import { SearchableSelect } from '../../components/SearchableSelect'
 import { SortableTh } from '../../components/SortableTh'
+import { Pagination } from '../../components/Pagination'
 import { useSort } from '../../lib/useSort'
+import { usePagination } from '../../lib/usePagination'
 import { useClients, useProjects, useCostCenters } from '../../lib/queries/masters'
 import { useCreateProject, useUpdateProject, useDeleteProject } from '../../lib/queries/admin'
-import { fmt, parseINR } from '../../lib/calc/format'
+import { fmt, fmtDate, parseINR } from '../../lib/calc/format'
 import { clientLabel } from '../../lib/labels'
 
 function todayStr() {
@@ -49,6 +51,7 @@ export function ProjectsSection() {
     endDate: (p) => p.end_date,
     status: (p) => p.status,
   })
+  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedProjects)
 
   useEffect(() => {
     if (!sameAsClient) return
@@ -270,7 +273,7 @@ export function ProjectsSection() {
                 </td>
               </tr>
             )}
-            {sortedProjects?.map((p) => {
+            {pageRows?.map((p) => {
               const client = clients?.find((c) => c.id === p.client_id)
               return (
                 <tr key={p.id}>
@@ -281,8 +284,8 @@ export function ProjectsSection() {
                   <td>{p.cost_center ?? '—'}</td>
                   <td className="amt">{p.budget ? fmt(p.budget) : '—'}</td>
                   <td className="amt">{p.value_ex_gst ? fmt(p.value_ex_gst) : '—'}</td>
-                  <td>{p.start_date ?? '—'}</td>
-                  <td>{p.end_date ?? '—'}</td>
+                  <td>{p.start_date ? fmtDate(p.start_date) : '—'}</td>
+                  <td>{p.end_date ? fmtDate(p.end_date) : '—'}</td>
                   <td>{p.status}</td>
                   <td>
                     <button type="button" className="pay-btn" onClick={() => startEdit(p)}>
@@ -298,6 +301,7 @@ export function ProjectsSection() {
           </tbody>
         </table>
       </div>
+      <Pagination page={page} totalPages={totalPages} totalCount={totalCount} onChange={setPage} />
     </details>
   )
 }

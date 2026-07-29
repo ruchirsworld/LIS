@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { PeriodFilter } from '../../components/PeriodFilter'
 import { SortableTh } from '../../components/SortableTh'
+import { Pagination } from '../../components/Pagination'
 import { useSort } from '../../lib/useSort'
+import { usePagination } from '../../lib/usePagination'
 import { useExpenses, useDeleteExpense } from '../../lib/queries/expenses'
 import { useProjects, useClients, useVendors } from '../../lib/queries/masters'
-import { fmt } from '../../lib/calc/format'
+import { fmt, fmtDate } from '../../lib/calc/format'
 import type { DateRange } from '../../lib/calc/period'
 import { ReceiptLink } from '../../components/ReceiptLink'
 import { clientLabel } from '../../lib/labels'
@@ -38,6 +40,7 @@ export function ExpenseTable() {
     amount: (e) => e.amount,
     reimbursable: (e) => (e.reimbursable ? 1 : 0),
   })
+  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedExpenses)
 
   return (
     <details className="toggle-section" open>
@@ -80,14 +83,14 @@ export function ExpenseTable() {
                 </td>
               </tr>
             )}
-            {sortedExpenses?.map((e) => {
+            {pageRows?.map((e) => {
               const projLabel = projLabelOf(e)
               const vendorName = vendorNameOf(e)
 
               return (
                 <tr key={e.id}>
                   <td>{e.display_id ?? '—'}</td>
-                  <td>{e.date}</td>
+                  <td>{fmtDate(e.date)}</td>
                   <td>{vendorName || '—'}</td>
                   <td>{e.description}</td>
                   <td>{e.type}</td>
@@ -124,6 +127,7 @@ export function ExpenseTable() {
           </tbody>
         </table>
       </div>
+      <Pagination page={page} totalPages={totalPages} totalCount={totalCount} onChange={setPage} />
     </details>
   )
 }

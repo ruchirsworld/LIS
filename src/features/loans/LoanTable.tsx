@@ -1,9 +1,11 @@
 import { Fragment, useState } from 'react'
 import { PeriodFilter } from '../../components/PeriodFilter'
 import { SortableTh } from '../../components/SortableTh'
+import { Pagination } from '../../components/Pagination'
 import { useSort } from '../../lib/useSort'
+import { usePagination } from '../../lib/usePagination'
 import { useLoans, useLoanPayments, useDeleteLoan } from '../../lib/queries/loans'
-import { fmt } from '../../lib/calc/format'
+import { fmt, fmtDate } from '../../lib/calc/format'
 import { loanPrincipalPaid, loanInterestPaid, loanOutstanding, monthlyInterestDue } from '../../lib/calc/loans'
 import type { DateRange } from '../../lib/calc/period'
 import { LoanPaymentForm } from './LoanPaymentForm'
@@ -36,6 +38,7 @@ export function LoanTable() {
     },
     'dateTaken'
   )
+  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedLoans)
 
   return (
     <details className="toggle-section" open>
@@ -78,7 +81,7 @@ export function LoanTable() {
                 </td>
               </tr>
             )}
-            {sortedLoans?.map((l) => {
+            {pageRows?.map((l) => {
               const loanPayments = payments?.filter((p) => p.loan_id === l.id) ?? []
               const principalPaid = loanPrincipalPaid(loanPayments)
               const interestPaid = loanInterestPaid(loanPayments)
@@ -92,8 +95,8 @@ export function LoanTable() {
                     <td>{l.display_id ?? '—'}</td>
                     <td>{LOAN_TYPE_LABEL[l.loan_type] ?? l.loan_type}</td>
                     <td>{l.lender}</td>
-                    <td>{l.date_taken ?? '—'}</td>
-                    <td>{l.interest_payment_date ?? '—'}</td>
+                    <td>{l.date_taken ? fmtDate(l.date_taken) : '—'}</td>
+                    <td>{l.interest_payment_date ? fmtDate(l.interest_payment_date) : '—'}</td>
                     <td className="amt">{fmt(l.principal)}</td>
                     <td className="amt">{l.roi_pct || 0}%</td>
                     <td className="amt">{fmt(principalPaid)}</td>
@@ -113,7 +116,7 @@ export function LoanTable() {
                         <div className="pay-history">
                           {loanPayments.map((p) => (
                             <div key={p.id}>
-                              {p.display_id} — {p.date} — principal {fmt(p.principal_paid)}, interest{' '}
+                              {p.display_id} — {fmtDate(p.date)} — principal {fmt(p.principal_paid)}, interest{' '}
                               {fmt(p.interest_paid)}
                               {p.reference ? ` · ${p.reference}` : ''}
                             </div>
@@ -131,6 +134,7 @@ export function LoanTable() {
           </tbody>
         </table>
       </div>
+      <Pagination page={page} totalPages={totalPages} totalCount={totalCount} onChange={setPage} />
     </details>
   )
 }

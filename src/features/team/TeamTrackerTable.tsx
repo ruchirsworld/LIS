@@ -1,10 +1,12 @@
 import { Fragment, useState } from 'react'
 import { PeriodFilter } from '../../components/PeriodFilter'
 import { SortableTh } from '../../components/SortableTh'
+import { Pagination } from '../../components/Pagination'
 import { useSort } from '../../lib/useSort'
+import { usePagination } from '../../lib/usePagination'
 import { useTeamTracker, useDeleteTeamTracker, useTeamTrackerPayments } from '../../lib/queries/team'
 import { useProjects } from '../../lib/queries/masters'
-import { fmt } from '../../lib/calc/format'
+import { fmt, fmtDate } from '../../lib/calc/format'
 import { ttPaid, ttDue } from '../../lib/calc/teamTracker'
 import type { DateRange } from '../../lib/calc/period'
 import { TeamTrackerPaymentForm } from './TeamTrackerPaymentForm'
@@ -40,6 +42,7 @@ export function TeamTrackerTable() {
     },
     'date'
   )
+  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedEntries)
 
   return (
     <details className="toggle-section" open>
@@ -81,7 +84,7 @@ export function TeamTrackerTable() {
                 </td>
               </tr>
             )}
-            {sortedEntries?.map((t) => {
+            {pageRows?.map((t) => {
               const proj = projects?.find((p) => p.id === t.project_id)
               const entryPayments = payments?.filter((p) => p.team_tracker_id === t.id) ?? []
               const paid = ttPaid(entryPayments)
@@ -92,7 +95,7 @@ export function TeamTrackerTable() {
                 <Fragment key={t.id}>
                   <tr>
                     <td>{t.display_id ?? '—'}</td>
-                    <td>{t.date}</td>
+                    <td>{fmtDate(t.date)}</td>
                     <td>{t.supplier}</td>
                     <td>{proj ? proj.name : '—'}</td>
                     <td className="amt">{t.qty ?? '—'}</td>
@@ -116,7 +119,7 @@ export function TeamTrackerTable() {
                         <div className="pay-history">
                           {entryPayments.map((p) => (
                             <div key={p.id}>
-                              {p.display_id} — {p.date} — {fmt(p.amount)}
+                              {p.display_id} — {fmtDate(p.date)} — {fmt(p.amount)}
                               {p.reference ? ` · ${p.reference}` : ''}
                             </div>
                           ))}
@@ -133,6 +136,7 @@ export function TeamTrackerTable() {
           </tbody>
         </table>
       </div>
+      <Pagination page={page} totalPages={totalPages} totalCount={totalCount} onChange={setPage} />
     </details>
   )
 }

@@ -689,6 +689,8 @@ button:focus-visible {
 
 .table-scroll {
   overflow-x: auto;
+  overflow-y: auto;
+  max-height: 480px;
   border-radius: 10px;
   border: 1px solid var(--line);
 }
@@ -707,6 +709,9 @@ table.data th {
   background: var(--paper-2);
   border-bottom: 1px solid var(--line);
   white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 table.data td {
   padding: 11px 14px;

@@ -2,7 +2,9 @@ import { useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
 import { SortableTh } from '../../components/SortableTh'
+import { Pagination } from '../../components/Pagination'
 import { useSort } from '../../lib/useSort'
+import { usePagination } from '../../lib/usePagination'
 import { useBankAccounts } from '../../lib/queries/masters'
 import { useCreateBankAccount, useUpdateBankAccount, useDeleteBankAccount } from '../../lib/queries/admin'
 import { fmt, parseINR } from '../../lib/calc/format'
@@ -18,6 +20,7 @@ export function BankAccountsSection() {
     accountNumber: (a) => a.account_number,
     openingBalance: (a) => a.opening_balance,
   })
+  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedAccounts)
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [name, setName] = useState('')
@@ -135,7 +138,7 @@ export function BankAccountsSection() {
                 </td>
               </tr>
             )}
-            {sortedAccounts?.map((a) => (
+            {pageRows?.map((a) => (
               <tr key={a.id}>
                 <td>{a.name}</td>
                 <td>{a.account_number ?? '—'}</td>
@@ -153,6 +156,7 @@ export function BankAccountsSection() {
           </tbody>
         </table>
       </div>
+      <Pagination page={page} totalPages={totalPages} totalCount={totalCount} onChange={setPage} />
     </details>
   )
 }

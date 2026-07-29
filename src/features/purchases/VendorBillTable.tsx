@@ -1,10 +1,12 @@
 import { Fragment, useState } from 'react'
 import { PeriodFilter } from '../../components/PeriodFilter'
 import { SortableTh } from '../../components/SortableTh'
+import { Pagination } from '../../components/Pagination'
 import { useSort } from '../../lib/useSort'
+import { usePagination } from '../../lib/usePagination'
 import { useVendorBills, useVendorBillPayments, useDeleteVendorBill } from '../../lib/queries/purchases'
 import { useVendors, useProjects, useClients } from '../../lib/queries/masters'
-import { fmt } from '../../lib/calc/format'
+import { fmt, fmtDate } from '../../lib/calc/format'
 import { billGstAmt, billTotal, billPaid, billDue } from '../../lib/calc/vendorBills'
 import type { DateRange } from '../../lib/calc/period'
 import { VendorBillPaymentForm } from './VendorBillPaymentForm'
@@ -56,6 +58,7 @@ export function VendorBillTable() {
     },
     'date'
   )
+  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedBills)
 
   return (
     <details className="toggle-section" open>
@@ -117,7 +120,7 @@ export function VendorBillTable() {
                 </td>
               </tr>
             )}
-            {sortedBills?.map((b) => {
+            {pageRows?.map((b) => {
               const vendor = vendors?.find((v) => v.id === b.vendor_id)
               const client = b.client_id ? clients?.find((c) => c.id === b.client_id) : null
               const project = b.project_id ? projects?.find((p) => p.id === b.project_id) : null
@@ -134,7 +137,7 @@ export function VendorBillTable() {
                     <td>{b.description ?? '—'}</td>
                     <td>{clientLabel(client)}</td>
                     <td>{project ? project.name : '—'}</td>
-                    <td>{b.date ?? '—'}</td>
+                    <td>{b.date ? fmtDate(b.date) : '—'}</td>
                     <td className="amt">{fmt(b.amount)}</td>
                     <td className="amt">{fmt(billGstAmt(b))}</td>
                     <td className="amt">{fmt(billTotal(b))}</td>
@@ -154,7 +157,7 @@ export function VendorBillTable() {
                         <div className="pay-history">
                           {billPayments.map((p) => (
                             <div key={p.id}>
-                              {p.display_id} — {p.date} — {fmt(p.amount)}
+                              {p.display_id} — {fmtDate(p.date)} — {fmt(p.amount)}
                               {p.payment_mode ? ` · ${p.payment_mode}` : ''}
                               {p.reference ? ` · ${p.reference}` : ''}
                             </div>
@@ -172,6 +175,7 @@ export function VendorBillTable() {
           </tbody>
         </table>
       </div>
+      <Pagination page={page} totalPages={totalPages} totalCount={totalCount} onChange={setPage} />
     </details>
   )
 }

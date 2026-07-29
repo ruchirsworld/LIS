@@ -3,7 +3,7 @@ import { useAuth } from '../../lib/auth'
 import { useEmployees } from '../../lib/queries/masters'
 import { useAttendance, useSalaryPayments, useSalaryAdjustments } from '../../lib/queries/team'
 import { periodToRange, inRange } from '../../lib/calc/period'
-import { fmt } from '../../lib/calc/format'
+import { fmt, fmtDate } from '../../lib/calc/format'
 import { salaryPaid, salaryDue, salaryAdjustmentsTotal, daysInMonth } from '../../lib/calc/salary'
 import { SalaryPaymentForm } from './SalaryPaymentForm'
 import { SalaryPaymentEditForm } from './SalaryPaymentEditForm'
@@ -135,7 +135,7 @@ export function SalaryCalculator() {
                                 />
                               ) : (
                                 <div key={p.id}>
-                                  {p.display_id} — {p.date} — {fmt(p.amount)}
+                                  {p.display_id} — {fmtDate(p.date)} — {fmt(p.amount)}
                                   {p.notes ? ` · ${p.notes}` : ''}{' '}
                                   <button type="button" className="pay-btn" onClick={() => setEditingPaymentId(p.id)}>
                                     Edit

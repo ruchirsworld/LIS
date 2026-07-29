@@ -2,7 +2,9 @@ import { useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui'
 import { SearchableSelect } from '../../components/SearchableSelect'
 import { SortableTh } from '../../components/SortableTh'
+import { Pagination } from '../../components/Pagination'
 import { useSort } from '../../lib/useSort'
+import { usePagination } from '../../lib/usePagination'
 import { useProfiles, useCreateUser, useUpdateProfile, useDeleteUser, type Profile } from '../../lib/queries/admin'
 import { useEmployees } from '../../lib/queries/masters'
 import { useAuth } from '../../lib/auth'
@@ -22,6 +24,7 @@ export function UsersSection() {
     phone: (p) => p.phone,
     role: (p) => p.role,
   })
+  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedProfiles)
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [name, setName] = useState('')
@@ -197,7 +200,7 @@ export function UsersSection() {
                 </td>
               </tr>
             )}
-            {sortedProfiles?.map((p) => (
+            {pageRows?.map((p) => (
               <tr key={p.id}>
                 <td>{p.name}</td>
                 <td>{p.phone ?? '—'}</td>
@@ -217,6 +220,7 @@ export function UsersSection() {
           </tbody>
         </table>
       </div>
+      <Pagination page={page} totalPages={totalPages} totalCount={totalCount} onChange={setPage} />
     </details>
   )
 }

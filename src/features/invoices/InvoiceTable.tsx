@@ -1,10 +1,12 @@
 import { Fragment, useState } from 'react'
 import { PeriodFilter } from '../../components/PeriodFilter'
 import { SortableTh } from '../../components/SortableTh'
+import { Pagination } from '../../components/Pagination'
 import { useSort } from '../../lib/useSort'
+import { usePagination } from '../../lib/usePagination'
 import { useInvoices, useInvoicePayments, useDeleteInvoice, useCycleInvoiceStatus } from '../../lib/queries/invoices'
 import { useClients, useProjects } from '../../lib/queries/masters'
-import { fmt } from '../../lib/calc/format'
+import { fmt, fmtDate } from '../../lib/calc/format'
 import { gstAmt, tdsAmt, netPayable, totalPaid, dueAmount, effectiveDueDate, effectiveStatus } from '../../lib/calc/invoices'
 import type { DateRange } from '../../lib/calc/period'
 import { InvoicePaymentForm } from './InvoicePaymentForm'
@@ -47,6 +49,7 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
     },
     'invoiceDate'
   )
+  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedInvoices)
 
   return (
     <details className="toggle-section" open>
@@ -91,7 +94,7 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
                 </td>
               </tr>
             )}
-            {sortedInvoices?.map((inv) => {
+            {pageRows?.map((inv) => {
               const client = clients?.find((c) => c.id === inv.client_id)
               const project = inv.project_id ? projects?.find((p) => p.id === inv.project_id) : null
               const invPayments = payments?.filter((p) => p.invoice_id === inv.id) ?? []
@@ -109,8 +112,8 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
                     <td>{inv.invoice_number ?? '—'}</td>
                     <td>{clientLabel(client)}</td>
                     <td>{project ? project.name : '—'}</td>
-                    <td>{inv.invoice_date ?? '— (not sent yet)'}</td>
-                    <td>{dueDateDisplay ?? '—'}</td>
+                    <td>{inv.invoice_date ? fmtDate(inv.invoice_date) : '— (not sent yet)'}</td>
+                    <td>{dueDateDisplay ? fmtDate(dueDateDisplay) : '—'}</td>
                     <td className="amt">{fmt(inv.amount)}</td>
                     <td className="amt">
                       {fmt(gstAmt(inv))} <span style={{ color: 'var(--ink-soft)', fontSize: 11 }}>({inv.gst_pct || 0}%)</span>
@@ -152,7 +155,7 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
                         <div className="pay-history">
                           {invPayments.map((p) => (
                             <div key={p.id}>
-                              {p.display_id} — {p.date} — {fmt(p.amount)}
+                              {p.display_id} — {fmtDate(p.date)} — {fmt(p.amount)}
                               {p.reference ? ` · ${p.reference}` : ''}
                             </div>
                           ))}
@@ -169,6 +172,7 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
           </tbody>
         </table>
       </div>
+      <Pagination page={page} totalPages={totalPages} totalCount={totalCount} onChange={setPage} />
     </details>
   )
 }

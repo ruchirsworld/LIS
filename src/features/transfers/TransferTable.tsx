@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { PeriodFilter } from '../../components/PeriodFilter'
 import { SortableTh } from '../../components/SortableTh'
+import { Pagination } from '../../components/Pagination'
 import { useSort } from '../../lib/useSort'
+import { usePagination } from '../../lib/usePagination'
 import { useTransfers, useDeleteTransfer } from '../../lib/queries/transfers'
 import { useBankAccounts } from '../../lib/queries/masters'
-import { fmt } from '../../lib/calc/format'
+import { fmt, fmtDate } from '../../lib/calc/format'
 import type { DateRange } from '../../lib/calc/period'
 
 export function TransferTable() {
@@ -30,6 +32,7 @@ export function TransferTable() {
     },
     'date'
   )
+  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedTransfers)
 
   return (
     <details className="toggle-section" open>
@@ -67,12 +70,12 @@ export function TransferTable() {
                 </td>
               </tr>
             )}
-            {sortedTransfers?.map((t) => (
+            {pageRows?.map((t) => (
               <tr key={t.id}>
                 <td>{t.display_id ?? '—'}</td>
                 <td>{accountName(t.from_account_id)}</td>
                 <td>{accountName(t.to_account_id)}</td>
-                <td>{t.date ?? '—'}</td>
+                <td>{t.date ? fmtDate(t.date) : '—'}</td>
                 <td className="amt">{fmt(t.amount)}</td>
                 <td>{t.notes ?? '—'}</td>
                 <td>
@@ -85,6 +88,7 @@ export function TransferTable() {
           </tbody>
         </table>
       </div>
+      <Pagination page={page} totalPages={totalPages} totalCount={totalCount} onChange={setPage} />
     </details>
   )
 }

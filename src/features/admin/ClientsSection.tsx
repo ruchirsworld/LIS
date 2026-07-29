@@ -1,7 +1,9 @@
 import { useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui'
 import { SortableTh } from '../../components/SortableTh'
+import { Pagination } from '../../components/Pagination'
 import { useSort } from '../../lib/useSort'
+import { usePagination } from '../../lib/usePagination'
 import { useClients } from '../../lib/queries/masters'
 import { useCreateClient, useUpdateClient, useDeleteClient } from '../../lib/queries/admin'
 
@@ -18,6 +20,7 @@ export function ClientsSection() {
     gst: (c) => c.gst,
     email: (c) => c.email,
   })
+  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedClients)
   const createClient = useCreateClient()
   const updateClient = useUpdateClient()
   const deleteClient = useDeleteClient()
@@ -187,7 +190,7 @@ export function ClientsSection() {
                 </td>
               </tr>
             )}
-            {sortedClients?.map((c) => (
+            {pageRows?.map((c) => (
               <tr key={c.id}>
                 <td>{c.display_id ?? '—'}</td>
                 <td>{c.name}</td>
@@ -211,6 +214,7 @@ export function ClientsSection() {
           </tbody>
         </table>
       </div>
+      <Pagination page={page} totalPages={totalPages} totalCount={totalCount} onChange={setPage} />
     </details>
   )
 }

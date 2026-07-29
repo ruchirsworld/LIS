@@ -2,10 +2,12 @@ import { useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
 import { SortableTh } from '../../components/SortableTh'
+import { Pagination } from '../../components/Pagination'
 import { useSort } from '../../lib/useSort'
+import { usePagination } from '../../lib/usePagination'
 import { useEmployees } from '../../lib/queries/masters'
 import { useEmployeeSensitive, useCreateEmployee, useUpdateEmployee, useDeleteEmployee } from '../../lib/queries/admin'
-import { fmt, parseINR } from '../../lib/calc/format'
+import { fmt, fmtDate, parseINR } from '../../lib/calc/format'
 
 function maskAadhar(aadhar: string | null | undefined): string {
   if (!aadhar) return '—'
@@ -35,6 +37,7 @@ export function EmployeesSection() {
     otherAllowance: (emp) => emp.other_allowance,
     status: (emp) => emp.status,
   })
+  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedEmployees)
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [name, setName] = useState('')
@@ -229,7 +232,7 @@ export function EmployeesSection() {
                 </td>
               </tr>
             )}
-            {sortedEmployees?.map((emp) => {
+            {pageRows?.map((emp) => {
               const s = sensitiveOf(emp)
               return (
                 <tr key={emp.id}>
@@ -242,7 +245,7 @@ export function EmployeesSection() {
                   <td className="amt">{emp.monthly_salary ? fmt(emp.monthly_salary) : '—'}</td>
                   <td className="amt">{emp.fuel_allowance ? fmt(emp.fuel_allowance) : '—'}</td>
                   <td className="amt">{emp.other_allowance ? fmt(emp.other_allowance) : '—'}</td>
-                  <td>{emp.status === 'left' ? `Left${emp.left_date ? ` (${emp.left_date})` : ''}` : 'Active'}</td>
+                  <td>{emp.status === 'left' ? `Left${emp.left_date ? ` (${fmtDate(emp.left_date)})` : ''}` : 'Active'}</td>
                   <td>
                     <button type="button" className="pay-btn" onClick={() => startEdit(emp)}>
                       Edit
@@ -257,6 +260,7 @@ export function EmployeesSection() {
           </tbody>
         </table>
       </div>
+      <Pagination page={page} totalPages={totalPages} totalCount={totalCount} onChange={setPage} />
     </details>
   )
 }

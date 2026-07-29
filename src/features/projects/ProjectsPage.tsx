@@ -8,7 +8,7 @@ import { useExpenses } from '../../lib/queries/expenses'
 import { useVendorBills } from '../../lib/queries/purchases'
 import { useInvoices, useInvoicePayments } from '../../lib/queries/invoices'
 import { useTeamTracker } from '../../lib/queries/team'
-import { fmt } from '../../lib/calc/format'
+import { fmt, fmtDate } from '../../lib/calc/format'
 import { clientLabel } from '../../lib/labels'
 import type { Database } from '../../types/database'
 import {
@@ -109,8 +109,8 @@ export function ProjectsPage() {
               <summary>{selected.name}</summary>
               <div className="note" style={{ marginTop: 16, marginBottom: 12 }}>
                 {clientLabel(client)} · {selected.project_location ?? '—'} · {selected.display_id ?? '—'} · Started{' '}
-                {selected.start_date ?? '—'}
-                {selected.end_date ? ` · Completed ${selected.end_date}` : ''}
+                {selected.start_date ? fmtDate(selected.start_date) : '—'}
+                {selected.end_date ? ` · Completed ${fmtDate(selected.end_date)}` : ''}
               </div>
 
               <div className="dash-grid">
@@ -155,8 +155,8 @@ export function ProjectsPage() {
                         <td>{p.display_id ?? '—'}</td>
                         <td>{p.name}</td>
                         <td>{clientLabel(rowClient)}</td>
-                        <td>{p.start_date ?? '—'}</td>
-                        <td>{p.end_date ?? '—'}</td>
+                        <td>{p.start_date ? fmtDate(p.start_date) : '—'}</td>
+                        <td>{p.end_date ? fmtDate(p.end_date) : '—'}</td>
                         <td>
                           {canEditStatus ? (
                             <label className="status-switch" onClick={(e) => e.stopPropagation()}>

@@ -1,10 +1,13 @@
 import { useState } from 'react'
 import { PeriodFilter } from '../../components/PeriodFilter'
 import { SortableTh } from '../../components/SortableTh'
+import { Pagination } from '../../components/Pagination'
 import { useSort } from '../../lib/useSort'
+import { usePagination } from '../../lib/usePagination'
 import { useAttendance, useDeleteAttendance } from '../../lib/queries/team'
 import { useEmployees } from '../../lib/queries/masters'
 import { useAuth } from '../../lib/auth'
+import { fmtDate } from '../../lib/calc/format'
 import type { DateRange } from '../../lib/calc/period'
 
 const STATUS_LABEL: Record<string, string> = {
@@ -37,6 +40,7 @@ export function AttendanceTable() {
     },
     'date'
   )
+  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedAttendance)
 
   return (
     <details className="toggle-section" open>
@@ -73,13 +77,13 @@ export function AttendanceTable() {
                 </td>
               </tr>
             )}
-            {sortedAttendance?.map((a) => {
+            {pageRows?.map((a) => {
               const empName = employeeNameOf(a)
               return (
                 <tr key={a.id}>
                   <td>{a.display_id ?? '—'}</td>
                   <td>{empName || '—'}</td>
-                  <td>{a.date}</td>
+                  <td>{fmtDate(a.date)}</td>
                   <td>{STATUS_LABEL[a.status] ?? a.status}</td>
                   <td>{a.notes ?? '—'}</td>
                   <td>
@@ -99,6 +103,7 @@ export function AttendanceTable() {
           </tbody>
         </table>
       </div>
+      <Pagination page={page} totalPages={totalPages} totalCount={totalCount} onChange={setPage} />
     </details>
   )
 }

@@ -2,7 +2,9 @@ import { useVendors } from '../../lib/queries/masters'
 import { useDeleteVendor } from '../../lib/queries/admin'
 import { useAuth } from '../../lib/auth'
 import { SortableTh } from '../../components/SortableTh'
+import { Pagination } from '../../components/Pagination'
 import { useSort } from '../../lib/useSort'
+import { usePagination } from '../../lib/usePagination'
 import type { Database } from '../../types/database'
 
 type Vendor = Database['public']['Tables']['vendors']['Row']
@@ -22,9 +24,11 @@ export function VendorTable({ onEdit }: { onEdit: (vendor: Vendor) => void }) {
     gstpan: (v) => v.gstpan,
     address: (v) => v.address,
   })
+  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedVendors)
 
   return (
-    <div className="table-scroll">
+    <>
+      <div className="table-scroll">
       <table className="data">
         <thead>
           <tr>
@@ -53,7 +57,7 @@ export function VendorTable({ onEdit }: { onEdit: (vendor: Vendor) => void }) {
               </td>
             </tr>
           )}
-          {sortedVendors?.map((v) => (
+          {pageRows?.map((v) => (
             <tr key={v.id}>
               <td>{v.display_id ?? '—'}</td>
               <td>{v.name}</td>
@@ -78,6 +82,8 @@ export function VendorTable({ onEdit }: { onEdit: (vendor: Vendor) => void }) {
           ))}
         </tbody>
       </table>
-    </div>
+      </div>
+      <Pagination page={page} totalPages={totalPages} totalCount={totalCount} onChange={setPage} />
+    </>
   )
 }

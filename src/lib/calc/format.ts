@@ -30,3 +30,16 @@ export function formatINR(raw: string): string {
 export function parseINR(value: string | null | undefined): number {
   return Number(String(value || '0').replace(/,/g, '')) || 0
 }
+
+/** Displays a stored YYYY-MM-DD (or YYYY-MM-DDThh:mm:ss) date as DD-MM-YYYY.
+ * Storage/inputs stay ISO — this is display-only, applied wherever a raw
+ * date is shown in a table. Falls back to the original string if it isn't
+ * in the expected shape. */
+export function fmtDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return ''
+  const s = dateStr.length > 10 ? dateStr.slice(0, 10) : dateStr
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s)
+  if (!match) return dateStr
+  const [, y, m, d] = match
+  return `${d}-${m}-${y}`
+}

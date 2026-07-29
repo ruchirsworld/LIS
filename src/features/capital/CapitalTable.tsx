@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { PeriodFilter } from '../../components/PeriodFilter'
 import { SortableTh } from '../../components/SortableTh'
+import { Pagination } from '../../components/Pagination'
 import { useSort } from '../../lib/useSort'
+import { usePagination } from '../../lib/usePagination'
 import { useCapitalTx, useDeleteCapitalTx } from '../../lib/queries/capital'
 import { usePartners } from '../../lib/queries/masters'
-import { fmt } from '../../lib/calc/format'
+import { fmt, fmtDate } from '../../lib/calc/format'
 import type { DateRange } from '../../lib/calc/period'
 
 export function CapitalTable() {
@@ -27,6 +29,7 @@ export function CapitalTable() {
     },
     'date'
   )
+  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedTx)
 
   return (
     <details className="toggle-section" open>
@@ -64,14 +67,14 @@ export function CapitalTable() {
                 </td>
               </tr>
             )}
-            {sortedTx?.map((t) => {
+            {pageRows?.map((t) => {
               const partner = partners?.find((p) => p.id === t.partner_id)
               return (
                 <tr key={t.id}>
                   <td>{t.display_id ?? '—'}</td>
                   <td>{partner ? partner.name : '—'}</td>
                   <td>{t.type === 'injection' ? 'Injection (in)' : 'Withdrawal (out)'}</td>
-                  <td>{t.date ?? '—'}</td>
+                  <td>{t.date ? fmtDate(t.date) : '—'}</td>
                   <td className="amt">{fmt(t.amount)}</td>
                   <td>{t.notes ?? '—'}</td>
                   <td>
@@ -85,6 +88,7 @@ export function CapitalTable() {
           </tbody>
         </table>
       </div>
+      <Pagination page={page} totalPages={totalPages} totalCount={totalCount} onChange={setPage} />
     </details>
   )
 }
