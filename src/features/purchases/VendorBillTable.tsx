@@ -86,11 +86,10 @@ export function VendorBillTable() {
     <details className="toggle-section" open>
       <summary>Vendor bill records</summary>
 
-      <div style={{ marginTop: 16 }}>
-        <PeriodFilter onChange={setRange} allowCustom />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 12, marginTop: 16 }}>
+        <PeriodFilter onChange={setRange} allowCustom style={{ marginBottom: 0 }} />
+        <ReportExportButtons title="Vendor bill records" sections={exportSections} range={range} style={{ marginTop: 0 }} />
       </div>
-
-      <ReportExportButtons title="Vendor bill records" sections={exportSections} range={range} />
 
       {categories.length > 0 && (
         <div className="pill-tabs" style={{ marginTop: 12, flexWrap: 'wrap' }}>

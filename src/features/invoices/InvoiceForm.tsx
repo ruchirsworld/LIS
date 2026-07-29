@@ -5,6 +5,7 @@ import { SearchableSelect } from '../../components/SearchableSelect'
 import { useClients, useProjects } from '../../lib/queries/masters'
 import { useCreateInvoice, useUpdateInvoice } from '../../lib/queries/invoices'
 import { parseINR } from '../../lib/calc/format'
+import { getErrorMessage } from '../../lib/errors'
 import { clientLabel } from '../../lib/labels'
 import type { Database } from '../../types/database'
 
@@ -110,7 +111,7 @@ export function InvoiceForm({
       }
       resetForm()
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Could not save invoice.')
+      setFormError(getErrorMessage(err, 'Could not save invoice.'))
     } finally {
       setSubmitting(false)
     }

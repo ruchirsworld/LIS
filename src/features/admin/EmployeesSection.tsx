@@ -10,6 +10,7 @@ import type { ExportSection } from '../../lib/export/report'
 import { useEmployees } from '../../lib/queries/masters'
 import { useEmployeeSensitive, useCreateEmployee, useUpdateEmployee, useDeleteEmployee } from '../../lib/queries/admin'
 import { fmt, fmtDate, parseINR } from '../../lib/calc/format'
+import { getErrorMessage } from '../../lib/errors'
 
 function maskAadhar(aadhar: string | null | undefined): string {
   if (!aadhar) return '—'
@@ -138,7 +139,7 @@ export function EmployeesSection() {
       }
       resetForm()
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Could not save employee.')
+      setFormError(getErrorMessage(err, 'Could not save employee.'))
     } finally {
       setSubmitting(false)
     }

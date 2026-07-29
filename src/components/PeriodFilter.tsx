@@ -1,14 +1,15 @@
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import type { DateRange, PeriodFilterType } from '../lib/calc/period'
 import { periodToRange } from '../lib/calc/period'
 
 interface PeriodFilterProps {
   onChange: (range: DateRange | null) => void
   allowCustom?: boolean
+  style?: CSSProperties
 }
 
 /** Month/Quarter/Year/All-time filter, ported from the v1.0 prototype's per-tab filter row. */
-export function PeriodFilter({ onChange, allowCustom = false }: PeriodFilterProps) {
+export function PeriodFilter({ onChange, allowCustom = false, style }: PeriodFilterProps) {
   const [type, setType] = useState<PeriodFilterType>('all')
   const [month, setMonth] = useState('')
   const [quarter, setQuarter] = useState(1)
@@ -37,7 +38,7 @@ export function PeriodFilter({ onChange, allowCustom = false }: PeriodFilterProp
   }
 
   return (
-    <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: 14 }}>
+    <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: 14, ...style }}>
       <div className="field" style={{ maxWidth: 130 }}>
         <label>Filter by</label>
         <select

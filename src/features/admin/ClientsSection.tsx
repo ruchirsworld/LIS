@@ -8,6 +8,7 @@ import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
 import { useClients } from '../../lib/queries/masters'
 import { useCreateClient, useUpdateClient, useDeleteClient } from '../../lib/queries/admin'
+import { getErrorMessage } from '../../lib/errors'
 
 export function ClientsSection() {
   const { data: clients, isLoading } = useClients()
@@ -107,7 +108,7 @@ export function ClientsSection() {
       }
       resetForm()
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Could not save client.')
+      setFormError(getErrorMessage(err, 'Could not save client.'))
     } finally {
       setSubmitting(false)
     }

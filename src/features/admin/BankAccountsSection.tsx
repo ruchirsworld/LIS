@@ -10,6 +10,7 @@ import type { ExportSection } from '../../lib/export/report'
 import { useBankAccounts } from '../../lib/queries/masters'
 import { useCreateBankAccount, useUpdateBankAccount, useDeleteBankAccount } from '../../lib/queries/admin'
 import { fmt, parseINR } from '../../lib/calc/format'
+import { getErrorMessage } from '../../lib/errors'
 
 export function BankAccountsSection() {
   const { data: accounts, isLoading } = useBankAccounts()
@@ -74,7 +75,7 @@ export function BankAccountsSection() {
       }
       resetForm()
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Could not save bank account.')
+      setFormError(getErrorMessage(err, 'Could not save bank account.'))
     } finally {
       setSubmitting(false)
     }

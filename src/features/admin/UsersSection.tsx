@@ -8,6 +8,7 @@ import { usePagination } from '../../lib/usePagination'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
 import { useProfiles, useCreateUser, useUpdateProfile, useDeleteUser, type Profile } from '../../lib/queries/admin'
+import { getErrorMessage } from '../../lib/errors'
 import { useEmployees } from '../../lib/queries/masters'
 import { useAuth } from '../../lib/auth'
 
@@ -76,7 +77,7 @@ export function UsersSection() {
         await updateProfile.mutateAsync({ id: editingId, name: name.trim(), role, employeeId: employeeId || null })
         resetForm()
       } catch (err) {
-        setFormError(err instanceof Error ? err.message : 'Could not save user.')
+        setFormError(getErrorMessage(err, 'Could not save user.'))
       } finally {
         setSubmitting(false)
       }

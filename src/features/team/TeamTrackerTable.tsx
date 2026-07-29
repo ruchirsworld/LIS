@@ -69,11 +69,10 @@ export function TeamTrackerTable() {
     <details className="toggle-section" open>
       <summary>Team tracker records</summary>
 
-      <div style={{ marginTop: 16 }}>
-        <PeriodFilter onChange={setRange} allowCustom />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 12, marginTop: 16 }}>
+        <PeriodFilter onChange={setRange} allowCustom style={{ marginBottom: 0 }} />
+        <ReportExportButtons title="Team tracker records" sections={exportSections} range={range} style={{ marginTop: 0 }} />
       </div>
-
-      <ReportExportButtons title="Team tracker records" sections={exportSections} range={range} />
 
       <div className="table-scroll">
         <table className="data">

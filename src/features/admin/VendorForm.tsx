@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui'
 import { useCreateVendorFull, useUpdateVendor } from '../../lib/queries/admin'
 import { useAuth } from '../../lib/auth'
+import { getErrorMessage } from '../../lib/errors'
 import type { Database } from '../../types/database'
 
 type Vendor = Database['public']['Tables']['vendors']['Row']
@@ -77,7 +78,7 @@ export function VendorForm({
         resetForm()
       }
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Could not save vendor.')
+      setFormError(getErrorMessage(err, 'Could not save vendor.'))
     } finally {
       setSubmitting(false)
     }

@@ -11,6 +11,7 @@ import type { ExportSection } from '../../lib/export/report'
 import { useClients, useProjects, useCostCenters } from '../../lib/queries/masters'
 import { useCreateProject, useUpdateProject, useDeleteProject } from '../../lib/queries/admin'
 import { fmt, fmtDate, parseINR } from '../../lib/calc/format'
+import { getErrorMessage } from '../../lib/errors'
 import { clientLabel } from '../../lib/labels'
 
 function todayStr() {
@@ -159,7 +160,7 @@ export function ProjectsSection() {
       }
       resetForm()
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Could not save project.')
+      setFormError(getErrorMessage(err, 'Could not save project.'))
     } finally {
       setSubmitting(false)
     }

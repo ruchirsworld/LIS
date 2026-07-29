@@ -14,6 +14,7 @@ import { useGeolocation } from '../../lib/useGeolocation'
 import { compressImage } from '../../lib/compressImage'
 import { uploadReceipt } from '../../lib/storage'
 import { parseINR, fmt, fmtPlain } from '../../lib/calc/format'
+import { getErrorMessage } from '../../lib/errors'
 import { clientLabel, matchesCategoryLabel } from '../../lib/labels'
 import { loanOutstanding, monthlyInterestDue } from '../../lib/calc/loans'
 import { VendorCombobox } from '../purchases/VendorCombobox'
@@ -281,7 +282,7 @@ export function ExpenseForm() {
 
       resetForm()
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Could not save.')
+      setFormError(getErrorMessage(err, 'Could not save.'))
     } finally {
       setSubmitting(false)
     }
