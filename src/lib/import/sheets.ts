@@ -15,12 +15,8 @@ export const SHEET_LOAN_PAYMENTS = 'Loan Payments'
 export const COLUMNS_PROJECTS = [
   'Client Name',
   'Project Name',
-  'Cost Center',
-  'Budget',
   'Contract Value (ex GST)',
-  'Location',
   'Start Date (YYYY-MM-DD)',
-  'Status (Active/Completed)',
 ] as const
 
 export const COLUMNS_INVOICES = [
@@ -29,10 +25,7 @@ export const COLUMNS_INVOICES = [
   'Project Name',
   'Amount',
   'GST %',
-  'TDS %',
   'Invoice Date (YYYY-MM-DD)',
-  'Due Days',
-  'Status (Draft/Sent)',
 ] as const
 
 export const COLUMNS_PAYMENTS = ['Invoice Number', 'Payment Date (YYYY-MM-DD)', 'Amount', 'Notes'] as const
@@ -41,7 +34,6 @@ export const COLUMNS_VENDOR_BILLS = [
   'Reference',
   'Vendor Name',
   'Bill Date (YYYY-MM-DD)',
-  'Description',
   'Client Name (optional)',
   'Project Name (optional)',
   'Bill Value ex GST',
@@ -76,7 +68,6 @@ export const COLUMNS_LOANS = [
   'Principal Amount',
   'Interest Rate % (ROI)',
   'Date Taken (YYYY-MM-DD)',
-  'Interest Due (Months)',
   'Notes',
 ] as const
 
@@ -89,28 +80,9 @@ export const COLUMNS_LOAN_PAYMENTS = [
   'Notes',
 ] as const
 
-export const EXAMPLE_ROW_PROJECTS = [
-  'Ganesh Builders',
-  'NH7 Mdn (Interm-01)',
-  'Field / project site',
-  '120000',
-  '160000',
-  'Dehradun (UK)',
-  '2025-04-01',
-  'Active',
-]
+export const EXAMPLE_ROW_PROJECTS = ['Ganesh Builders', 'NH7 Mdn (Interm-01)', '160000', '2025-04-01']
 
-export const EXAMPLE_ROW_INVOICES = [
-  'GB/24-25/003',
-  'Ganesh Builders',
-  'NH7 Mdn (Interm-01)',
-  '160000',
-  '18',
-  '2',
-  '2025-04-10',
-  '30',
-  'Sent',
-]
+export const EXAMPLE_ROW_INVOICES = ['GB/24-25/003', 'Ganesh Builders', 'NH7 Mdn (Interm-01)', '160000', '18', '2025-04-10']
 
 export const EXAMPLE_ROW_PAYMENTS = ['GB/24-25/003', '2025-05-01', '80000', 'Part payment via bank transfer']
 
@@ -118,7 +90,6 @@ export const EXAMPLE_ROW_VENDOR_BILLS = [
   'BILL-1',
   'Vidhi Enterprises',
   '2025-04-15',
-  'Irrigation pipes',
   'Ganesh Builders',
   'NH7 Mdn (Interm-01)',
   '100000',
@@ -129,7 +100,7 @@ export const EXAMPLE_ROW_VENDOR_BILL_PAYMENTS = ['BILL-1', '2025-05-01', '50000'
 
 export const EXAMPLE_ROW_EXPENSES = ['General', '#Fuel', 'DDN', '', '', '', '1500', '2025-04-05', 'Cash', 'No']
 
-export const EXAMPLE_ROW_LOANS =['LOAN-1', 'Schrutir Jain', 'Private', '500000', '12', '2025-01-15', '', 'Private loan for working capital']
+export const EXAMPLE_ROW_LOANS = ['LOAN-1', 'Schrutir Jain', 'Private', '500000', '12', '2025-01-15', 'Private loan for working capital']
 
 export const EXAMPLE_ROW_LOAN_PAYMENTS = ['LOAN-1', '2025-06-01', '5000', '20000', 'Bank', '']
 
@@ -144,5 +115,6 @@ export const INSTRUCTIONS_LINES: string[] = [
   '6. On the Expenses sheet, only fill in the columns that match the Category you pick for that row: General needs Cost Center, Purchase needs Vendor Name, Project needs Project Name (Client Name is optional there).',
   '7. If a Client, Project, Vendor, or Lender name doesn’t already exist in the system, it will be created automatically.',
   '8. Dates should be in YYYY-MM-DD format, e.g. 2025-04-01.',
-  '9. Save this file and upload it back on the Admin → Data import section when you’re done.',
+  '9. This sheet only covers the essentials. Anything left out (Budget, Cost Center, Location, TDS %, Due Days on Projects/Invoices) can be added afterward via Edit in the app — Vendor Bills and Loans don\'t have an Edit option yet, so fill those in carefully the first time. A Loan\'s "Interest due (months)" starts at 0 and is edited directly in Loan records.',
+  '10. Save this file and upload it back on the Admin → Data import section when you’re done.',
 ]

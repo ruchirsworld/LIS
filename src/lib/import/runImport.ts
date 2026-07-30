@@ -189,12 +189,12 @@ export async function runImport(file: File): Promise<ImportResultRow[]> {
         .insert({
           client_id: clientId,
           name: projectName,
-          cost_center: str(row[COLUMNS_PROJECTS[2]]) || null,
-          budget: num(row[COLUMNS_PROJECTS[3]]),
-          value_ex_gst: num(row[COLUMNS_PROJECTS[4]]),
-          project_location: str(row[COLUMNS_PROJECTS[5]]) || null,
-          start_date: toDateStr(row[COLUMNS_PROJECTS[6]]),
-          status: projectStatus(row[COLUMNS_PROJECTS[7]]),
+          cost_center: null,
+          budget: null,
+          value_ex_gst: num(row[COLUMNS_PROJECTS[2]]),
+          project_location: null,
+          start_date: toDateStr(row[COLUMNS_PROJECTS[3]]),
+          status: projectStatus(undefined),
         })
         .select('id')
         .single()
@@ -221,7 +221,7 @@ export async function runImport(file: File): Promise<ImportResultRow[]> {
 
       const clientId = await resolveClientId(clientName)
       const projectId = projectName ? await resolveProjectId(clientId, projectName) : null
-      const invoiceDate = toDateStr(row[COLUMNS_INVOICES[6]])
+      const invoiceDate = toDateStr(row[COLUMNS_INVOICES[5]])
 
       const { data, error } = await supabase
         .from('invoices')
@@ -231,10 +231,10 @@ export async function runImport(file: File): Promise<ImportResultRow[]> {
           invoice_number: invoiceNumber || null,
           amount,
           gst_pct: num(row[COLUMNS_INVOICES[4]]) ?? 0,
-          tds_pct: num(row[COLUMNS_INVOICES[5]]) ?? 0,
+          tds_pct: 0,
           invoice_date: invoiceDate,
-          due_days: num(row[COLUMNS_INVOICES[7]]),
-          status: invoiceStatus(row[COLUMNS_INVOICES[8]], !!invoiceDate),
+          due_days: null,
+          status: invoiceStatus(undefined, !!invoiceDate),
         })
         .select('id')
         .single()
@@ -288,13 +288,13 @@ export async function runImport(file: File): Promise<ImportResultRow[]> {
     try {
       const reference = str(row[COLUMNS_VENDOR_BILLS[0]])
       const vendorName = str(row[COLUMNS_VENDOR_BILLS[1]])
-      const amount = num(row[COLUMNS_VENDOR_BILLS[6]])
+      const amount = num(row[COLUMNS_VENDOR_BILLS[5]])
       if (!vendorName) throw new Error('Vendor Name is required')
       if (amount === null) throw new Error('Bill Value ex GST is required')
 
       const vendorId = await resolveVendorId(vendorName)
-      const clientName = str(row[COLUMNS_VENDOR_BILLS[4]])
-      const projectName = str(row[COLUMNS_VENDOR_BILLS[5]])
+      const clientName = str(row[COLUMNS_VENDOR_BILLS[3]])
+      const projectName = str(row[COLUMNS_VENDOR_BILLS[4]])
       const clientId = clientName ? await resolveClientId(clientName) : null
       const projectId = clientId && projectName ? await resolveProjectId(clientId, projectName) : null
 
@@ -303,11 +303,11 @@ export async function runImport(file: File): Promise<ImportResultRow[]> {
         .insert({
           vendor_id: vendorId,
           date: toDateStr(row[COLUMNS_VENDOR_BILLS[2]]),
-          description: str(row[COLUMNS_VENDOR_BILLS[3]]) || null,
+          description: null,
           client_id: clientId,
           project_id: projectId,
           amount,
-          gst_pct: num(row[COLUMNS_VENDOR_BILLS[7]]) ?? 0,
+          gst_pct: num(row[COLUMNS_VENDOR_BILLS[6]]) ?? 0,
         })
         .select('id')
         .single()
@@ -421,8 +421,8 @@ export async function runImport(file: File): Promise<ImportResultRow[]> {
           principal,
           roi_pct: roi,
           date_taken: toDateStr(row[COLUMNS_LOANS[5]]),
-          interest_due_months: num(row[COLUMNS_LOANS[6]]) ?? 0,
-          notes: str(row[COLUMNS_LOANS[7]]) || null,
+          interest_due_months: 0,
+          notes: str(row[COLUMNS_LOANS[6]]) || null,
         })
         .select('id')
         .single()
