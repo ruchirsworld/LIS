@@ -14,8 +14,11 @@ import type { DateRange } from '../../lib/calc/period'
 import { VendorBillPaymentForm } from './VendorBillPaymentForm'
 import { ReceiptLink } from '../../components/ReceiptLink'
 import { clientLabel } from '../../lib/labels'
+import type { Database } from '../../types/database'
 
-export function VendorBillTable() {
+type VendorBill = Database['public']['Tables']['vendor_bills']['Row']
+
+export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void }) {
   const [range, setRange] = useState<DateRange | null>(null)
   const { data: bills, isLoading } = useVendorBills(range)
   const { data: payments } = useVendorBillPayments()
@@ -173,6 +176,9 @@ export function VendorBillTable() {
                           Record payment
                         </button>
                       )}
+                      <button type="button" className="pay-btn" onClick={() => onEdit(b)}>
+                        Edit
+                      </button>
                       <button type="button" className="btn danger-link" onClick={() => deleteBill.mutate(b.id)}>
                         Remove
                       </button>

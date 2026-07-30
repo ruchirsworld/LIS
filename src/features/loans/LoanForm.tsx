@@ -1,11 +1,22 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
-import { useCreateLoan } from '../../lib/queries/loans'
+import { useCreateLoan, useUpdateLoan } from '../../lib/queries/loans'
 import { parseINR } from '../../lib/calc/format'
+import { getErrorMessage } from '../../lib/errors'
+import type { Database } from '../../types/database'
 
-export function LoanForm() {
+type Loan = Database['public']['Tables']['loans']['Row']
+
+export function LoanForm({
+  editingLoan,
+  onDoneEditing,
+}: {
+  editingLoan: Loan | null
+  onDoneEditing: () => void
+}) {
   const createLoan = useCreateLoan()
+  const updateLoan = useUpdateLoan()
 
   const [loanType, setLoanType] = useState<'private' | 'bank'>('private')
   const [lender, setLender] = useState('')
@@ -17,6 +28,33 @@ export function LoanForm() {
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
+  useEffect(() => {
+    if (!editingLoan) return
+    setLoanType(editingLoan.loan_type === 'bank' ? 'bank' : 'private')
+    setLender(editingLoan.lender)
+    setPrincipal(String(editingLoan.principal))
+    setRoiPct(String(editingLoan.roi_pct))
+    setDateTaken(editingLoan.date_taken ?? '')
+    setInterestDueMonths(String(editingLoan.interest_due_months))
+    setNotes(editingLoan.notes ?? '')
+    setFormError(null)
+  }, [editingLoan])
+
+  function resetForm() {
+    setLoanType('private')
+    setLender('')
+    setPrincipal('0')
+    setRoiPct('')
+    setDateTaken('')
+    setInterestDueMonths('0')
+    setNotes('')
+  }
+
+  function handleCancel() {
+    resetForm()
+    onDoneEditing()
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setFormError(null)
@@ -26,7 +64,7 @@ export function LoanForm() {
     }
     setSubmitting(true)
     try {
-      await createLoan.mutateAsync({
+      const patch = {
         loan_type: loanType,
         lender: lender.trim(),
         principal: parseINR(principal),
@@ -34,16 +72,16 @@ export function LoanForm() {
         date_taken: dateTaken || null,
         interest_due_months: Number(interestDueMonths) || 0,
         notes: notes.trim() || null,
-      })
-      setLoanType('private')
-      setLender('')
-      setPrincipal('0')
-      setRoiPct('')
-      setDateTaken('')
-      setInterestDueMonths('0')
-      setNotes('')
+      }
+      if (editingLoan) {
+        await updateLoan.mutateAsync({ id: editingLoan.id, patch })
+        onDoneEditing()
+      } else {
+        await createLoan.mutateAsync(patch)
+      }
+      resetForm()
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Could not add loan.')
+      setFormError(getErrorMessage(err, 'Could not save loan.'))
     } finally {
       setSubmitting(false)
     }
@@ -125,10 +163,15 @@ export function LoanForm() {
           <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} />
         </div>
 
-        <div className="field full">
+        <div className="field full" style={{ display: 'flex', gap: 8 }}>
           <Button type="submit" disabled={submitting}>
-            {submitting ? 'Adding…' : 'Add loan'}
+            {submitting ? 'Saving…' : editingLoan ? 'Save changes' : 'Add loan'}
           </Button>
+          {editingLoan && (
+            <Button type="button" variant="secondary" onClick={handleCancel}>
+              Cancel
+            </Button>
+          )}
         </div>
       </form>
 

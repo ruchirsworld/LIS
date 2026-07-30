@@ -13,8 +13,11 @@ import { fmt, fmtDate } from '../../lib/calc/format'
 import type { DateRange } from '../../lib/calc/period'
 import { ReceiptLink } from '../../components/ReceiptLink'
 import { clientLabel } from '../../lib/labels'
+import type { Database } from '../../types/database'
 
-export function ExpenseTable() {
+type Expense = Database['public']['Tables']['expenses']['Row']
+
+export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void }) {
   const [range, setRange] = useState<DateRange | null>(null)
   const [recentOnly, setRecentOnly] = useState(false)
   const { data: expenses, isLoading } = useExpenses(recentOnly ? null : range)
@@ -151,6 +154,9 @@ export function ExpenseTable() {
                   <td>{e.reimbursable ? 'Yes' : 'No'}</td>
                   <td>{e.receipt_path ? <ReceiptLink path={e.receipt_path} /> : '—'}</td>
                   <td>
+                    <button type="button" className="pay-btn" onClick={() => onEdit(e)}>
+                      Edit
+                    </button>
                     <button
                       type="button"
                       className="btn danger-link"

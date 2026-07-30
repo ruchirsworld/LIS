@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
 import { InlineCalculator } from '../../components/InlineCalculator'
@@ -7,7 +7,7 @@ import { SearchableSelect } from '../../components/SearchableSelect'
 import { ReceiptUploadButton } from '../../components/ReceiptUploadButton'
 import { useAuth } from '../../lib/auth'
 import { useClients, useProjects, useVendors, useCostCenters, usePartners, useExpenseCategories } from '../../lib/queries/masters'
-import { useCreateExpense } from '../../lib/queries/expenses'
+import { useCreateExpense, useUpdateExpense } from '../../lib/queries/expenses'
 import { useLoans, useLoanPayments, useCreateLoanPayment } from '../../lib/queries/loans'
 import { useCreateCapitalTx } from '../../lib/queries/capital'
 import { useGeolocation } from '../../lib/useGeolocation'
@@ -19,7 +19,9 @@ import { clientLabel, matchesCategoryLabel } from '../../lib/labels'
 import { loanOutstanding, monthlyInterestDue, totalInterestDue } from '../../lib/calc/loans'
 import { VendorCombobox } from '../purchases/VendorCombobox'
 import { useVendorCategoryFilter, VendorCategoryPills } from '../purchases/VendorCategoryFilter'
+import type { Database } from '../../types/database'
 
+type ExpenseRow = Database['public']['Tables']['expenses']['Row']
 type ToggleCategory = 'general' | 'purchase' | 'project' | 'loan' | 'capital'
 type PaymentMode = 'UPI' | 'Cash' | 'Bank'
 
@@ -55,7 +57,13 @@ function CalculatorIcon() {
   )
 }
 
-export function ExpenseForm() {
+export function ExpenseForm({
+  editingExpense,
+  onDoneEditing,
+}: {
+  editingExpense: ExpenseRow | null
+  onDoneEditing: () => void
+}) {
   const { profile } = useAuth()
   const canAddVendor = profile?.role === 'admin' || profile?.role === 'cxo'
 
@@ -71,6 +79,7 @@ export function ExpenseForm() {
   const { geo } = useGeolocation()
 
   const createExpense = useCreateExpense()
+  const updateExpense = useUpdateExpense()
   const createLoanPayment = useCreateLoanPayment()
   const createCapitalTx = useCreateCapitalTx()
 
@@ -126,6 +135,35 @@ export function ExpenseForm() {
   const suggestedInterestDue = selectedLoan ? totalInterestDue(selectedLoan, selectedLoanPayments) : 0
 
   const writesToExpenses = toggleCategory === 'general' || toggleCategory === 'purchase' || toggleCategory === 'project'
+  // Editing an expense row can only move it between the three categories
+  // that write to the expenses table — switching to Loan/Capital would mean
+  // writing to a different table entirely, which isn't an "edit" anymore.
+  const visibleToggleOptions = editingExpense
+    ? TOGGLE_OPTIONS.filter((o) => o.id === 'general' || o.id === 'purchase' || o.id === 'project')
+    : TOGGLE_OPTIONS
+
+  useEffect(() => {
+    if (!editingExpense) return
+    const cat: ToggleCategory =
+      editingExpense.type === 'General' ? 'general' : editingExpense.type === 'Purchase' ? 'purchase' : 'project'
+    setToggleCategory(cat)
+    setAmount(String(editingExpense.amount))
+    setDescription(editingExpense.description)
+    setDate(editingExpense.date)
+    setReimbursable(editingExpense.reimbursable)
+    setCostCenter(editingExpense.cost_center ?? '')
+    setVendorId(editingExpense.vendor_id ?? '')
+    setVendorCategory(null)
+    setProjectId(editingExpense.project_id ?? '')
+    const proj = projects?.find((p) => p.id === editingExpense.project_id)
+    setClientId(proj?.client_id ?? '')
+    setPaymentMode((editingExpense.payment_mode as PaymentMode) ?? 'UPI')
+    setReceiptBlob(null)
+    setReceiptStatus(editingExpense.receipt_path ? 'Photo attached' : 'Take photo')
+    setShowCalc(false)
+    setFormError(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editingExpense, projects])
 
   function handleToggleChange(next: ToggleCategory) {
     setToggleCategory(next)
@@ -200,6 +238,11 @@ export function ExpenseForm() {
     setShowCalc(false)
   }
 
+  function handleCancel() {
+    resetForm()
+    onDoneEditing()
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setFormError(null)
@@ -261,11 +304,11 @@ export function ExpenseForm() {
           setSubmitting(false)
           return
         }
-        let receiptPath: string | null = null
+        let receiptPath: string | null = editingExpense?.receipt_path ?? null
         if (receiptBlob) {
           receiptPath = await uploadReceipt(receiptBlob)
         }
-        await createExpense.mutateAsync({
+        const patch = {
           description: description.trim(),
           type: toggleCategory === 'general' ? 'General' : toggleCategory === 'purchase' ? 'Purchase' : 'Project',
           project_id: toggleCategory === 'project' || toggleCategory === 'purchase' ? projectId || null : null,
@@ -274,11 +317,18 @@ export function ExpenseForm() {
           amount: amt,
           date,
           reimbursable,
-          geo_lat: geo?.lat ?? null,
-          geo_lng: geo?.lng ?? null,
           receipt_path: receiptPath,
           payment_mode: paymentMode,
-        })
+        }
+        if (editingExpense) {
+          await updateExpense.mutateAsync({
+            id: editingExpense.id,
+            patch: { ...patch, geo_lat: editingExpense.geo_lat, geo_lng: editingExpense.geo_lng },
+          })
+          onDoneEditing()
+        } else {
+          await createExpense.mutateAsync({ ...patch, geo_lat: geo?.lat ?? null, geo_lng: geo?.lng ?? null })
+        }
       }
 
       resetForm()
@@ -316,7 +366,7 @@ export function ExpenseForm() {
         <div className="field full">
           <label>Category</label>
           <div className="pill-tabs exp-cat-tabs">
-            {TOGGLE_OPTIONS.map((opt) => (
+            {visibleToggleOptions.map((opt) => (
               <button
                 key={opt.id}
                 type="button"
@@ -594,10 +644,15 @@ export function ExpenseForm() {
                 <label htmlFor="e-reimb">Reimbursable</label>
               </div>
             </div>
-            <div className="field full">
-              <Button type="submit" disabled={submitting} style={{ width: '100%' }}>
-                {submitting ? 'Adding…' : 'Add expense'}
+            <div className="field full" style={{ display: 'flex', gap: 8 }}>
+              <Button type="submit" disabled={submitting} style={{ flex: editingExpense ? undefined : '1 1 auto' }}>
+                {submitting ? 'Saving…' : editingExpense ? 'Save changes' : 'Add expense'}
               </Button>
+              {editingExpense && (
+                <Button type="button" variant="secondary" onClick={handleCancel}>
+                  Cancel
+                </Button>
+              )}
             </div>
           </>
         )}

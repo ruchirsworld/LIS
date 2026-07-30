@@ -4,6 +4,7 @@ import type { DateRange } from '../calc/period'
 import type { Database } from '../../types/database'
 
 type VendorBillInsert = Database['public']['Tables']['vendor_bills']['Insert']
+type VendorBillUpdate = Database['public']['Tables']['vendor_bills']['Update']
 type VendorBillPaymentInsert = Database['public']['Tables']['vendor_bill_payments']['Insert']
 
 export function useVendorBills(range: DateRange | null) {
@@ -25,6 +26,21 @@ export function useCreateVendorBill() {
   return useMutation({
     mutationFn: async (bill: VendorBillInsert) => {
       const { data, error } = await supabase.from('vendor_bills').insert(bill).select().single()
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['vendor_bills'] })
+      qc.invalidateQueries({ queryKey: ['dashboard-kpis'] })
+    },
+  })
+}
+
+export function useUpdateVendorBill() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, patch }: { id: string; patch: VendorBillUpdate }) => {
+      const { data, error } = await supabase.from('vendor_bills').update(patch).eq('id', id).select().single()
       if (error) throw error
       return data
     },

@@ -1,30 +1,41 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
 import { ReceiptUploadButton } from '../../components/ReceiptUploadButton'
 import { SearchableSelect } from '../../components/SearchableSelect'
 import { useAuth } from '../../lib/auth'
 import { useClients, useProjects, useVendors } from '../../lib/queries/masters'
-import { useCreateVendorBill } from '../../lib/queries/purchases'
+import { useCreateVendorBill, useUpdateVendorBill } from '../../lib/queries/purchases'
 import { fmt, parseINR } from '../../lib/calc/format'
 import { billTotal } from '../../lib/calc/vendorBills'
 import { compressImage } from '../../lib/compressImage'
 import { uploadReceipt } from '../../lib/storage'
+import { getErrorMessage } from '../../lib/errors'
 import { clientLabel } from '../../lib/labels'
 import { VendorCombobox } from './VendorCombobox'
 import { useVendorCategoryFilter, VendorCategoryPills } from './VendorCategoryFilter'
+import type { Database } from '../../types/database'
+
+type VendorBill = Database['public']['Tables']['vendor_bills']['Row']
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
 }
 
-export function VendorBillForm() {
+export function VendorBillForm({
+  editingBill,
+  onDoneEditing,
+}: {
+  editingBill: VendorBill | null
+  onDoneEditing: () => void
+}) {
   const { profile } = useAuth()
   const canAddVendor = profile?.role === 'admin' || profile?.role === 'cxo'
   const { data: vendors } = useVendors()
   const { data: clients } = useClients()
   const { data: projects } = useProjects()
   const createVendorBill = useCreateVendorBill()
+  const updateVendorBill = useUpdateVendorBill()
 
   const [vendorId, setVendorId] = useState('')
   const { categories: vendorCategories, category: vendorCategory, setCategory: setVendorCategory, filteredVendors } =
@@ -41,6 +52,38 @@ export function VendorBillForm() {
   const [formError, setFormError] = useState<string | null>(null)
 
   const visibleProjects = clientId ? projects?.filter((p) => p.client_id === clientId) : projects
+
+  useEffect(() => {
+    if (!editingBill) return
+    setVendorId(editingBill.vendor_id)
+    setDescription(editingBill.description ?? '')
+    setClientId(editingBill.client_id ?? '')
+    setProjectId(editingBill.project_id ?? '')
+    setDate(editingBill.date ?? todayStr())
+    setAmount(String(editingBill.amount))
+    setGstPct(String(editingBill.gst_pct ?? 0))
+    setReceiptBlob(null)
+    setReceiptStatus(editingBill.receipt_path ? 'Photo attached' : 'Take photo')
+    setFormError(null)
+  }, [editingBill])
+
+  function resetForm() {
+    setVendorId('')
+    setVendorCategory(null)
+    setDescription('')
+    setClientId('')
+    setProjectId('')
+    setDate(todayStr())
+    setAmount('0')
+    setGstPct('0')
+    setReceiptBlob(null)
+    setReceiptStatus('Take photo')
+  }
+
+  function handleCancel() {
+    resetForm()
+    onDoneEditing()
+  }
 
   function handleClientChange(id: string) {
     setClientId(id)
@@ -68,12 +111,12 @@ export function VendorBillForm() {
     }
     setSubmitting(true)
     try {
-      let receiptPath: string | null = null
+      let receiptPath: string | null = editingBill?.receipt_path ?? null
       if (receiptBlob) {
         receiptPath = await uploadReceipt(receiptBlob, 'vendor_bills')
       }
 
-      await createVendorBill.mutateAsync({
+      const patch = {
         vendor_id: vendorId,
         description: description.trim() || null,
         client_id: clientId || null,
@@ -82,19 +125,17 @@ export function VendorBillForm() {
         amount: parseINR(amount),
         gst_pct: Number(gstPct) || 0,
         receipt_path: receiptPath,
-      })
-      setVendorId('')
-      setVendorCategory(null)
-      setDescription('')
-      setClientId('')
-      setProjectId('')
-      setDate(todayStr())
-      setAmount('0')
-      setGstPct('0')
-      setReceiptBlob(null)
-      setReceiptStatus('Take photo')
+      }
+
+      if (editingBill) {
+        await updateVendorBill.mutateAsync({ id: editingBill.id, patch })
+        onDoneEditing()
+      } else {
+        await createVendorBill.mutateAsync(patch)
+      }
+      resetForm()
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Could not add bill.')
+      setFormError(getErrorMessage(err, 'Could not save bill.'))
     } finally {
       setSubmitting(false)
     }
@@ -186,9 +227,16 @@ export function VendorBillForm() {
           </div>
           <div className="field vb-submit">
             <label>&nbsp;</label>
-            <Button type="submit" disabled={submitting}>
-              {submitting ? 'Adding…' : 'Add bill'}
-            </Button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Button type="submit" disabled={submitting}>
+                {submitting ? 'Saving…' : editingBill ? 'Save changes' : 'Add bill'}
+              </Button>
+              {editingBill && (
+                <Button type="button" variant="secondary" onClick={handleCancel}>
+                  Cancel
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </form>

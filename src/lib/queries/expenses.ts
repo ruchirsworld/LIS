@@ -4,6 +4,7 @@ import type { DateRange } from '../calc/period'
 import type { Database } from '../../types/database'
 
 type ExpenseInsert = Database['public']['Tables']['expenses']['Insert']
+type ExpenseUpdate = Database['public']['Tables']['expenses']['Update']
 
 export function useExpenses(range: DateRange | null) {
   return useQuery({
@@ -24,6 +25,21 @@ export function useCreateExpense() {
   return useMutation({
     mutationFn: async (expense: ExpenseInsert) => {
       const { data, error } = await supabase.from('expenses').insert(expense).select().single()
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['expenses'] })
+      qc.invalidateQueries({ queryKey: ['dashboard-kpis'] })
+    },
+  })
+}
+
+export function useUpdateExpense() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, patch }: { id: string; patch: ExpenseUpdate }) => {
+      const { data, error } = await supabase.from('expenses').update(patch).eq('id', id).select().single()
       if (error) throw error
       return data
     },

@@ -11,10 +11,13 @@ import { fmt, fmtDate } from '../../lib/calc/format'
 import { loanPrincipalPaid, loanInterestPaid, loanOutstanding, monthlyInterestDue, totalInterestDue } from '../../lib/calc/loans'
 import type { DateRange } from '../../lib/calc/period'
 import { LoanPaymentForm } from './LoanPaymentForm'
+import type { Database } from '../../types/database'
+
+type Loan = Database['public']['Tables']['loans']['Row']
 
 const LOAN_TYPE_LABEL: Record<string, string> = { private: 'Private Party', bank: 'Bank' }
 
-export function LoanTable() {
+export function LoanTable({ onEdit }: { onEdit: (loan: Loan) => void }) {
   const [range, setRange] = useState<DateRange | null>(null)
   const { data: loans, isLoading } = useLoans(range)
   const { data: payments } = useLoanPayments()
@@ -155,6 +158,9 @@ export function LoanTable() {
                           Record repayment
                         </button>
                       )}
+                      <button type="button" className="pay-btn" onClick={() => onEdit(l)}>
+                        Edit
+                      </button>
                       <button type="button" className="btn danger-link" onClick={() => deleteLoan.mutate(l.id)}>
                         Remove
                       </button>
