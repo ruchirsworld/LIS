@@ -50,12 +50,12 @@ Deno.serve(async (req) => {
       return json({ error: "Only admins can create users" }, 403);
     }
 
-    const { phone, pin, name, role, employeeId } = await req.json();
+    const { phone, pin, name, role } = await req.json();
     if (!phone || !pin || !name || !role) {
       return json({ error: "phone, pin, name, and role are required" }, 400);
     }
-    if (!["admin", "cxo", "staff"].includes(role)) {
-      return json({ error: "role must be admin, cxo, or staff" }, 400);
+    if (!["admin", "cxo"].includes(role)) {
+      return json({ error: "role must be admin or cxo" }, 400);
     }
     const digits = String(phone).replace(/\D/g, "");
     if (digits.length < 10) return json({ error: "Enter a valid phone number." }, 400);
@@ -73,7 +73,7 @@ Deno.serve(async (req) => {
       email: syntheticEmail,
       password: pin,
       email_confirm: true,
-      user_metadata: { name, role, phone: digits, employee_id: employeeId || null },
+      user_metadata: { name, role, phone: digits },
     });
 
     if (createErr) return json({ error: createErr.message }, 400);

@@ -1,7 +1,6 @@
 export const TABS = [
   { id: 'dashboard', label: 'Dashboard', adminOnly: false },
   { id: 'expenses', label: 'Expenses', adminOnly: false },
-  { id: 'team', label: 'Team', adminOnly: false },
   { id: 'purchases', label: 'Purchases', adminOnly: false },
   { id: 'invoices', label: 'Invoices', adminOnly: false },
   { id: 'loans', label: 'Loans', adminOnly: false },

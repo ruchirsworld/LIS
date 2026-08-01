@@ -14,54 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      attendance: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          date: string
-          display_id: string | null
-          employee_id: string
-          id: string
-          notes: string | null
-          status: Database["public"]["Enums"]["attendance_status"]
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          date: string
-          display_id?: string | null
-          employee_id: string
-          id?: string
-          notes?: string | null
-          status: Database["public"]["Enums"]["attendance_status"]
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          date?: string
-          display_id?: string | null
-          employee_id?: string
-          id?: string
-          notes?: string | null
-          status?: Database["public"]["Enums"]["attendance_status"]
-        }
-        Relationships: [
-          {
-            foreignKeyName: "attendance_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "attendance_employee_id_fkey"
-            columns: ["employee_id"]
-            isOneToOne: false
-            referencedRelation: "employees"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       bank_accounts: {
         Row: {
           account_number: string | null
@@ -236,85 +188,6 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "cost_centers_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      employee_sensitive: {
-        Row: {
-          aadhar: string | null
-          employee_id: string
-          pan: string | null
-        }
-        Insert: {
-          aadhar?: string | null
-          employee_id: string
-          pan?: string | null
-        }
-        Update: {
-          aadhar?: string | null
-          employee_id?: string
-          pan?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "employee_sensitive_employee_id_fkey"
-            columns: ["employee_id"]
-            isOneToOne: true
-            referencedRelation: "employees"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      employees: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          designation: string | null
-          display_id: string | null
-          fuel_allowance: number | null
-          id: string
-          left_date: string | null
-          monthly_salary: number | null
-          name: string
-          other_allowance: number | null
-          phone: string | null
-          status: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          designation?: string | null
-          display_id?: string | null
-          fuel_allowance?: number | null
-          id?: string
-          left_date?: string | null
-          monthly_salary?: number | null
-          name: string
-          other_allowance?: number | null
-          phone?: string | null
-          status?: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          designation?: string | null
-          display_id?: string | null
-          fuel_allowance?: number | null
-          id?: string
-          left_date?: string | null
-          monthly_salary?: number | null
-          name?: string
-          other_allowance?: number | null
-          phone?: string | null
-          status?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "employees_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -731,7 +604,6 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string
-          employee_id: string | null
           id: string
           name: string
           phone: string | null
@@ -739,7 +611,6 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          employee_id?: string | null
           id: string
           name: string
           phone?: string | null
@@ -747,21 +618,12 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          employee_id?: string | null
           id?: string
           name?: string
           phone?: string | null
           role?: Database["public"]["Enums"]["user_role"]
         }
-        Relationships: [
-          {
-            foreignKeyName: "profiles_employee_id_fkey"
-            columns: ["employee_id"]
-            isOneToOne: false
-            referencedRelation: "employees"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       projects: {
         Row: {
@@ -832,214 +694,6 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      salary_adjustments: {
-        Row: {
-          amount: number
-          created_at: string
-          created_by: string | null
-          display_id: string | null
-          employee_id: string
-          id: string
-          month: string
-          notes: string | null
-        }
-        Insert: {
-          amount: number
-          created_at?: string
-          created_by?: string | null
-          display_id?: string | null
-          employee_id: string
-          id?: string
-          month: string
-          notes?: string | null
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          created_by?: string | null
-          display_id?: string | null
-          employee_id?: string
-          id?: string
-          month?: string
-          notes?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "salary_adjustments_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "salary_adjustments_employee_id_fkey"
-            columns: ["employee_id"]
-            isOneToOne: false
-            referencedRelation: "employees"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      salary_payments: {
-        Row: {
-          amount: number
-          created_at: string
-          created_by: string | null
-          date: string
-          display_id: string | null
-          employee_id: string
-          id: string
-          notes: string | null
-        }
-        Insert: {
-          amount: number
-          created_at?: string
-          created_by?: string | null
-          date: string
-          display_id?: string | null
-          employee_id: string
-          id?: string
-          notes?: string | null
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          created_by?: string | null
-          date?: string
-          display_id?: string | null
-          employee_id?: string
-          id?: string
-          notes?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "salary_payments_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "salary_payments_employee_id_fkey"
-            columns: ["employee_id"]
-            isOneToOne: false
-            referencedRelation: "employees"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      team_tracker: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          date: string
-          display_id: string | null
-          id: string
-          project_id: string
-          qty: number | null
-          rate: number | null
-          remarks: string | null
-          supplier: string
-          total: number | null
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          date: string
-          display_id?: string | null
-          id?: string
-          project_id: string
-          qty?: number | null
-          rate?: number | null
-          remarks?: string | null
-          supplier: string
-          total?: number | null
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          date?: string
-          display_id?: string | null
-          id?: string
-          project_id?: string
-          qty?: number | null
-          rate?: number | null
-          remarks?: string | null
-          supplier?: string
-          total?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "team_tracker_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "team_tracker_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "team_tracker_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "v_project_summary"
-            referencedColumns: ["project_id"]
-          },
-        ]
-      }
-      team_tracker_payments: {
-        Row: {
-          amount: number
-          created_at: string
-          created_by: string | null
-          date: string
-          display_id: string | null
-          id: string
-          reference: string | null
-          team_tracker_id: string
-        }
-        Insert: {
-          amount: number
-          created_at?: string
-          created_by?: string | null
-          date: string
-          display_id?: string | null
-          id?: string
-          reference?: string | null
-          team_tracker_id: string
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          created_by?: string | null
-          date?: string
-          display_id?: string | null
-          id?: string
-          reference?: string | null
-          team_tracker_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "team_tracker_payments_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "team_tracker_payments_team_tracker_id_fkey"
-            columns: ["team_tracker_id"]
-            isOneToOne: false
-            referencedRelation: "team_tracker"
             referencedColumns: ["id"]
           },
         ]
@@ -1333,7 +987,6 @@ export type Database = {
           net_partner_capital: number | null
           outstanding_from_clients: number | null
           owed_to_vendors: number | null
-          team_members_count: number | null
         }
         Relationships: []
       }
@@ -1718,7 +1371,6 @@ export type Database = {
       }
     }
     Functions: {
-      current_user_employee_id: { Args: never; Returns: string }
       current_user_role: {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]

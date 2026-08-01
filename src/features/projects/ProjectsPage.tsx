@@ -7,14 +7,12 @@ import { useUpdateProject } from '../../lib/queries/admin'
 import { useExpenses } from '../../lib/queries/expenses'
 import { useVendorBills } from '../../lib/queries/purchases'
 import { useInvoices, useInvoicePayments } from '../../lib/queries/invoices'
-import { useTeamTracker } from '../../lib/queries/team'
 import { fmt, fmtDate } from '../../lib/calc/format'
 import { clientLabel } from '../../lib/labels'
 import type { Database } from '../../types/database'
 import {
   projectExpenseTotal,
   projectVendorBillTotal,
-  projectManPowerTotal,
   projectInvoicedRevenue,
   projectReceivedRevenue,
 } from '../../lib/calc/projects'
@@ -30,7 +28,6 @@ export function ProjectsPage() {
   const { data: vendorBills } = useVendorBills(null)
   const { data: invoices } = useInvoices(null)
   const { data: invoicePayments } = useInvoicePayments()
-  const { data: teamTracker } = useTeamTracker(null)
   const updateProject = useUpdateProject()
 
   const activeProjects = projects?.filter((p) => p.status === 'active') ?? []
@@ -63,8 +60,7 @@ export function ProjectsPage() {
   const client = selected ? clients?.find((c) => c.id === selected.client_id) : undefined
   const expenseTotal = selected ? projectExpenseTotal(selected.id, expenses ?? []) : 0
   const vendorBillTotal = selected ? projectVendorBillTotal(selected.id, vendorBills ?? []) : 0
-  const manPowerTotal = selected ? projectManPowerTotal(selected.id, teamTracker ?? []) : 0
-  const costTotal = expenseTotal + vendorBillTotal + manPowerTotal
+  const costTotal = expenseTotal + vendorBillTotal
   const invoicedRevenue = selected ? projectInvoicedRevenue(selected.id, invoices ?? []) : 0
   const receivedRevenue = selected ? projectReceivedRevenue(selected.id, invoices ?? [], invoicePayments ?? []) : 0
   const balanceDue = invoicedRevenue - receivedRevenue
@@ -120,7 +116,6 @@ export function ProjectsPage() {
                 <KpiCard label="Total expenses incurred" value={fmt(expenseTotal)} />
                 <KpiCard label="Budget remaining" value={budgetRemaining !== null ? fmt(budgetRemaining) : '—'} />
                 <KpiCard label="Total purchases" value={fmt(vendorBillTotal)} />
-                <KpiCard label="Total man power" value={fmt(manPowerTotal)} />
                 <KpiCard label="Total invoice raised" value={fmt(invoicedRevenue)} />
                 <KpiCard label="Amount received" value={fmt(receivedRevenue)} />
                 <KpiCard label="Balance amount due" value={fmt(balanceDue)} />

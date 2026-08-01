@@ -1,6 +1,5 @@
 import { useState, type ReactNode } from 'react'
 import { useAuth } from '../lib/auth'
-import { useEmployees } from '../lib/queries/masters'
 import { Sidebar } from './Sidebar'
 import { MobileFooter } from './MobileFooter'
 import { MobileFab } from './MobileFab'
@@ -8,7 +7,7 @@ import { type TabId } from '../lib/nav'
 import laavinMark from '../assets/laavin-mark.png'
 import './Shell.css'
 
-const ROLE_LABEL: Record<string, string> = { admin: 'Admin', cxo: 'CXO', staff: 'Staff' }
+const ROLE_LABEL: Record<string, string> = { admin: 'Admin', cxo: 'CXO' }
 
 function LogoutIcon() {
   return (
@@ -30,11 +29,9 @@ export function Shell({
   children: ReactNode
 }) {
   const { signOut, profile } = useAuth()
-  const { data: employees } = useEmployees()
   const [drawerOpen, setDrawerOpen] = useState(false)
 
-  const linkedEmployee = employees?.find((e) => e.id === profile?.employee_id)
-  const designation = linkedEmployee?.designation || (profile ? ROLE_LABEL[profile.role] : '')
+  const designation = profile ? ROLE_LABEL[profile.role] : ''
 
   return (
     <div className="app-layout">

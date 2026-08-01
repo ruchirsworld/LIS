@@ -5,7 +5,6 @@ import { ExpenseBreakdownReport } from './ExpenseBreakdownReport'
 import { ClientReport } from './ClientReport'
 import { VendorReport } from './VendorReport'
 import { ProjectProfitabilityReport } from './ProjectProfitabilityReport'
-import { TeamSalaryReport } from './TeamSalaryReport'
 import { LoanReport } from './LoanReport'
 import { CapitalReport } from './CapitalReport'
 import { CashBankReport } from './CashBankReport'
@@ -24,7 +23,6 @@ export function ReportsPage() {
       <ClientReport range={range} />
       <VendorReport range={range} />
       <ProjectProfitabilityReport range={range} />
-      <TeamSalaryReport range={range} />
       <LoanReport range={range} />
       <CapitalReport range={range} />
       <CashBankReport range={range} />

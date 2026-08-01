@@ -18,15 +18,6 @@ export function projectVendorBillTotal(projectId: string, bills: (VendorBillRow 
     .reduce((s, b) => s + billTotal(b), 0)
 }
 
-export interface TeamTrackerRow {
-  project_id: string
-  total: number | null
-}
-
-export function projectManPowerTotal(projectId: string, entries: TeamTrackerRow[]): number {
-  return entries.filter((e) => e.project_id === projectId).reduce((s, e) => s + Number(e.total || 0), 0)
-}
-
 export function projectInvoicedRevenue(
   projectId: string,
   invoices: (InvoiceRow & { id: string; project_id: string | null })[],

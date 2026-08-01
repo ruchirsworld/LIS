@@ -5,9 +5,8 @@ import { supabase } from './supabase'
 export interface Profile {
   id: string
   name: string
-  role: 'admin' | 'cxo' | 'staff'
+  role: 'admin' | 'cxo'
   phone: string | null
-  employee_id: string | null
 }
 
 interface AuthContextValue {
@@ -67,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(true)
     supabase
       .from('profiles')
-      .select('id, name, role, phone, employee_id')
+      .select('id, name, role, phone')
       .eq('id', session.user.id)
       .single()
       .then(({ data, error }) => {

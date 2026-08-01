@@ -7,10 +7,6 @@ type ClientUpdate = Database['public']['Tables']['clients']['Update']
 type ProjectInsert = Database['public']['Tables']['projects']['Insert']
 type ProjectUpdate = Database['public']['Tables']['projects']['Update']
 type CostCenterInsert = Database['public']['Tables']['cost_centers']['Insert']
-type EmployeeInsert = Database['public']['Tables']['employees']['Insert']
-type EmployeeUpdate = Database['public']['Tables']['employees']['Update']
-type EmployeeSensitiveInsert = Database['public']['Tables']['employee_sensitive']['Insert']
-type EmployeeSensitiveUpdate = Database['public']['Tables']['employee_sensitive']['Update']
 type VendorInsert = Database['public']['Tables']['vendors']['Insert']
 type VendorUpdate = Database['public']['Tables']['vendors']['Update']
 type BankAccountInsert = Database['public']['Tables']['bank_accounts']['Insert']
@@ -282,103 +278,13 @@ export function useDeleteBankAccount() {
   })
 }
 
-// --- Employees (name/designation/phone/rate live in `employees`; aadhar/pan in
-// the admin-only `employee_sensitive` table, per the spec's RLS-restriction decision) ---
-
-export function useEmployeeSensitive() {
-  return useQuery({
-    queryKey: ['employee_sensitive'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('employee_sensitive').select('*')
-      if (error) throw error
-      return data
-    },
-  })
-}
-
-export function useCreateEmployee() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async ({
-      employee,
-      aadhar,
-      pan,
-    }: {
-      employee: EmployeeInsert
-      aadhar: string | null
-      pan: string | null
-    }) => {
-      const { data: created, error } = await supabase.from('employees').insert(employee).select().single()
-      if (error) throw error
-      if (aadhar || pan) {
-        const sensitive: EmployeeSensitiveInsert = { employee_id: created.id, aadhar, pan }
-        const { error: sensitiveErr } = await supabase.from('employee_sensitive').insert(sensitive)
-        if (sensitiveErr) throw sensitiveErr
-      }
-      return created
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['employees'] })
-      qc.invalidateQueries({ queryKey: ['employee_sensitive'] })
-      qc.invalidateQueries({ queryKey: ['dashboard-kpis'] })
-    },
-  })
-}
-
-export function useUpdateEmployee() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async ({
-      id,
-      employee,
-      aadhar,
-      pan,
-    }: {
-      id: string
-      employee: EmployeeUpdate
-      aadhar: string | null
-      pan: string | null
-    }) => {
-      const { error } = await supabase.from('employees').update(employee).eq('id', id)
-      if (error) throw error
-
-      const sensitive: EmployeeSensitiveUpdate = { aadhar, pan }
-      const { error: upsertErr } = await supabase
-        .from('employee_sensitive')
-        .upsert({ employee_id: id, ...sensitive })
-      if (upsertErr) throw upsertErr
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['employees'] })
-      qc.invalidateQueries({ queryKey: ['employee_sensitive'] })
-      qc.invalidateQueries({ queryKey: ['dashboard-kpis'] })
-    },
-  })
-}
-
-export function useDeleteEmployee() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from('employees').delete().eq('id', id)
-      if (error) throw error
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['employees'] })
-      qc.invalidateQueries({ queryKey: ['employee_sensitive'] })
-      qc.invalidateQueries({ queryKey: ['dashboard-kpis'] })
-    },
-  })
-}
-
 // --- Users (profiles + admin-create-user Edge Function; no delete-user function exists yet) ---
 
 export interface Profile {
   id: string
   name: string
-  role: 'admin' | 'cxo' | 'staff'
+  role: 'admin' | 'cxo'
   phone: string | null
-  employee_id: string | null
   created_at: string
 }
 
@@ -400,8 +306,7 @@ export function useCreateUser() {
       phone: string
       pin: string
       name: string
-      role: 'admin' | 'cxo' | 'staff'
-      employeeId?: string | null
+      role: 'admin' | 'cxo'
     }) => {
       const { data, error } = await supabase.functions.invoke('admin-create-user', { body: input })
       if (error) throw error
@@ -419,17 +324,12 @@ export function useUpdateProfile() {
       id,
       name,
       role,
-      employeeId,
     }: {
       id: string
       name: string
-      role: 'admin' | 'cxo' | 'staff'
-      employeeId: string | null
+      role: 'admin' | 'cxo'
     }) => {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ name, role, employee_id: employeeId })
-        .eq('id', id)
+      const { error } = await supabase.from('profiles').update({ name, role }).eq('id', id)
       if (error) throw error
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['profiles'] }),

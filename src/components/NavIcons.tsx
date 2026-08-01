@@ -33,17 +33,6 @@ function ExpensesIcon() {
   )
 }
 
-function TeamIcon() {
-  return (
-    <svg {...svgProps}>
-      <circle cx="8" cy="8" r="3" />
-      <path d="M2 19a6 6 0 0 1 12 0" />
-      <circle cx="17" cy="9" r="2.5" />
-      <path d="M14.5 19a5 5 0 0 1 8 0" />
-    </svg>
-  )
-}
-
 function PurchasesIcon() {
   return (
     <svg {...svgProps}>
@@ -128,7 +117,6 @@ function AdminIcon() {
 const ICONS: Record<TabId, () => ReactElement> = {
   dashboard: DashboardIcon,
   expenses: ExpensesIcon,
-  team: TeamIcon,
   purchases: PurchasesIcon,
   invoices: InvoicesIcon,
   loans: LoansIcon,

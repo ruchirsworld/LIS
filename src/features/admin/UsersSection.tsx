@@ -1,6 +1,5 @@
 import { useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui'
-import { SearchableSelect } from '../../components/SearchableSelect'
 import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
 import { TableScroll } from '../../components/TableScroll'
@@ -10,15 +9,13 @@ import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
 import { useProfiles, useCreateUser, useUpdateProfile, useDeleteUser, type Profile } from '../../lib/queries/admin'
 import { getErrorMessage } from '../../lib/errors'
-import { useEmployees } from '../../lib/queries/masters'
 import { useAuth } from '../../lib/auth'
 
-const ROLE_LABEL: Record<string, string> = { admin: 'Admin', cxo: 'CXO', staff: 'Staff' }
+const ROLE_LABEL: Record<string, string> = { admin: 'Admin', cxo: 'CXO' }
 
 export function UsersSection() {
   const { profile: myProfile } = useAuth()
   const { data: profiles, isLoading } = useProfiles()
-  const { data: employees } = useEmployees()
   const createUser = useCreateUser()
   const updateProfile = useUpdateProfile()
   const deleteUser = useDeleteUser()
@@ -42,8 +39,7 @@ export function UsersSection() {
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [pin, setPin] = useState('')
-  const [role, setRole] = useState<'staff' | 'cxo' | 'admin'>('staff')
-  const [employeeId, setEmployeeId] = useState('')
+  const [role, setRole] = useState<'cxo' | 'admin'>('cxo')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -52,15 +48,13 @@ export function UsersSection() {
     setName('')
     setPhone('')
     setPin('')
-    setRole('staff')
-    setEmployeeId('')
+    setRole('cxo')
   }
 
   function startEdit(p: Profile) {
     setEditingId(p.id)
     setName(p.name)
     setRole(p.role)
-    setEmployeeId(p.employee_id ?? '')
     setFormError(null)
   }
 
@@ -75,7 +69,7 @@ export function UsersSection() {
       }
       setSubmitting(true)
       try {
-        await updateProfile.mutateAsync({ id: editingId, name: name.trim(), role, employeeId: employeeId || null })
+        await updateProfile.mutateAsync({ id: editingId, name: name.trim(), role })
         resetForm()
       } catch (err) {
         setFormError(getErrorMessage(err, 'Could not save user.'))
@@ -100,7 +94,6 @@ export function UsersSection() {
         phone: phone.trim(),
         pin,
         role,
-        employeeId: employeeId || null,
       })
       resetForm()
     } catch (err) {
@@ -152,21 +145,9 @@ export function UsersSection() {
         <div className="field">
           <label>Role</label>
           <select value={role} onChange={(e) => setRole(e.target.value as typeof role)}>
-            <option value="staff">Staff</option>
             <option value="cxo">CXO</option>
             <option value="admin">Admin</option>
           </select>
-        </div>
-        <div className="field">
-          <label>Linked employee (optional)</label>
-          <SearchableSelect
-            items={employees}
-            value={employeeId}
-            onChange={setEmployeeId}
-            getId={(emp) => emp.id}
-            getLabel={(emp) => emp.name}
-            placeholder="— None —"
-          />
         </div>
 
         <div className="field full" style={{ display: 'flex', gap: 8 }}>

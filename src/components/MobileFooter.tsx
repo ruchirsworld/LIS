@@ -2,7 +2,7 @@ import { TABS, type TabId } from '../lib/nav'
 import { NavIcon } from './NavIcons'
 import './MobileFooter.css'
 
-const QUICK_ACCESS_IDS: TabId[] = ['team', 'purchases', 'dashboard', 'projects', 'reports']
+const QUICK_ACCESS_IDS: TabId[] = ['expenses', 'purchases', 'dashboard', 'projects', 'reports']
 const FOOTER_ITEMS = QUICK_ACCESS_IDS.map((id) => TABS.find((t) => t.id === id)!)
 
 export function MobileFooter({ active, onChange }: { active: TabId; onChange: (tab: TabId) => void }) {
