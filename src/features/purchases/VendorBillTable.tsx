@@ -3,6 +3,7 @@ import { PeriodFilter } from '../../components/PeriodFilter'
 import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
 import { TableScroll } from '../../components/TableScroll'
+import { RowMenu } from '../../components/RowMenu'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
@@ -18,6 +19,7 @@ import { clientLabel } from '../../lib/labels'
 import type { Database } from '../../types/database'
 
 type VendorBill = Database['public']['Tables']['vendor_bills']['Row']
+type VendorBillPayment = Database['public']['Tables']['vendor_bill_payments']['Row']
 
 export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void }) {
   const [range, setRange] = useState<DateRange | null>(null)
@@ -28,7 +30,24 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
   const { data: clients } = useClients()
   const deleteBill = useDeleteVendorBill()
   const [payFormId, setPayFormId] = useState<string | null>(null)
+  const [editingPayment, setEditingPayment] = useState<VendorBillPayment | null>(null)
+  const [editListId, setEditListId] = useState<string | null>(null)
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
+
+  function closePayForm() {
+    setPayFormId(null)
+    setEditingPayment(null)
+  }
+
+  function openAddPayment(billId: string) {
+    setEditingPayment(null)
+    setPayFormId(billId)
+  }
+
+  function openEditPayment(billId: string, payment: VendorBillPayment) {
+    setEditingPayment(payment)
+    setPayFormId(billId)
+  }
 
   const categories = Array.from(new Set(vendors?.map((v) => v.category).filter((c): c is string => !!c))).sort()
   const visibleBills = categoryFilter
@@ -69,11 +88,12 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
   const exportSections: ExportSection[] = [
     {
       title: 'Vendor bill records',
-      columns: ['Ref ID', 'Vendor', 'Description', 'Client', 'Project', 'Date', 'Amount', 'GST', 'Total', 'Paid', 'Due'],
+      columns: ['Ref ID', 'Vendor', 'Description', 'Remarks', 'Client', 'Project', 'Date', 'Amount', 'GST', 'Total', 'Paid', 'Due'],
       rows: (sortedBills ?? []).map((b) => [
         b.display_id ?? '',
         vendorNameOf(b),
         b.description ?? '',
+        b.remarks ?? '',
         clientNameOf(b),
         projectNameOf(b),
         b.date ? fmtDate(b.date) : '',
@@ -120,6 +140,7 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
               <SortableTh label="Ref ID" sortKey="id" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Vendor" sortKey="vendor" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Description" sortKey="description" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <th>Remarks</th>
               <SortableTh label="Client" sortKey="client" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Project" sortKey="project" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Date" sortKey="date" activeKey={sortKey} direction={direction} onSort={toggleSort} />
@@ -128,6 +149,7 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
               <SortableTh label="Total" sortKey="total" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
               <SortableTh label="Paid" sortKey="paid" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
               <SortableTh label="Due" sortKey="due" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+              <th></th>
               <th>Receipt</th>
               <th></th>
             </tr>
@@ -135,14 +157,14 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={13} className="empty-row">
+                <td colSpan={15} className="empty-row">
                   Loading…
                 </td>
               </tr>
             )}
             {!isLoading && (!sortedBills || sortedBills.length === 0) && (
               <tr>
-                <td colSpan={13} className="empty-row">
+                <td colSpan={15} className="empty-row">
                   No vendor bills in this period
                 </td>
               </tr>
@@ -156,12 +178,15 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
               const due = billDue(b, billPayments)
               const hasHistory = billPayments.length > 0
 
+              const showEditList = editListId === b.id
+
               return (
                 <Fragment key={b.id}>
                   <tr>
                     <td>{b.display_id ?? '—'}</td>
                     <td>{vendor ? vendor.name : '—'}</td>
                     <td>{b.description ?? '—'}</td>
+                    <td>{b.remarks ?? '—'}</td>
                     <td>{clientLabel(client)}</td>
                     <td>{project ? project.name : '—'}</td>
                     <td>{b.date ? fmtDate(b.date) : '—'}</td>
@@ -170,13 +195,16 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
                     <td className="amt">{fmt(billTotal(b))}</td>
                     <td className="amt">{fmt(paid)}</td>
                     <td className="amt">{fmt(due)}</td>
+                    <td>
+                      <RowMenu
+                        items={[
+                          { label: 'Add payment', disabled: due <= 0, onClick: () => openAddPayment(b.id) },
+                          { label: 'Edit payments', disabled: !hasHistory, onClick: () => setEditListId(b.id) },
+                        ]}
+                      />
+                    </td>
                     <td>{b.receipt_path ? <ReceiptLink path={b.receipt_path} /> : '—'}</td>
                     <td>
-                      {due > 0 && (
-                        <button type="button" className="pay-btn" onClick={() => setPayFormId(b.id)}>
-                          Record payment
-                        </button>
-                      )}
                       <button type="button" className="pay-btn" onClick={() => onEdit(b)}>
                         Edit
                       </button>
@@ -186,10 +214,21 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
                       {hasHistory && (
                         <div className="pay-history">
                           {billPayments.map((p) => (
-                            <div key={p.id}>
-                              {p.display_id} — {fmtDate(p.date)} — {fmt(p.amount)}
-                              {p.payment_mode ? ` · ${p.payment_mode}` : ''}
-                              {p.reference ? ` · ${p.reference}` : ''}
+                            <div key={p.id} className="pay-history-line">
+                              <span>
+                                {p.display_id} — {fmtDate(p.date)} — {fmt(p.amount)}
+                                {p.payment_mode ? ` · ${p.payment_mode}` : ''}
+                                {p.reference ? ` · ${p.reference}` : ''}
+                              </span>
+                              {showEditList && (
+                                <button
+                                  type="button"
+                                  className="pay-history-edit"
+                                  onClick={() => openEditPayment(b.id, p)}
+                                >
+                                  Edit
+                                </button>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -197,7 +236,13 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
                     </td>
                   </tr>
                   {payFormId === b.id && (
-                    <VendorBillPaymentForm billId={b.id} due={due} onClose={() => setPayFormId(null)} />
+                    <VendorBillPaymentForm
+                      billId={b.id}
+                      due={due}
+                      editingPayment={editingPayment}
+                      colSpan={15}
+                      onClose={closePayForm}
+                    />
                   )}
                 </Fragment>
               )

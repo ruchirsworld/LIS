@@ -827,6 +827,7 @@ export type Database = {
           id: string
           project_id: string | null
           receipt_path: string | null
+          remarks: string | null
           vendor_id: string
         }
         Insert: {
@@ -841,6 +842,7 @@ export type Database = {
           id?: string
           project_id?: string | null
           receipt_path?: string | null
+          remarks?: string | null
           vendor_id: string
         }
         Update: {
@@ -855,6 +857,7 @@ export type Database = {
           id?: string
           project_id?: string | null
           receipt_path?: string | null
+          remarks?: string | null
           vendor_id?: string
         }
         Relationships: [

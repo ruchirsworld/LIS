@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { ModuleHeader } from '../../components/ui'
 import { VendorBillForm } from './VendorBillForm'
 import { VendorBillTable } from './VendorBillTable'
-import { VendorBillQuickPaymentForm } from './VendorBillQuickPaymentForm'
 import { VendorSummaryTable } from './VendorSummaryTable'
 import type { Database } from '../../types/database'
 
@@ -13,9 +12,8 @@ export function PurchasesPage() {
 
   return (
     <div>
-      <ModuleHeader>Purchases</ModuleHeader>
+      <ModuleHeader>Vendors</ModuleHeader>
       <VendorBillForm editingBill={editingBill} onDoneEditing={() => setEditingBill(null)} />
-      <VendorBillQuickPaymentForm />
       <VendorSummaryTable />
       <VendorBillTable onEdit={setEditingBill} />
     </div>

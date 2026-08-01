@@ -41,6 +41,7 @@ export function VendorBillForm({
   const { categories: vendorCategories, category: vendorCategory, setCategory: setVendorCategory, filteredVendors } =
     useVendorCategoryFilter(vendors, () => setVendorId(''))
   const [description, setDescription] = useState('')
+  const [remarks, setRemarks] = useState('')
   const [clientId, setClientId] = useState('')
   const [projectId, setProjectId] = useState('')
   const [date, setDate] = useState(todayStr())
@@ -57,6 +58,7 @@ export function VendorBillForm({
     if (!editingBill) return
     setVendorId(editingBill.vendor_id)
     setDescription(editingBill.description ?? '')
+    setRemarks(editingBill.remarks ?? '')
     setClientId(editingBill.client_id ?? '')
     setProjectId(editingBill.project_id ?? '')
     setDate(editingBill.date ?? todayStr())
@@ -71,6 +73,7 @@ export function VendorBillForm({
     setVendorId('')
     setVendorCategory(null)
     setDescription('')
+    setRemarks('')
     setClientId('')
     setProjectId('')
     setDate(todayStr())
@@ -119,6 +122,7 @@ export function VendorBillForm({
       const patch = {
         vendor_id: vendorId,
         description: description.trim() || null,
+        remarks: remarks.trim() || null,
         client_id: clientId || null,
         project_id: projectId || null,
         date,
@@ -192,6 +196,16 @@ export function VendorBillForm({
               placeholder="— No project / general —"
             />
           </div>
+        </div>
+
+        <div className="field full">
+          <label>Remarks (optional)</label>
+          <input
+            type="text"
+            placeholder="Any extra context"
+            value={remarks}
+            onChange={(e) => setRemarks(e.target.value)}
+          />
         </div>
 
         <div className="field-row">
