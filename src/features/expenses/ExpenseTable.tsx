@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { PeriodFilter } from '../../components/PeriodFilter'
 import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
+import { TableScroll } from '../../components/TableScroll'
 import { Button } from '../../components/ui'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
@@ -109,7 +110,7 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
         />
       </div>
 
-      <div className="table-scroll">
+      <TableScroll>
         <table className="data">
           <thead>
             <tr>
@@ -188,7 +189,7 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
             })}
           </tbody>
         </table>
-      </div>
+      </TableScroll>
       <Pagination page={page} totalPages={totalPages} totalCount={totalCount} onChange={setPage} />
     </details>
   )

@@ -694,6 +694,12 @@ button:focus-visible {
   border-radius: 10px;
   border: 1px solid var(--line);
 }
+.table-scroll-top {
+  overflow-x: auto;
+  overflow-y: hidden;
+  height: 16px;
+  margin-bottom: 6px;
+}
 table.data {
   width: 100%;
   border-collapse: collapse;

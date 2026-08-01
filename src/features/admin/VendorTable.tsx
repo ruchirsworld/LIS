@@ -3,6 +3,7 @@ import { useDeleteVendor } from '../../lib/queries/admin'
 import { useAuth } from '../../lib/auth'
 import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
+import { TableScroll } from '../../components/TableScroll'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
@@ -47,7 +48,7 @@ export function VendorTable({ onEdit }: { onEdit: (vendor: Vendor) => void }) {
   return (
     <>
       <ReportExportButtons title="Vendors" sections={exportSections} range={null} />
-      <div className="table-scroll">
+      <TableScroll>
       <table className="data">
         <thead>
           <tr>
@@ -101,7 +102,7 @@ export function VendorTable({ onEdit }: { onEdit: (vendor: Vendor) => void }) {
           ))}
         </tbody>
       </table>
-      </div>
+      </TableScroll>
       <Pagination page={page} totalPages={totalPages} totalCount={totalCount} onChange={setPage} />
     </>
   )

@@ -3,6 +3,7 @@ import { PeriodFilter } from '../../components/PeriodFilter'
 import { SearchableSelect } from '../../components/SearchableSelect'
 import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
+import { TableScroll } from '../../components/TableScroll'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
@@ -104,7 +105,7 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
         <ReportExportButtons title="Invoice records" sections={exportSections} range={range} style={{ marginTop: 0 }} />
       </div>
 
-      <div className="table-scroll">
+      <TableScroll>
         <table className="data">
           <thead>
             <tr>
@@ -216,7 +217,7 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
             })}
           </tbody>
         </table>
-      </div>
+      </TableScroll>
       <Pagination page={page} totalPages={totalPages} totalCount={totalCount} onChange={setPage} />
     </details>
   )

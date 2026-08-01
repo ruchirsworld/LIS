@@ -2,6 +2,7 @@ import { Fragment, useState } from 'react'
 import { PeriodFilter } from '../../components/PeriodFilter'
 import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
+import { TableScroll } from '../../components/TableScroll'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
@@ -74,7 +75,7 @@ export function TeamTrackerTable() {
         <ReportExportButtons title="Team tracker records" sections={exportSections} range={range} style={{ marginTop: 0 }} />
       </div>
 
-      <div className="table-scroll">
+      <TableScroll>
         <table className="data">
           <thead>
             <tr>
@@ -157,7 +158,7 @@ export function TeamTrackerTable() {
             })}
           </tbody>
         </table>
-      </div>
+      </TableScroll>
       <Pagination page={page} totalPages={totalPages} totalCount={totalCount} onChange={setPage} />
     </details>
   )

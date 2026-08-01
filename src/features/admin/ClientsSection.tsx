@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui'
 import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
+import { TableScroll } from '../../components/TableScroll'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
@@ -181,7 +182,7 @@ export function ClientsSection() {
 
       <ReportExportButtons title="Clients" sections={exportSections} range={null} />
 
-      <div className="table-scroll">
+      <TableScroll>
         <table className="data">
           <thead>
             <tr>
@@ -235,7 +236,7 @@ export function ClientsSection() {
             ))}
           </tbody>
         </table>
-      </div>
+      </TableScroll>
       <Pagination page={page} totalPages={totalPages} totalCount={totalCount} onChange={setPage} />
     </details>
   )

@@ -3,6 +3,7 @@ import { Button } from '../../components/ui'
 import { SearchableSelect } from '../../components/SearchableSelect'
 import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
+import { TableScroll } from '../../components/TableScroll'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
@@ -188,7 +189,7 @@ export function UsersSection() {
 
       <ReportExportButtons title="Users" sections={exportSections} range={null} />
 
-      <div className="table-scroll">
+      <TableScroll>
         <table className="data">
           <thead>
             <tr>
@@ -232,7 +233,7 @@ export function UsersSection() {
             ))}
           </tbody>
         </table>
-      </div>
+      </TableScroll>
       <Pagination page={page} totalPages={totalPages} totalCount={totalCount} onChange={setPage} />
     </details>
   )

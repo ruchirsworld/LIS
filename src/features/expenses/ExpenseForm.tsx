@@ -39,6 +39,24 @@ function todayStr() {
   return new Date().toISOString().slice(0, 10)
 }
 
+function IdBadge({ id }: { id: string | null }) {
+  return (
+    <span
+      style={{
+        background: 'var(--red-soft)',
+        color: 'var(--red)',
+        borderRadius: 6,
+        padding: '6px 12px',
+        fontSize: 13,
+        fontWeight: 600,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      Saved as {id}
+    </span>
+  )
+}
+
 function CalculatorIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -93,6 +111,7 @@ export function ExpenseForm({
   const [receiptStatus, setReceiptStatus] = useState('Take photo')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+  const [lastCreatedId, setLastCreatedId] = useState<string | null>(null)
 
   // Row 2 fields — one set per category, only the relevant one is shown/used.
   const [costCenter, setCostCenter] = useState('')
@@ -162,6 +181,7 @@ export function ExpenseForm({
     setReceiptStatus(editingExpense.receipt_path ? 'Photo attached' : 'Take photo')
     setShowCalc(false)
     setFormError(null)
+    setLastCreatedId(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingExpense, projects])
 
@@ -274,7 +294,7 @@ export function ExpenseForm({
           setSubmitting(false)
           return
         }
-        await createLoanPayment.mutateAsync({
+        const created = await createLoanPayment.mutateAsync({
           loan_id: loanId,
           date,
           interest_paid: interest,
@@ -282,6 +302,7 @@ export function ExpenseForm({
           reference: description.trim() || null,
           payment_mode: paymentMode,
         })
+        setLastCreatedId(created.display_id)
       } else if (toggleCategory === 'capital') {
         const amt = parseINR(amount)
         if (amt <= 0) {
@@ -289,7 +310,7 @@ export function ExpenseForm({
           setSubmitting(false)
           return
         }
-        await createCapitalTx.mutateAsync({
+        const created = await createCapitalTx.mutateAsync({
           partner_id: partnerId,
           type: 'withdrawal',
           amount: amt,
@@ -297,6 +318,7 @@ export function ExpenseForm({
           notes: description.trim() || null,
           payment_mode: paymentMode,
         })
+        setLastCreatedId(created.display_id)
       } else {
         const amt = parseINR(amount)
         if (amt <= 0) {
@@ -327,7 +349,8 @@ export function ExpenseForm({
           })
           onDoneEditing()
         } else {
-          await createExpense.mutateAsync({ ...patch, geo_lat: geo?.lat ?? null, geo_lng: geo?.lng ?? null })
+          const created = await createExpense.mutateAsync({ ...patch, geo_lat: geo?.lat ?? null, geo_lng: geo?.lng ?? null })
+          setLastCreatedId(created.display_id)
         }
       }
 
@@ -644,7 +667,7 @@ export function ExpenseForm({
                 <label htmlFor="e-reimb">Reimbursable</label>
               </div>
             </div>
-            <div className="field full" style={{ display: 'flex', gap: 8 }}>
+            <div className="field full" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <Button type="submit" disabled={submitting} style={{ flex: editingExpense ? undefined : '1 1 auto' }}>
                 {submitting ? 'Saving…' : editingExpense ? 'Save changes' : 'Add expense'}
               </Button>
@@ -653,6 +676,7 @@ export function ExpenseForm({
                   Cancel
                 </Button>
               )}
+              {lastCreatedId && <IdBadge id={lastCreatedId} />}
             </div>
           </>
         )}
@@ -660,10 +684,11 @@ export function ExpenseForm({
         {!writesToExpenses && (
           <>
             {paymentModeField}
-            <div className="field full">
+            <div className="field full" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <Button type="submit" disabled={submitting}>
                 {submitting ? 'Adding…' : 'Add transaction'}
               </Button>
+              {lastCreatedId && <IdBadge id={lastCreatedId} />}
             </div>
           </>
         )}
