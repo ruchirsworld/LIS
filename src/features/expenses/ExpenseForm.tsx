@@ -17,7 +17,7 @@ import { uploadReceipt } from '../../lib/storage'
 import { parseINR, fmt, fmtPlain } from '../../lib/calc/format'
 import { getErrorMessage } from '../../lib/errors'
 import { clientLabel, matchesCategoryLabel } from '../../lib/labels'
-import { loanOutstanding, monthlyInterestDue, totalInterestDue } from '../../lib/calc/loans'
+import { loanOutstanding, monthlyInterestDue, monthsInterestDue, totalInterestDue } from '../../lib/calc/loans'
 import { VendorCombobox } from '../purchases/VendorCombobox'
 import { useVendorCategoryFilter, VendorCategoryPills } from '../purchases/VendorCategoryFilter'
 import type { Database } from '../../types/database'
@@ -153,6 +153,7 @@ export function ExpenseForm({
   const selectedLoan = openLoans?.find((l) => l.id === loanId)
   const selectedLoanPayments = loanPayments?.filter((p) => p.loan_id === loanId) ?? []
   const suggestedMonthlyInterest = selectedLoan ? monthlyInterestDue(selectedLoan, selectedLoanPayments) : 0
+  const suggestedInterestDueMonths = selectedLoan ? monthsInterestDue(selectedLoan, selectedLoanPayments) : 0
   const suggestedInterestDue = selectedLoan ? totalInterestDue(selectedLoan, selectedLoanPayments) : 0
 
   const writesToExpenses = toggleCategory === 'general' || toggleCategory === 'purchase' || toggleCategory === 'project'
@@ -483,7 +484,7 @@ export function ExpenseForm({
             />
             {selectedLoan && (
               <div className="note" style={{ marginTop: 2 }}>
-                Monthly interest: {fmt(suggestedMonthlyInterest)} · Interest due ({selectedLoan.interest_due_months} mo): {fmt(suggestedInterestDue)}
+                Monthly interest: {fmt(suggestedMonthlyInterest)} · Interest due ({suggestedInterestDueMonths} mo): {fmt(suggestedInterestDue)}
               </div>
             )}
           </div>

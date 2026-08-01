@@ -7,11 +7,17 @@ import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
-import { useLoans, useLoanPayments, useDeleteLoan, useUpdateLoan } from '../../lib/queries/loans'
+import { useLoans, useLoanPayments, useDeleteLoan } from '../../lib/queries/loans'
 import { fmt, fmtDate } from '../../lib/calc/format'
-import { loanPrincipalPaid, loanInterestPaid, loanOutstanding, monthlyInterestDue, totalInterestDue } from '../../lib/calc/loans'
+import {
+  loanPrincipalPaid,
+  loanInterestPaid,
+  loanOutstanding,
+  monthlyInterestDue,
+  monthsInterestDue,
+  totalInterestDue,
+} from '../../lib/calc/loans'
 import type { DateRange } from '../../lib/calc/period'
-import { LoanPaymentForm } from './LoanPaymentForm'
 import type { Database } from '../../types/database'
 
 type Loan = Database['public']['Tables']['loans']['Row']
@@ -23,8 +29,6 @@ export function LoanTable({ onEdit }: { onEdit: (loan: Loan) => void }) {
   const { data: loans, isLoading } = useLoans(range)
   const { data: payments } = useLoanPayments()
   const deleteLoan = useDeleteLoan()
-  const updateLoan = useUpdateLoan()
-  const [payFormId, setPayFormId] = useState<string | null>(null)
 
   const paymentsOf = (l: NonNullable<typeof loans>[number]) => payments?.filter((p) => p.loan_id === l.id) ?? []
 
@@ -41,7 +45,7 @@ export function LoanTable({ onEdit }: { onEdit: (loan: Loan) => void }) {
       interestPaid: (l) => loanInterestPaid(paymentsOf(l)),
       outstanding: (l) => loanOutstanding(l, paymentsOf(l)),
       monthlyInterest: (l) => monthlyInterestDue(l, paymentsOf(l)),
-      interestDueMonths: (l) => l.interest_due_months,
+      interestDueMonths: (l) => monthsInterestDue(l, paymentsOf(l)),
       interestDue: (l) => totalInterestDue(l, paymentsOf(l)),
     },
     'dateTaken'
@@ -65,7 +69,7 @@ export function LoanTable({ onEdit }: { onEdit: (loan: Loan) => void }) {
           loanInterestPaid(loanPayments),
           loanOutstanding(l, loanPayments),
           monthlyInterestDue(l, loanPayments),
-          l.interest_due_months,
+          monthsInterestDue(l, loanPayments),
           totalInterestDue(l, loanPayments),
         ]
       }),
@@ -121,6 +125,7 @@ export function LoanTable({ onEdit }: { onEdit: (loan: Loan) => void }) {
               const interestPaid = loanInterestPaid(loanPayments)
               const outstanding = loanOutstanding(l, loanPayments)
               const monthlyInterest = monthlyInterestDue(l, loanPayments)
+              const interestDueMonths = monthsInterestDue(l, loanPayments)
               const interestDue = totalInterestDue(l, loanPayments)
               const hasHistory = loanPayments.length > 0
 
@@ -137,28 +142,9 @@ export function LoanTable({ onEdit }: { onEdit: (loan: Loan) => void }) {
                     <td className="amt">{fmt(interestPaid)}</td>
                     <td className="amt">{fmt(outstanding)}</td>
                     <td className="amt">{outstanding > 0 ? fmt(monthlyInterest) : '—'}</td>
-                    <td className="amt">
-                      <input
-                        type="number"
-                        min="0"
-                        step="1"
-                        defaultValue={l.interest_due_months}
-                        style={{ width: 56, textAlign: 'right' }}
-                        onBlur={(e) => {
-                          const next = Number(e.target.value) || 0
-                          if (next !== l.interest_due_months) {
-                            updateLoan.mutate({ id: l.id, patch: { interest_due_months: next } })
-                          }
-                        }}
-                      />
-                    </td>
+                    <td className="amt">{outstanding > 0 ? interestDueMonths : '—'}</td>
                     <td className="amt">{outstanding > 0 ? fmt(interestDue) : '—'}</td>
                     <td>
-                      {outstanding > 0 && (
-                        <button type="button" className="pay-btn" onClick={() => setPayFormId(l.id)}>
-                          Record repayment
-                        </button>
-                      )}
                       <button type="button" className="pay-btn" onClick={() => onEdit(l)}>
                         Edit
                       </button>
@@ -178,9 +164,6 @@ export function LoanTable({ onEdit }: { onEdit: (loan: Loan) => void }) {
                       )}
                     </td>
                   </tr>
-                  {payFormId === l.id && (
-                    <LoanPaymentForm loanId={l.id} loan={l} payments={loanPayments} onClose={() => setPayFormId(null)} />
-                  )}
                 </Fragment>
               )
             })}

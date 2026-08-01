@@ -558,7 +558,6 @@ export type Database = {
           date_taken: string | null
           display_id: string | null
           id: string
-          interest_due_months: number
           lender: string
           loan_type: string
           notes: string | null
@@ -571,7 +570,6 @@ export type Database = {
           date_taken?: string | null
           display_id?: string | null
           id?: string
-          interest_due_months?: number
           lender: string
           loan_type?: string
           notes?: string | null
@@ -584,7 +582,6 @@ export type Database = {
           date_taken?: string | null
           display_id?: string | null
           id?: string
-          interest_due_months?: number
           lender?: string
           loan_type?: string
           notes?: string | null

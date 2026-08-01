@@ -5,7 +5,6 @@ export interface LoanRow {
   principal: number
   roi_pct: number
   date_taken: string | null
-  interest_due_months: number
 }
 
 export interface LoanPaymentRow {
@@ -38,11 +37,33 @@ export function monthlyInterestDue(loan: LoanRow, payments: LoanPaymentRow[]): n
   return (outstanding * (Number(loan.roi_pct) || 0)) / 100 / 12
 }
 
+/** Calendar months between a date and today (like Excel's DATEDIF(start, TODAY(), "m")). */
+function monthsElapsed(fromDateStr: string, today: Date): number {
+  const from = new Date(fromDateStr)
+  let months = (today.getFullYear() - from.getFullYear()) * 12 + (today.getMonth() - from.getMonth())
+  if (today.getDate() < from.getDate()) months -= 1
+  return Math.max(0, months)
+}
+
+/** Most recent payment date that included an interest component, else the loan's start date. */
+export function lastInterestPaymentDate(loan: LoanRow, payments: LoanPaymentRow[]): string | null {
+  const interestPayments = payments.filter((p) => Number(p.interest_paid || 0) > 0)
+  if (interestPayments.length === 0) return loan.date_taken
+  return interestPayments.reduce((latest, p) => (p.date > latest ? p.date : latest), interestPayments[0].date)
+}
+
+/** Months of interest currently outstanding, counted automatically from the last interest
+ * payment (or the loan's start date) up to today — no manual entry needed. */
+export function monthsInterestDue(loan: LoanRow, payments: LoanPaymentRow[]): number {
+  const from = lastInterestPaymentDate(loan, payments)
+  if (!from) return 0
+  return monthsElapsed(from, new Date())
+}
+
 /**
- * Total interest currently owed = monthly interest (above) x the number of
- * months of interest the admin has marked as due. Stops mattering once the
- * principal is fully repaid, since monthlyInterestDue then returns 0.
+ * Total interest currently owed = monthly interest (above) x months of interest due (above).
+ * Stops mattering once the principal is fully repaid, since monthlyInterestDue then returns 0.
  */
 export function totalInterestDue(loan: LoanRow, payments: LoanPaymentRow[]): number {
-  return monthlyInterestDue(loan, payments) * (Number(loan.interest_due_months) || 0)
+  return monthlyInterestDue(loan, payments) * monthsInterestDue(loan, payments)
 }
