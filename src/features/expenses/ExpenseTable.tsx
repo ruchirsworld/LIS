@@ -22,20 +22,12 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
   const [range, setRange] = useState<DateRange | null>(null)
   const [idSearch, setIdSearch] = useState('')
   const { data: expenses, isLoading } = useExpenses(range)
-  // Independent of the period filter — "amount still to claim" is a running
-  // total, not scoped to whatever date range the table happens to show.
-  const { data: allExpenses } = useExpenses(null)
   const { data: projects } = useProjects()
   const { data: clients } = useClients()
   const { data: vendors } = useVendors()
   const { data: profiles } = useProfiles()
   const deleteExpense = useDeleteExpense()
   const updateExpense = useUpdateExpense()
-
-  const reimbursementDue = (allExpenses ?? []).reduce(
-    (s, e) => (e.reimbursable && !e.reimbursed ? s + Number(e.amount || 0) : s),
-    0
-  )
 
   const projLabelOf = (e: NonNullable<typeof expenses>[number]) => {
     const project = projects?.find((p) => p.id === e.project_id)
@@ -112,21 +104,6 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
           </div>
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          {reimbursementDue > 0 && (
-            <span
-              style={{
-                background: 'var(--red-soft)',
-                color: 'var(--red)',
-                borderRadius: 6,
-                padding: '6px 12px',
-                fontSize: 13,
-                fontWeight: 600,
-                whiteSpace: 'nowrap',
-              }}
-            >
-              Reimbursement due: {fmt(reimbursementDue)}
-            </span>
-          )}
           <ReportExportButtons
             title="Expense records"
             sections={exportSections}
