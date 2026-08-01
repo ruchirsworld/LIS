@@ -6,10 +6,10 @@ import { SearchableSelect } from '../../components/SearchableSelect'
 import { useAuth } from '../../lib/auth'
 import { useClients, useProjects, useVendors } from '../../lib/queries/masters'
 import { useCreateVendorBill, useUpdateVendorBill } from '../../lib/queries/purchases'
-import { fmt, parseINR } from '../../lib/calc/format'
+import { fmt, fmtDate, parseINR } from '../../lib/calc/format'
 import { billTotal } from '../../lib/calc/vendorBills'
 import { compressImage } from '../../lib/compressImage'
-import { uploadReceipt } from '../../lib/storage'
+import { uploadReceiptToDrive } from '../../lib/storage'
 import { getErrorMessage } from '../../lib/errors'
 import { clientLabel } from '../../lib/labels'
 import { VendorCombobox } from './VendorCombobox'
@@ -20,6 +20,12 @@ type VendorBill = Database['public']['Tables']['vendor_bills']['Row']
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
+}
+
+// e.g. Ref ID "Bill/23" + Bill date 2026-08-03 -> "Ven-03-08-2026-Bill23.jpg"
+function receiptFileName(displayId: string | null, dateStr: string): string {
+  const refId = (displayId ?? 'unknown').replace(/\//g, '')
+  return `Ven-${fmtDate(dateStr)}-${refId}.jpg`
 }
 
 export function VendorBillForm({
@@ -126,12 +132,7 @@ export function VendorBillForm({
     }
     setSubmitting(true)
     try {
-      let receiptPath: string | null = editingBill?.receipt_path ?? null
-      if (receiptBlob) {
-        receiptPath = await uploadReceipt(receiptBlob, 'vendor_bills')
-      }
-
-      const patch = {
+      const basePatch = {
         vendor_id: vendorId,
         description: description.trim() || null,
         remarks: remarks.trim() || null,
@@ -142,14 +143,23 @@ export function VendorBillForm({
         gst_pct: isMenPower ? 0 : Number(gstPct) || 0,
         qty: isMenPower ? Number(qty) || 0 : null,
         rate: isMenPower ? parseINR(rate) : null,
-        receipt_path: receiptPath,
       }
 
       if (editingBill) {
-        await updateVendorBill.mutateAsync({ id: editingBill.id, patch })
+        // Ref ID is already known, so a new photo can be uploaded before the single update.
+        let receiptPath: string | null = editingBill.receipt_path ?? null
+        if (receiptBlob) {
+          receiptPath = await uploadReceiptToDrive(receiptBlob, receiptFileName(editingBill.display_id, date))
+        }
+        await updateVendorBill.mutateAsync({ id: editingBill.id, patch: { ...basePatch, receipt_path: receiptPath } })
         onDoneEditing()
       } else {
-        await createVendorBill.mutateAsync(patch)
+        // Ref ID is only assigned on insert, so create the row first, then upload, then attach the path.
+        const created = await createVendorBill.mutateAsync({ ...basePatch, receipt_path: null })
+        if (receiptBlob) {
+          const receiptPath = await uploadReceiptToDrive(receiptBlob, receiptFileName(created.display_id, date))
+          await updateVendorBill.mutateAsync({ id: created.id, patch: { receipt_path: receiptPath } })
+        }
       }
       resetForm()
     } catch (err) {
