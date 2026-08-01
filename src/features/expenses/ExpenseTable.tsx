@@ -8,7 +8,7 @@ import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
-import { useExpenses, useDeleteExpense } from '../../lib/queries/expenses'
+import { useExpenses, useDeleteExpense, useUpdateExpense } from '../../lib/queries/expenses'
 import { useProjects, useClients, useVendors } from '../../lib/queries/masters'
 import { fmt, fmtDate } from '../../lib/calc/format'
 import type { DateRange } from '../../lib/calc/period'
@@ -23,10 +23,19 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
   const [recentOnly, setRecentOnly] = useState(false)
   const [idSearch, setIdSearch] = useState('')
   const { data: expenses, isLoading } = useExpenses(recentOnly ? null : range)
+  // Independent of the period filter — "amount still to claim" is a running
+  // total, not scoped to whatever date range the table happens to show.
+  const { data: allExpenses } = useExpenses(null)
   const { data: projects } = useProjects()
   const { data: clients } = useClients()
   const { data: vendors } = useVendors()
   const deleteExpense = useDeleteExpense()
+  const updateExpense = useUpdateExpense()
+
+  const reimbursementDue = (allExpenses ?? []).reduce(
+    (s, e) => (e.reimbursable && !e.reimbursed ? s + Number(e.amount || 0) : s),
+    0
+  )
 
   const projLabelOf = (e: NonNullable<typeof expenses>[number]) => {
     const project = projects?.find((p) => p.id === e.project_id)
@@ -57,13 +66,14 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
     costCenter: (e) => e.cost_center,
     amount: (e) => e.amount,
     reimbursable: (e) => (e.reimbursable ? 1 : 0),
+    reimbursed: (e) => (e.reimbursed ? 1 : 0),
   })
   const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedExpenses)
 
   const exportSections: ExportSection[] = [
     {
       title: 'Expense records',
-      columns: ['ID', 'Date', 'Vendor', 'Description', 'Type', 'Project / client', 'Cost center', 'Amount', 'Reimbursable'],
+      columns: ['ID', 'Date', 'Vendor', 'Description', 'Type', 'Project / client', 'Cost center', 'Amount', 'Reimbursable', 'Reimbursed'],
       rows: (sortedExpenses ?? []).map((e) => [
         e.display_id ?? '',
         fmtDate(e.date),
@@ -74,6 +84,7 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
         e.cost_center ?? '',
         e.amount,
         e.reimbursable ? 'Yes' : 'No',
+        e.reimbursable ? (e.reimbursed ? 'Yes' : 'No') : '—',
       ]),
     },
   ]
@@ -102,12 +113,29 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
             />
           </div>
         </div>
-        <ReportExportButtons
-          title="Expense records"
-          sections={exportSections}
-          range={recentOnly ? null : range}
-          style={{ marginTop: 0 }}
-        />
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          {reimbursementDue > 0 && (
+            <span
+              style={{
+                background: 'var(--red-soft)',
+                color: 'var(--red)',
+                borderRadius: 6,
+                padding: '6px 12px',
+                fontSize: 13,
+                fontWeight: 600,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Reimbursement due: {fmt(reimbursementDue)}
+            </span>
+          )}
+          <ReportExportButtons
+            title="Expense records"
+            sections={exportSections}
+            range={recentOnly ? null : range}
+            style={{ marginTop: 0 }}
+          />
+        </div>
       </div>
 
       <TableScroll>
@@ -124,6 +152,7 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
               <th>Location</th>
               <SortableTh label="Amount" sortKey="amount" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
               <SortableTh label="Reimb." sortKey="reimbursable" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Reimbursed" sortKey="reimbursed" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <th>Receipt</th>
               <th></th>
             </tr>
@@ -131,14 +160,14 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={12} className="empty-row">
+                <td colSpan={13} className="empty-row">
                   Loading…
                 </td>
               </tr>
             )}
             {!isLoading && (!sortedExpenses || sortedExpenses.length === 0) && (
               <tr>
-                <td colSpan={12} className="empty-row">
+                <td colSpan={13} className="empty-row">
                   {idSearch.trim() ? `No expenses match "${idSearch.trim()}"` : 'No expenses in this period'}
                 </td>
               </tr>
@@ -171,6 +200,19 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
                   </td>
                   <td className="amt">{fmt(e.amount)}</td>
                   <td>{e.reimbursable ? 'Yes' : 'No'}</td>
+                  <td>
+                    {e.reimbursable ? (
+                      <input
+                        type="checkbox"
+                        checked={e.reimbursed}
+                        onChange={(ev) =>
+                          updateExpense.mutate({ id: e.id, patch: { reimbursed: ev.target.checked } })
+                        }
+                      />
+                    ) : (
+                      '—'
+                    )}
+                  </td>
                   <td>{e.receipt_path ? <ReceiptLink path={e.receipt_path} /> : '—'}</td>
                   <td>
                     <button type="button" className="pay-btn" onClick={() => onEdit(e)}>

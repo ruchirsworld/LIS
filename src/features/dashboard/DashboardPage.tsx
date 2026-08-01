@@ -9,7 +9,7 @@ import { dueAmount } from '../../lib/calc/invoices'
 import { ReportPeriodFilter } from '../reports/ReportPeriodFilter'
 import { FinancialSummaryReport } from '../reports/FinancialSummaryReport'
 import { GstSummaryReport } from '../reports/GstSummaryReport'
-import { GeneralExpenseSummary } from './GeneralExpenseSummary'
+import { ExpenseSummary } from './ExpenseSummary'
 import { reportPeriodToRange } from '../../lib/calc/reportPeriod'
 import type { DateRange, ReportPeriodType } from '../../lib/calc/reportPeriod'
 
@@ -75,7 +75,7 @@ export function DashboardPage() {
 
       <FinancialSummaryReport range={range} />
       <GstSummaryReport range={range} />
-      <GeneralExpenseSummary range={range} />
+      <ExpenseSummary range={range} />
     </div>
   )
 }

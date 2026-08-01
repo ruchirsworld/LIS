@@ -370,6 +370,7 @@ export type Database = {
           project_id: string | null
           receipt_path: string | null
           reimbursable: boolean
+          reimbursed: boolean
           type: string
           vendor_id: string | null
         }
@@ -388,6 +389,7 @@ export type Database = {
           project_id?: string | null
           receipt_path?: string | null
           reimbursable?: boolean
+          reimbursed?: boolean
           type: string
           vendor_id?: string | null
         }
@@ -406,6 +408,7 @@ export type Database = {
           project_id?: string | null
           receipt_path?: string | null
           reimbursable?: boolean
+          reimbursed?: boolean
           type?: string
           vendor_id?: string | null
         }
