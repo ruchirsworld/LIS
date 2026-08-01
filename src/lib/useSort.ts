@@ -36,7 +36,9 @@ export function useSort<T>(
       if (av == null) return 1
       if (bv == null) return -1
       if (typeof av === 'number' && typeof bv === 'number') return av - bv
-      return String(av).localeCompare(String(bv))
+      // numeric:true makes "Exp/2" sort before "Exp/10" instead of after it
+      // (plain string compare treats the digits as text, so "10" < "2").
+      return String(av).localeCompare(String(bv), undefined, { numeric: true })
     })
     if (direction === 'desc') copy.reverse()
     return copy

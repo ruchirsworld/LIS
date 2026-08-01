@@ -20,6 +20,7 @@ type Expense = Database['public']['Tables']['expenses']['Row']
 export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void }) {
   const [range, setRange] = useState<DateRange | null>(null)
   const [recentOnly, setRecentOnly] = useState(false)
+  const [idSearch, setIdSearch] = useState('')
   const { data: expenses, isLoading } = useExpenses(recentOnly ? null : range)
   const { data: projects } = useProjects()
   const { data: clients } = useClients()
@@ -36,7 +37,15 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
     return vendor?.name ?? ''
   }
 
-  const baseExpenses = recentOnly ? expenses?.slice(0, 10) : expenses
+  const idFiltered = idSearch.trim()
+    ? expenses?.filter((e) => e.display_id?.toLowerCase().includes(idSearch.trim().toLowerCase()))
+    : expenses
+  // A search overrides the "10 most recent" cap — searching should surface
+  // the matching record regardless of where it falls in the recency list.
+  const baseExpenses =
+    recentOnly && !idSearch.trim()
+      ? [...(idFiltered ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 10)
+      : idFiltered
   const { sorted: sortedExpenses, sortKey, direction, toggleSort } = useSort(baseExpenses, {
     id: (e) => e.display_id,
     date: (e) => e.date,
@@ -82,6 +91,15 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
           <Button type="button" variant="secondary" onClick={() => setRecentOnly((v) => !v)}>
             {recentOnly ? 'Show all' : 'Recent 10'}
           </Button>
+          <div className="field" style={{ maxWidth: 160, marginBottom: 0 }}>
+            <label>Search ID</label>
+            <input
+              type="text"
+              placeholder="e.g. Exp/23"
+              value={idSearch}
+              onChange={(e) => setIdSearch(e.target.value)}
+            />
+          </div>
         </div>
         <ReportExportButtons
           title="Expense records"
@@ -117,10 +135,10 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
                 </td>
               </tr>
             )}
-            {!isLoading && (!expenses || expenses.length === 0) && (
+            {!isLoading && (!sortedExpenses || sortedExpenses.length === 0) && (
               <tr>
                 <td colSpan={12} className="empty-row">
-                  No expenses in this period
+                  {idSearch.trim() ? `No expenses match "${idSearch.trim()}"` : 'No expenses in this period'}
                 </td>
               </tr>
             )}
