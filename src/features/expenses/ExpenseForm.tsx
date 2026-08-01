@@ -107,6 +107,7 @@ export function ExpenseForm({
   const [description, setDescription] = useState('')
   const [date, setDate] = useState(todayStr())
   const [reimbursable, setReimbursable] = useState(false)
+  const [remarks, setRemarks] = useState('')
   const [receiptBlob, setReceiptBlob] = useState<Blob | null>(null)
   const [receiptStatus, setReceiptStatus] = useState('Take photo')
   const [submitting, setSubmitting] = useState(false)
@@ -154,12 +155,13 @@ export function ExpenseForm({
   const suggestedInterestDue = selectedLoan ? totalInterestDue(selectedLoan, selectedLoanPayments) : 0
 
   const writesToExpenses = toggleCategory === 'general' || toggleCategory === 'purchase' || toggleCategory === 'project'
-  // Editing an expense row can only move it between the three categories
-  // that write to the expenses table — switching to Loan/Capital would mean
-  // writing to a different table entirely, which isn't an "edit" anymore.
+  // Project is no longer offered for new entries — project-related spend now
+  // goes through Purchase (which already has its own Project selector).
+  // Editing an existing Project-type expense still shows it, so old records
+  // stay editable without being force-recategorized.
   const visibleToggleOptions = editingExpense
     ? TOGGLE_OPTIONS.filter((o) => o.id === 'general' || o.id === 'purchase' || o.id === 'project')
-    : TOGGLE_OPTIONS
+    : TOGGLE_OPTIONS.filter((o) => o.id !== 'project')
 
   useEffect(() => {
     if (!editingExpense) return
@@ -170,6 +172,7 @@ export function ExpenseForm({
     setDescription(editingExpense.description)
     setDate(editingExpense.date)
     setReimbursable(editingExpense.reimbursable)
+    setRemarks(editingExpense.remarks ?? '')
     setCostCenter(editingExpense.cost_center ?? '')
     setVendorId(editingExpense.vendor_id ?? '')
     setVendorCategory(null)
@@ -252,6 +255,7 @@ export function ExpenseForm({
     setPrincipalPaid('0')
     setPaymentMode('UPI')
     setReimbursable(false)
+    setRemarks('')
     setReceiptBlob(null)
     setReceiptStatus('Take photo')
     setDate(todayStr())
@@ -339,6 +343,7 @@ export function ExpenseForm({
           amount: amt,
           date,
           reimbursable,
+          remarks: remarks.trim() || null,
           receipt_path: receiptPath,
           payment_mode: paymentMode,
         }
@@ -621,6 +626,19 @@ export function ExpenseForm({
               setShowCalc(false)
             }}
           />
+        )}
+
+        {/* Row 5: Remarks (optional, extra context beyond the required Tags) */}
+        {writesToExpenses && (
+          <div className="field full">
+            <label>Remarks (optional)</label>
+            <input
+              type="text"
+              placeholder="Any extra context"
+              value={remarks}
+              onChange={(e) => setRemarks(e.target.value)}
+            />
+          </div>
         )}
 
         {writesToExpenses && (

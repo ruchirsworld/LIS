@@ -371,6 +371,7 @@ export type Database = {
           receipt_path: string | null
           reimbursable: boolean
           reimbursed: boolean
+          remarks: string | null
           type: string
           vendor_id: string | null
         }
@@ -390,6 +391,7 @@ export type Database = {
           receipt_path?: string | null
           reimbursable?: boolean
           reimbursed?: boolean
+          remarks?: string | null
           type: string
           vendor_id?: string | null
         }
@@ -409,6 +411,7 @@ export type Database = {
           receipt_path?: string | null
           reimbursable?: boolean
           reimbursed?: boolean
+          remarks?: string | null
           type?: string
           vendor_id?: string | null
         }
