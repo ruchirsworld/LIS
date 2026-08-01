@@ -16,8 +16,10 @@ function MenuIcon() {
   )
 }
 
-/** Small "⋮"-style dropdown for per-row actions — closes on outside click or Escape. */
-export function RowMenu({ items }: { items: RowMenuItem[] }) {
+/** Small "⋮"-style dropdown for per-row info + actions — closes on outside click or Escape.
+ * `info` renders read-only detail above the action buttons (e.g. fields trimmed from a
+ * shortened table); omit it for a plain actions-only menu. */
+export function RowMenu({ items, info }: { items: RowMenuItem[]; info?: React.ReactNode }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -39,11 +41,12 @@ export function RowMenu({ items }: { items: RowMenuItem[] }) {
 
   return (
     <div className="row-menu" ref={ref}>
-      <button type="button" className="row-menu-btn" onClick={() => setOpen((v) => !v)} aria-label="Payment actions">
+      <button type="button" className="row-menu-btn" onClick={() => setOpen((v) => !v)} aria-label="Row actions">
         <MenuIcon />
       </button>
       {open && (
         <div className="row-menu-dropdown">
+          {info && <div className="row-menu-info">{info}</div>}
           {items.map((item) => (
             <button
               key={item.label}

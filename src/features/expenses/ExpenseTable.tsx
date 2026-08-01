@@ -3,6 +3,7 @@ import { PeriodFilter } from '../../components/PeriodFilter'
 import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
 import { TableScroll } from '../../components/TableScroll'
+import { RowMenu } from '../../components/RowMenu'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
@@ -51,15 +52,11 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
     {
       id: (e) => e.display_id,
       date: (e) => e.date,
-      vendor: (e) => vendorNameOf(e),
       description: (e) => e.description,
       type: (e) => e.type,
-      project: (e) => projLabelOf(e),
       costCenter: (e) => e.cost_center,
       amount: (e) => e.amount,
       reimbursable: (e) => (e.reimbursable ? 1 : 0),
-      reimbursed: (e) => (e.reimbursed ? 1 : 0),
-      user: (e) => userNameOf(e),
     },
     'id'
   )
@@ -119,32 +116,25 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
             <tr>
               <SortableTh label="ID" sortKey="id" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Date" sortKey="date" activeKey={sortKey} direction={direction} onSort={toggleSort} />
-              <SortableTh label="Vendor" sortKey="vendor" activeKey={sortKey} direction={direction} onSort={toggleSort} />
-              <SortableTh label="Description" sortKey="description" activeKey={sortKey} direction={direction} onSort={toggleSort} />
-              <th>Remarks</th>
-              <SortableTh label="Type" sortKey="type" activeKey={sortKey} direction={direction} onSort={toggleSort} />
-              <SortableTh label="Project / client" sortKey="project" activeKey={sortKey} direction={direction} onSort={toggleSort} />
-              <SortableTh label="Cost center" sortKey="costCenter" activeKey={sortKey} direction={direction} onSort={toggleSort} />
-              <th>Location</th>
               <SortableTh label="Amount" sortKey="amount" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
-              <SortableTh label="Reimb." sortKey="reimbursable" activeKey={sortKey} direction={direction} onSort={toggleSort} />
-              <SortableTh label="Reimbursed" sortKey="reimbursed" activeKey={sortKey} direction={direction} onSort={toggleSort} />
-              <SortableTh label="Recorded by" sortKey="user" activeKey={sortKey} direction={direction} onSort={toggleSort} />
-              <th>Receipt</th>
+              <SortableTh label="Description" sortKey="description" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Type" sortKey="type" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Cost center" sortKey="costCenter" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Reimbursable" sortKey="reimbursable" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <th></th>
             </tr>
           </thead>
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={15} className="empty-row">
+                <td colSpan={8} className="empty-row">
                   Loading…
                 </td>
               </tr>
             )}
             {!isLoading && (!sortedExpenses || sortedExpenses.length === 0) && (
               <tr>
-                <td colSpan={15} className="empty-row">
+                <td colSpan={8} className="empty-row">
                   {idSearch.trim() ? `No expenses match "${idSearch.trim()}"` : 'No expenses in this period'}
                 </td>
               </tr>
@@ -157,53 +147,61 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
                 <tr key={e.id}>
                   <td>{e.display_id ?? '—'}</td>
                   <td>{fmtDate(e.date)}</td>
-                  <td>{vendorName || '—'}</td>
-                  <td>{e.description}</td>
-                  <td>{e.remarks ?? '—'}</td>
-                  <td>{e.type}</td>
-                  <td>{projLabel || '—'}</td>
-                  <td>{e.cost_center ?? '—'}</td>
-                  <td>
-                    {e.geo_lat != null && e.geo_lng != null ? (
-                      <a
-                        href={`https://maps.google.com/?q=${e.geo_lat},${e.geo_lng}`}
-                        target="_blank"
-                        rel="noopener"
-                      >
-                        📍 view
-                      </a>
-                    ) : (
-                      '—'
-                    )}
-                  </td>
                   <td className="amt">{fmt(e.amount)}</td>
+                  <td>{e.description}</td>
+                  <td>{e.type}</td>
+                  <td>{e.cost_center ?? '—'}</td>
                   <td>{e.reimbursable ? 'Yes' : 'No'}</td>
                   <td>
-                    {e.reimbursable ? (
-                      <input
-                        type="checkbox"
-                        checked={e.reimbursed}
-                        onChange={(ev) =>
-                          updateExpense.mutate({ id: e.id, patch: { reimbursed: ev.target.checked } })
-                        }
-                      />
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                  <td>{userNameOf(e) || '—'}</td>
-                  <td>{e.receipt_path ? <ReceiptLink path={e.receipt_path} /> : '—'}</td>
-                  <td>
-                    <button type="button" className="pay-btn" onClick={() => onEdit(e)}>
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      className="btn danger-link"
-                      onClick={() => deleteExpense.mutate(e.id)}
-                    >
-                      Remove
-                    </button>
+                    <RowMenu
+                      info={
+                        <>
+                          <div>
+                            <strong>Project / client:</strong> {projLabel || '—'}
+                          </div>
+                          <div>
+                            <strong>Vendor:</strong> {vendorName || '—'}
+                          </div>
+                          <div>
+                            <strong>Remarks:</strong> {e.remarks ?? '—'}
+                          </div>
+                          <div>
+                            <strong>Recorded by:</strong> {userNameOf(e) || '—'}
+                          </div>
+                          <div>
+                            <strong>Location:</strong>{' '}
+                            {e.geo_lat != null && e.geo_lng != null ? (
+                              <a href={`https://maps.google.com/?q=${e.geo_lat},${e.geo_lng}`} target="_blank" rel="noopener">
+                                view
+                              </a>
+                            ) : (
+                              '—'
+                            )}
+                          </div>
+                          <div>
+                            <strong>Receipt:</strong> {e.receipt_path ? <ReceiptLink path={e.receipt_path} /> : '—'}
+                          </div>
+                          {e.reimbursable && (
+                            <div style={{ marginTop: 6 }}>
+                              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={e.reimbursed}
+                                  onChange={(ev) =>
+                                    updateExpense.mutate({ id: e.id, patch: { reimbursed: ev.target.checked } })
+                                  }
+                                />
+                                Reimbursed
+                              </label>
+                            </div>
+                          )}
+                        </>
+                      }
+                      items={[
+                        { label: 'Edit', onClick: () => onEdit(e) },
+                        { label: 'Remove', onClick: () => deleteExpense.mutate(e.id) },
+                      ]}
+                    />
                   </td>
                 </tr>
               )
