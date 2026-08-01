@@ -660,7 +660,8 @@ button:focus-visible {
 
   /* Record receipts (invoices) — Client row and Date/Amount row capped to
      280px, Add receipt its own 280px row, per spec. */
-  .form-grid .rr-client {
+  .form-grid .rr-client,
+  .form-grid .rr-invoice {
     max-width: 280px;
   }
   .form-grid .rr-row2 {
