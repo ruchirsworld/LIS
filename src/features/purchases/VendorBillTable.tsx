@@ -88,7 +88,7 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
   const exportSections: ExportSection[] = [
     {
       title: 'Vendor bill records',
-      columns: ['Ref ID', 'Vendor', 'Description', 'Remarks', 'Client', 'Project', 'Date', 'Amount', 'GST', 'Total', 'Paid', 'Due'],
+      columns: ['Ref ID', 'Vendor', 'Description', 'Remarks', 'Client', 'Project', 'Date', 'Qty', 'Rate', 'Amount', 'GST', 'Total', 'Paid', 'Due'],
       rows: (sortedBills ?? []).map((b) => [
         b.display_id ?? '',
         vendorNameOf(b),
@@ -97,6 +97,8 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
         clientNameOf(b),
         projectNameOf(b),
         b.date ? fmtDate(b.date) : '',
+        b.qty ?? '',
+        b.rate ?? '',
         b.amount,
         billGstAmt(b),
         billTotal(b),
@@ -144,6 +146,8 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
               <SortableTh label="Client" sortKey="client" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Project" sortKey="project" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Date" sortKey="date" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <th style={{ textAlign: 'right' }}>Qty</th>
+              <th style={{ textAlign: 'right' }}>Rate</th>
               <SortableTh label="Amount" sortKey="amount" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
               <SortableTh label="GST" sortKey="gst" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
               <SortableTh label="Total" sortKey="total" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
@@ -157,14 +161,14 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={15} className="empty-row">
+                <td colSpan={17} className="empty-row">
                   Loading…
                 </td>
               </tr>
             )}
             {!isLoading && (!sortedBills || sortedBills.length === 0) && (
               <tr>
-                <td colSpan={15} className="empty-row">
+                <td colSpan={17} className="empty-row">
                   No vendor bills in this period
                 </td>
               </tr>
@@ -190,6 +194,8 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
                     <td>{clientLabel(client)}</td>
                     <td>{project ? project.name : '—'}</td>
                     <td>{b.date ? fmtDate(b.date) : '—'}</td>
+                    <td className="amt">{b.qty ?? '—'}</td>
+                    <td className="amt">{b.rate != null ? fmt(b.rate) : '—'}</td>
                     <td className="amt">{fmt(b.amount)}</td>
                     <td className="amt">{fmt(billGstAmt(b))}</td>
                     <td className="amt">{fmt(billTotal(b))}</td>
@@ -240,7 +246,7 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
                       billId={b.id}
                       due={due}
                       editingPayment={editingPayment}
-                      colSpan={15}
+                      colSpan={17}
                       onClose={closePayForm}
                     />
                   )}

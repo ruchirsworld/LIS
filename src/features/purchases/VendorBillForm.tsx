@@ -47,12 +47,16 @@ export function VendorBillForm({
   const [date, setDate] = useState(todayStr())
   const [amount, setAmount] = useState('0')
   const [gstPct, setGstPct] = useState('0')
+  const [qty, setQty] = useState('')
+  const [rate, setRate] = useState('0')
   const [receiptBlob, setReceiptBlob] = useState<Blob | null>(null)
   const [receiptStatus, setReceiptStatus] = useState('Take photo')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
   const visibleProjects = clientId ? projects?.filter((p) => p.client_id === clientId) : projects
+  const selectedVendor = vendors?.find((v) => v.id === vendorId)
+  const isMenPower = selectedVendor?.category === 'MenPower'
 
   useEffect(() => {
     if (!editingBill) return
@@ -64,6 +68,8 @@ export function VendorBillForm({
     setDate(editingBill.date ?? todayStr())
     setAmount(String(editingBill.amount))
     setGstPct(String(editingBill.gst_pct ?? 0))
+    setQty(editingBill.qty != null ? String(editingBill.qty) : '')
+    setRate(editingBill.rate != null ? String(editingBill.rate) : '0')
     setReceiptBlob(null)
     setReceiptStatus(editingBill.receipt_path ? 'Photo attached' : 'Take photo')
     setFormError(null)
@@ -79,6 +85,8 @@ export function VendorBillForm({
     setDate(todayStr())
     setAmount('0')
     setGstPct('0')
+    setQty('')
+    setRate('0')
     setReceiptBlob(null)
     setReceiptStatus('Take photo')
   }
@@ -112,6 +120,10 @@ export function VendorBillForm({
       setFormError('Pick a vendor.')
       return
     }
+    if (isMenPower && (!qty || Number(qty) <= 0)) {
+      setFormError('Enter a quantity.')
+      return
+    }
     setSubmitting(true)
     try {
       let receiptPath: string | null = editingBill?.receipt_path ?? null
@@ -126,8 +138,10 @@ export function VendorBillForm({
         client_id: clientId || null,
         project_id: projectId || null,
         date,
-        amount: parseINR(amount),
-        gst_pct: Number(gstPct) || 0,
+        amount: isMenPower ? (Number(qty) || 0) * parseINR(rate) : parseINR(amount),
+        gst_pct: isMenPower ? 0 : Number(gstPct) || 0,
+        qty: isMenPower ? Number(qty) || 0 : null,
+        rate: isMenPower ? parseINR(rate) : null,
         receipt_path: receiptPath,
       }
 
@@ -209,14 +223,36 @@ export function VendorBillForm({
         </div>
 
         <div className="field-row">
-          <div className="field">
-            <label>Bill value (₹)</label>
-            <CurrencyInput value={amount} onValueChange={setAmount} required />
-          </div>
-          <div className="field">
-            <label>GST %</label>
-            <input type="number" min="0" step="0.01" value={gstPct} onChange={(e) => setGstPct(e.target.value)} />
-          </div>
+          {isMenPower ? (
+            <>
+              <div className="field">
+                <label>MenPower qty</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  required
+                  value={qty}
+                  onChange={(e) => setQty(e.target.value)}
+                />
+              </div>
+              <div className="field">
+                <label>Rate (₹)</label>
+                <CurrencyInput value={rate} onValueChange={setRate} required />
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="field">
+                <label>Bill value (₹)</label>
+                <CurrencyInput value={amount} onValueChange={setAmount} required />
+              </div>
+              <div className="field">
+                <label>GST %</label>
+                <input type="number" min="0" step="0.01" value={gstPct} onChange={(e) => setGstPct(e.target.value)} />
+              </div>
+            </>
+          )}
           <div className="field row-inline" style={{ flex: '0 0 auto', alignSelf: 'flex-end' }}>
             <ReceiptUploadButton
               idPrefix="vb-receipt"
@@ -237,7 +273,15 @@ export function VendorBillForm({
         <div className="field-row vb-row5">
           <div className="field vb-total">
             <label>Total value (₹)</label>
-            <input type="text" readOnly value={fmt(billTotal({ amount: parseINR(amount), gst_pct: Number(gstPct) || 0 }))} />
+            <input
+              type="text"
+              readOnly
+              value={
+                isMenPower
+                  ? fmt((Number(qty) || 0) * parseINR(rate))
+                  : fmt(billTotal({ amount: parseINR(amount), gst_pct: Number(gstPct) || 0 }))
+              }
+            />
           </div>
           <div className="field vb-submit">
             <label>&nbsp;</label>

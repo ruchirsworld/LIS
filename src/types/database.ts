@@ -826,6 +826,8 @@ export type Database = {
           gst_pct: number
           id: string
           project_id: string | null
+          qty: number | null
+          rate: number | null
           receipt_path: string | null
           remarks: string | null
           vendor_id: string
@@ -841,6 +843,8 @@ export type Database = {
           gst_pct?: number
           id?: string
           project_id?: string | null
+          qty?: number | null
+          rate?: number | null
           receipt_path?: string | null
           remarks?: string | null
           vendor_id: string
@@ -856,6 +860,8 @@ export type Database = {
           gst_pct?: number
           id?: string
           project_id?: string | null
+          qty?: number | null
+          rate?: number | null
           receipt_path?: string | null
           remarks?: string | null
           vendor_id?: string
