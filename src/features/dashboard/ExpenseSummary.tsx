@@ -9,6 +9,7 @@ import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
 
 const UNKNOWN_USER = 'Unknown'
+const UNASSIGNED_CC = 'Unassigned'
 
 // The three "masterheads" — the toggle-category on the expense form, and
 // what every expense's `type` column is set to.
@@ -29,6 +30,7 @@ export function ExpenseSummary({ range }: { range: DateRange | null }) {
   const { data: categories } = useExpenseCategories()
   const { data: profiles } = useProfiles()
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+  const [selectedCostCenter, setSelectedCostCenter] = useState<string | null>(null)
 
   const dueByUser = new Map<string, number>()
   ;(allExpenses ?? []).forEach((e) => {
@@ -51,12 +53,27 @@ export function ExpenseSummary({ range }: { range: DateRange | null }) {
   const categoryRows: [string, number][] = CATEGORIES.map((c) => [c, byCategory.get(c) ?? 0])
   const total = (expenses ?? []).reduce((s, e) => s + Number(e.amount || 0), 0)
 
-  const scoped = selectedCategory ? (expenses ?? []).filter((e) => e.type === selectedCategory) : expenses ?? []
+  const categoryScoped = selectedCategory ? (expenses ?? []).filter((e) => e.type === selectedCategory) : expenses ?? []
+
+  // Cost center only applies to General/Project expenses (Purchase never
+  // sets one) — those always land in "Unassigned", which is expected, not a bug.
+  const byCostCenter = new Map<string, number>()
+  categoryScoped.forEach((e) => {
+    const key = e.cost_center ?? UNASSIGNED_CC
+    byCostCenter.set(key, (byCostCenter.get(key) ?? 0) + Number(e.amount || 0))
+  })
+  const costCenterRows = Array.from(byCostCenter.entries()).sort((a, b) => b[1] - a[1])
+
+  const scoped = selectedCostCenter
+    ? categoryScoped.filter((e) => (e.cost_center ?? UNASSIGNED_CC) === selectedCostCenter)
+    : categoryScoped
 
   const rows: TagRow[] = []
   scoped.forEach((e) => {
     const adminTags = tagsOf(e.type)
-    const matches = (e.description || '').match(/#\w+/g) ?? []
+    // \S+ (not \w+) so tags with punctuation like "#F&B" match in full —
+    // \w+ stops at the "&", leaving just "#F" which never matches "F&B".
+    const matches = (e.description || '').match(/#\S+/g) ?? []
     const recognized = matches.filter((t) => adminTags.has(t.slice(1).toLowerCase()))
     const tags = recognized.length > 0 ? recognized : ['Untagged']
     tags.forEach((tag) => rows.push({ tag, id: e.display_id ?? '', date: e.date, amount: Number(e.amount || 0) }))
@@ -65,6 +82,11 @@ export function ExpenseSummary({ range }: { range: DateRange | null }) {
 
   const sections: ExportSection[] = [
     { title: 'By category', columns: ['Category', 'Amount'], rows: categoryRows.map(([c, a]) => [c, a]) },
+    {
+      title: selectedCategory ? `By cost center — ${selectedCategory}` : 'By cost center — all categories',
+      columns: ['Cost center', 'Amount'],
+      rows: costCenterRows.map(([c, a]) => [c, a]),
+    },
     {
       title: selectedCategory ? `By tag — ${selectedCategory}` : 'By tag — all categories',
       columns: ['Tag', 'ID', 'Date', 'Amount'],
@@ -95,7 +117,10 @@ export function ExpenseSummary({ range }: { range: DateRange | null }) {
             borderColor: selectedCategory === null ? 'var(--accent)' : undefined,
             background: selectedCategory === null ? 'var(--accent-soft)' : undefined,
           }}
-          onClick={() => setSelectedCategory(null)}
+          onClick={() => {
+            setSelectedCategory(null)
+            setSelectedCostCenter(null)
+          }}
         >
           <div className="dash-label">All</div>
           <div className="dash-value">{fmt(total)}</div>
@@ -111,7 +136,10 @@ export function ExpenseSummary({ range }: { range: DateRange | null }) {
               borderColor: selectedCategory === cat ? 'var(--accent)' : undefined,
               background: selectedCategory === cat ? 'var(--accent-soft)' : undefined,
             }}
-            onClick={() => setSelectedCategory(selectedCategory === cat ? null : cat)}
+            onClick={() => {
+              setSelectedCategory(selectedCategory === cat ? null : cat)
+              setSelectedCostCenter(null)
+            }}
           >
             <div className="dash-label">{cat}</div>
             <div className="dash-value">{fmt(amount)}</div>
@@ -120,7 +148,31 @@ export function ExpenseSummary({ range }: { range: DateRange | null }) {
       </div>
 
       <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-soft)', marginTop: 16, marginBottom: 8 }}>
+        By cost center {selectedCategory ? `— ${selectedCategory}` : '— all categories'}
+      </div>
+      <div className="dash-grid">
+        {costCenterRows.map(([center, amount]) => (
+          <button
+            key={center}
+            type="button"
+            className="dash-card"
+            style={{
+              textAlign: 'left',
+              cursor: 'pointer',
+              borderColor: selectedCostCenter === center ? 'var(--accent)' : undefined,
+              background: selectedCostCenter === center ? 'var(--accent-soft)' : undefined,
+            }}
+            onClick={() => setSelectedCostCenter(selectedCostCenter === center ? null : center)}
+          >
+            <div className="dash-label">{center}</div>
+            <div className="dash-value">{fmt(amount)}</div>
+          </button>
+        ))}
+      </div>
+
+      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-soft)', marginTop: 16, marginBottom: 8 }}>
         By tag {selectedCategory ? `— ${selectedCategory}` : '— all categories'}
+        {selectedCostCenter ? ` — ${selectedCostCenter}` : ''}
       </div>
       <div className="table-scroll">
         <table className="data">
