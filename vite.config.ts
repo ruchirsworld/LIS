@@ -10,7 +10,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       devOptions: { enabled: true },
       manifest: {
-        name: 'Laavin Internal System (LIS 1.17)',
+        name: 'Laavin Internal System (LIS 1.18)',
         short_name: 'LIS',
         description: 'Internal billing, clients, projects, vendors & expenses — Laavin InfraScapes',
         theme_color: '#2f6b40',

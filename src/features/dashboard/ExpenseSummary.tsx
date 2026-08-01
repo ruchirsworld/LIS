@@ -1,11 +1,14 @@
 import { useState } from 'react'
 import { useExpenses } from '../../lib/queries/expenses'
 import { useExpenseCategories } from '../../lib/queries/masters'
+import { useProfiles } from '../../lib/queries/admin'
 import { matchesCategoryLabel } from '../../lib/labels'
 import { fmt, fmtDate } from '../../lib/calc/format'
 import type { DateRange } from '../../lib/calc/reportPeriod'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
+
+const UNKNOWN_USER = 'Unknown'
 
 // The three "masterheads" — the toggle-category on the expense form, and
 // what every expense's `type` column is set to.
@@ -20,8 +23,21 @@ interface TagRow {
 
 export function ExpenseSummary({ range }: { range: DateRange | null }) {
   const { data: expenses } = useExpenses(range)
+  // Independent of the period filter — "amount still to claim" is a running
+  // total, not scoped to whatever date range is currently selected.
+  const { data: allExpenses } = useExpenses(null)
   const { data: categories } = useExpenseCategories()
+  const { data: profiles } = useProfiles()
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+
+  const dueByUser = new Map<string, number>()
+  ;(allExpenses ?? []).forEach((e) => {
+    if (!e.reimbursable || e.reimbursed) return
+    const name = (e.created_by && profiles?.find((p) => p.id === e.created_by)?.name) || UNKNOWN_USER
+    dueByUser.set(name, (dueByUser.get(name) ?? 0) + Number(e.amount || 0))
+  })
+  const dueByUserRows = Array.from(dueByUser.entries()).sort((a, b) => b[1] - a[1])
+  const totalDue = dueByUserRows.reduce((s, [, a]) => s + a, 0)
 
   const tagsOf = (typeName: string) => {
     const cat = categories?.find((c) => matchesCategoryLabel(c.name, typeName))
@@ -53,6 +69,11 @@ export function ExpenseSummary({ range }: { range: DateRange | null }) {
       title: selectedCategory ? `By tag — ${selectedCategory}` : 'By tag — all categories',
       columns: ['Tag', 'ID', 'Date', 'Amount'],
       rows: rows.map((r) => [r.tag, r.id, fmtDate(r.date), r.amount]),
+    },
+    {
+      title: 'Reimbursement due by user',
+      columns: ['User', 'Amount due'],
+      rows: dueByUserRows.map(([name, amount]) => [name, amount]),
     },
   ]
 
@@ -130,6 +151,32 @@ export function ExpenseSummary({ range }: { range: DateRange | null }) {
           </tbody>
         </table>
       </div>
+
+      {dueByUserRows.length > 0 && (
+        <>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-soft)', marginTop: 16, marginBottom: 8 }}>
+            Reimbursement due by user — total {fmt(totalDue)}
+          </div>
+          <div className="table-scroll">
+            <table className="data">
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th style={{ textAlign: 'right' }}>Amount due</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dueByUserRows.map(([name, amount]) => (
+                  <tr key={name}>
+                    <td>{name}</td>
+                    <td className="amt">{fmt(amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </details>
   )
 }
