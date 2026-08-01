@@ -3,13 +3,13 @@ import { PeriodFilter } from '../../components/PeriodFilter'
 import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
 import { TableScroll } from '../../components/TableScroll'
-import { Button } from '../../components/ui'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
 import { useExpenses, useDeleteExpense, useUpdateExpense } from '../../lib/queries/expenses'
 import { useProjects, useClients, useVendors } from '../../lib/queries/masters'
+import { useProfiles } from '../../lib/queries/admin'
 import { fmt, fmtDate } from '../../lib/calc/format'
 import type { DateRange } from '../../lib/calc/period'
 import { ReceiptLink } from '../../components/ReceiptLink'
@@ -20,15 +20,15 @@ type Expense = Database['public']['Tables']['expenses']['Row']
 
 export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void }) {
   const [range, setRange] = useState<DateRange | null>(null)
-  const [recentOnly, setRecentOnly] = useState(false)
   const [idSearch, setIdSearch] = useState('')
-  const { data: expenses, isLoading } = useExpenses(recentOnly ? null : range)
+  const { data: expenses, isLoading } = useExpenses(range)
   // Independent of the period filter — "amount still to claim" is a running
   // total, not scoped to whatever date range the table happens to show.
   const { data: allExpenses } = useExpenses(null)
   const { data: projects } = useProjects()
   const { data: clients } = useClients()
   const { data: vendors } = useVendors()
+  const { data: profiles } = useProfiles()
   const deleteExpense = useDeleteExpense()
   const updateExpense = useUpdateExpense()
 
@@ -46,34 +46,37 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
     const vendor = e.vendor_id ? vendors?.find((v) => v.id === e.vendor_id) : null
     return vendor?.name ?? ''
   }
+  const userNameOf = (e: NonNullable<typeof expenses>[number]) => {
+    const profile = e.created_by ? profiles?.find((p) => p.id === e.created_by) : null
+    return profile?.name ?? ''
+  }
 
   const idFiltered = idSearch.trim()
     ? expenses?.filter((e) => e.display_id?.toLowerCase().includes(idSearch.trim().toLowerCase()))
     : expenses
-  // A search overrides the "10 most recent" cap — searching should surface
-  // the matching record regardless of where it falls in the recency list.
-  const baseExpenses =
-    recentOnly && !idSearch.trim()
-      ? [...(idFiltered ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 10)
-      : idFiltered
-  const { sorted: sortedExpenses, sortKey, direction, toggleSort } = useSort(baseExpenses, {
-    id: (e) => e.display_id,
-    date: (e) => e.date,
-    vendor: (e) => vendorNameOf(e),
-    description: (e) => e.description,
-    type: (e) => e.type,
-    project: (e) => projLabelOf(e),
-    costCenter: (e) => e.cost_center,
-    amount: (e) => e.amount,
-    reimbursable: (e) => (e.reimbursable ? 1 : 0),
-    reimbursed: (e) => (e.reimbursed ? 1 : 0),
-  })
+  const { sorted: sortedExpenses, sortKey, direction, toggleSort } = useSort(
+    idFiltered,
+    {
+      id: (e) => e.display_id,
+      date: (e) => e.date,
+      vendor: (e) => vendorNameOf(e),
+      description: (e) => e.description,
+      type: (e) => e.type,
+      project: (e) => projLabelOf(e),
+      costCenter: (e) => e.cost_center,
+      amount: (e) => e.amount,
+      reimbursable: (e) => (e.reimbursable ? 1 : 0),
+      reimbursed: (e) => (e.reimbursed ? 1 : 0),
+      user: (e) => userNameOf(e),
+    },
+    'id'
+  )
   const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedExpenses)
 
   const exportSections: ExportSection[] = [
     {
       title: 'Expense records',
-      columns: ['ID', 'Date', 'Vendor', 'Description', 'Type', 'Project / client', 'Cost center', 'Amount', 'Reimbursable', 'Reimbursed'],
+      columns: ['ID', 'Date', 'Vendor', 'Description', 'Type', 'Project / client', 'Cost center', 'Amount', 'Reimbursable', 'Reimbursed', 'Recorded by'],
       rows: (sortedExpenses ?? []).map((e) => [
         e.display_id ?? '',
         fmtDate(e.date),
@@ -85,6 +88,7 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
         e.amount,
         e.reimbursable ? 'Yes' : 'No',
         e.reimbursable ? (e.reimbursed ? 'Yes' : 'No') : '—',
+        userNameOf(e),
       ]),
     },
   ]
@@ -95,14 +99,7 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 12, marginTop: 16 }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-          {recentOnly ? (
-            <div className="note">Showing the 10 most recent expenses.</div>
-          ) : (
-            <PeriodFilter onChange={setRange} allowCustom style={{ marginBottom: 0 }} />
-          )}
-          <Button type="button" variant="secondary" onClick={() => setRecentOnly((v) => !v)}>
-            {recentOnly ? 'Show all' : 'Recent 10'}
-          </Button>
+          <PeriodFilter onChange={setRange} allowCustom style={{ marginBottom: 0 }} />
           <div className="field" style={{ maxWidth: 160, marginBottom: 0 }}>
             <label>Search ID</label>
             <input
@@ -132,7 +129,7 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
           <ReportExportButtons
             title="Expense records"
             sections={exportSections}
-            range={recentOnly ? null : range}
+            range={range}
             style={{ marginTop: 0 }}
           />
         </div>
@@ -153,6 +150,7 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
               <SortableTh label="Amount" sortKey="amount" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
               <SortableTh label="Reimb." sortKey="reimbursable" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Reimbursed" sortKey="reimbursed" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Recorded by" sortKey="user" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <th>Receipt</th>
               <th></th>
             </tr>
@@ -160,14 +158,14 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={13} className="empty-row">
+                <td colSpan={14} className="empty-row">
                   Loading…
                 </td>
               </tr>
             )}
             {!isLoading && (!sortedExpenses || sortedExpenses.length === 0) && (
               <tr>
-                <td colSpan={13} className="empty-row">
+                <td colSpan={14} className="empty-row">
                   {idSearch.trim() ? `No expenses match "${idSearch.trim()}"` : 'No expenses in this period'}
                 </td>
               </tr>
@@ -213,6 +211,7 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
                       '—'
                     )}
                   </td>
+                  <td>{userNameOf(e) || '—'}</td>
                   <td>{e.receipt_path ? <ReceiptLink path={e.receipt_path} /> : '—'}</td>
                   <td>
                     <button type="button" className="pay-btn" onClick={() => onEdit(e)}>
