@@ -146,7 +146,7 @@ export type Database = {
             foreignKeyName: "capital_transactions_partner_id_fkey"
             columns: ["partner_id"]
             isOneToOne: false
-            referencedRelation: "partners"
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -721,35 +721,6 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "loans_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      partners: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          id: string
-          name: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          name: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          name?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "partners_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"

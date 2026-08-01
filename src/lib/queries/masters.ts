@@ -59,17 +59,6 @@ export function useExpenseCategories() {
   })
 }
 
-export function usePartners() {
-  return useQuery({
-    queryKey: ['partners'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('partners').select('*').order('name')
-      if (error) throw error
-      return data
-    },
-  })
-}
-
 export function useEmployees() {
   return useQuery({
     queryKey: ['employees'],

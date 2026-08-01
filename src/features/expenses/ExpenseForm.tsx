@@ -6,7 +6,8 @@ import { CostCenterPicker } from '../../components/CostCenterPicker'
 import { SearchableSelect } from '../../components/SearchableSelect'
 import { ReceiptUploadButton } from '../../components/ReceiptUploadButton'
 import { useAuth } from '../../lib/auth'
-import { useClients, useProjects, useVendors, useCostCenters, usePartners, useExpenseCategories } from '../../lib/queries/masters'
+import { useClients, useProjects, useVendors, useCostCenters, useExpenseCategories } from '../../lib/queries/masters'
+import { useProfiles } from '../../lib/queries/admin'
 import { useCreateExpense, useUpdateExpense } from '../../lib/queries/expenses'
 import { useLoans, useLoanPayments, useCreateLoanPayment } from '../../lib/queries/loans'
 import { useCreateCapitalTx } from '../../lib/queries/capital'
@@ -89,7 +90,7 @@ export function ExpenseForm({
   const { data: projects } = useProjects()
   const { data: vendors } = useVendors()
   const { data: costCenters } = useCostCenters()
-  const { data: partners } = usePartners()
+  const { data: profiles } = useProfiles()
   const { data: categories } = useExpenseCategories()
   const { data: loans } = useLoans(null)
   const { data: loanPayments } = useLoanPayments()
@@ -492,7 +493,7 @@ export function ExpenseForm({
           <div className="field full">
             <label>Partner</label>
             <SearchableSelect
-              items={partners}
+              items={profiles}
               value={partnerId}
               onChange={setPartnerId}
               getId={(p) => p.id}

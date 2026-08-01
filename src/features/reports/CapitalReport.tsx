@@ -1,4 +1,4 @@
-import { usePartners } from '../../lib/queries/masters'
+import { useProfiles } from '../../lib/queries/admin'
 import { useCapitalTx } from '../../lib/queries/capital'
 import { partnerNet } from '../../lib/calc/capital'
 import { inRange } from '../../lib/calc/period'
@@ -8,14 +8,14 @@ import { ReportExportButtons } from './ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
 
 export function CapitalReport({ range }: { range: DateRange | null }) {
-  const { data: partners } = usePartners()
+  const { data: profiles } = useProfiles()
   const { data: tx } = useCapitalTx(null)
 
   const from = range?.from ?? null
   const to = range?.to ?? null
   const periodTx = (tx ?? []).filter((t) => inRange(t.date, from, to))
 
-  const rows = (partners ?? []).map((p) => {
+  const rows = (profiles ?? []).map((p) => {
     const period = partnerNet(p.id, periodTx)
     const toDate = partnerNet(p.id, tx ?? [])
     return { id: p.id, name: p.name, injected: period.injected, withdrawn: period.withdrawn, net: toDate.net }
@@ -47,7 +47,7 @@ export function CapitalReport({ range }: { range: DateRange | null }) {
             {rows.length === 0 && (
               <tr>
                 <td colSpan={4} className="empty-row">
-                  No partners yet
+                  No users yet
                 </td>
               </tr>
             )}

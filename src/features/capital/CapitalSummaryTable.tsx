@@ -1,10 +1,10 @@
-import { usePartners } from '../../lib/queries/masters'
+import { useProfiles } from '../../lib/queries/admin'
 import { useCapitalTx } from '../../lib/queries/capital'
 import { fmt } from '../../lib/calc/format'
 import { partnerNet } from '../../lib/calc/capital'
 
 export function CapitalSummaryTable() {
-  const { data: partners } = usePartners()
+  const { data: profiles } = useProfiles()
   const { data: tx } = useCapitalTx(null)
 
   return (
@@ -22,14 +22,14 @@ export function CapitalSummaryTable() {
             </tr>
           </thead>
           <tbody>
-            {(!partners || partners.length === 0) && (
+            {(!profiles || profiles.length === 0) && (
               <tr>
                 <td colSpan={4} className="empty-row">
-                  Add partners in the Admin tab first
+                  Add users in the Admin tab first
                 </td>
               </tr>
             )}
-            {partners?.map((p) => {
+            {profiles?.map((p) => {
               const { injected, withdrawn, net } = partnerNet(p.id, tx ?? [])
               return (
                 <tr key={p.id}>

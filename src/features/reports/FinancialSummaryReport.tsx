@@ -3,9 +3,10 @@ import { KpiCard } from '../../components/ui'
 import { useReportSummary } from '../../lib/queries/reports'
 import { useInvoices } from '../../lib/queries/invoices'
 import { useLoans, useLoanPayments } from '../../lib/queries/loans'
-import { useEmployees, usePartners } from '../../lib/queries/masters'
+import { useEmployees } from '../../lib/queries/masters'
 import { useAttendance, useSalaryPayments, useSalaryAdjustments } from '../../lib/queries/team'
 import { useCapitalTx } from '../../lib/queries/capital'
+import { useProfiles } from '../../lib/queries/admin'
 import { fmt } from '../../lib/calc/format'
 import { netPayable } from '../../lib/calc/invoices'
 import { totalInterestDue } from '../../lib/calc/loans'
@@ -28,7 +29,7 @@ export function FinancialSummaryReport({ range }: { range: DateRange | null }) {
   const { data: attendance } = useAttendance(range)
   const { data: salaryPayments } = useSalaryPayments()
   const { data: salaryAdjustments } = useSalaryAdjustments()
-  const { data: partners } = usePartners()
+  const { data: profiles } = useProfiles()
   const { data: capitalTx } = useCapitalTx(null)
 
   // Draft invoices raised in this period still need sending.
@@ -75,7 +76,7 @@ export function FinancialSummaryReport({ range }: { range: DateRange | null }) {
   }
 
   // Capital positions are running balances too, not period-scoped.
-  const partnerRows = (partners ?? []).map((p) => {
+  const partnerRows = (profiles ?? []).map((p) => {
     const { injected, withdrawn } = partnerNet(p.id, capitalTx ?? [])
     return { id: p.id, name: p.name, net: withdrawn - injected }
   })

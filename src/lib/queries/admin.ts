@@ -7,7 +7,6 @@ type ClientUpdate = Database['public']['Tables']['clients']['Update']
 type ProjectInsert = Database['public']['Tables']['projects']['Insert']
 type ProjectUpdate = Database['public']['Tables']['projects']['Update']
 type CostCenterInsert = Database['public']['Tables']['cost_centers']['Insert']
-type PartnerInsert = Database['public']['Tables']['partners']['Insert']
 type EmployeeInsert = Database['public']['Tables']['employees']['Insert']
 type EmployeeUpdate = Database['public']['Tables']['employees']['Update']
 type EmployeeSensitiveInsert = Database['public']['Tables']['employee_sensitive']['Insert']
@@ -207,42 +206,6 @@ export function useUpdateExpenseCategoryTags() {
       if (error) throw error
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['expense_categories'] }),
-  })
-}
-
-// --- Partners ---
-
-export function useCreatePartner() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (partner: PartnerInsert) => {
-      const { data, error } = await supabase.from('partners').insert(partner).select().single()
-      if (error) throw error
-      return data
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['partners'] }),
-  })
-}
-
-export function useRenamePartner() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async ({ id, name }: { id: string; name: string }) => {
-      const { error } = await supabase.from('partners').update({ name }).eq('id', id)
-      if (error) throw error
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['partners'] }),
-  })
-}
-
-export function useDeletePartner() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from('partners').delete().eq('id', id)
-      if (error) throw error
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['partners'] }),
   })
 }
 

@@ -8,17 +8,17 @@ import { usePagination } from '../../lib/usePagination'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
 import { useCapitalTx, useDeleteCapitalTx } from '../../lib/queries/capital'
-import { usePartners } from '../../lib/queries/masters'
+import { useProfiles } from '../../lib/queries/admin'
 import { fmt, fmtDate } from '../../lib/calc/format'
 import type { DateRange } from '../../lib/calc/period'
 
 export function CapitalTable() {
   const [range, setRange] = useState<DateRange | null>(null)
   const { data: tx, isLoading } = useCapitalTx(range)
-  const { data: partners } = usePartners()
+  const { data: profiles } = useProfiles()
   const deleteTx = useDeleteCapitalTx()
 
-  const partnerNameOf = (t: NonNullable<typeof tx>[number]) => partners?.find((p) => p.id === t.partner_id)?.name ?? ''
+  const partnerNameOf = (t: NonNullable<typeof tx>[number]) => profiles?.find((p) => p.id === t.partner_id)?.name ?? ''
 
   const { sorted: sortedTx, sortKey, direction, toggleSort } = useSort(
     tx,
@@ -87,7 +87,7 @@ export function CapitalTable() {
               </tr>
             )}
             {pageRows?.map((t) => {
-              const partner = partners?.find((p) => p.id === t.partner_id)
+              const partner = profiles?.find((p) => p.id === t.partner_id)
               return (
                 <tr key={t.id}>
                   <td>{t.display_id ?? '—'}</td>

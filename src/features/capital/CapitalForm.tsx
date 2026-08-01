@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
 import { SearchableSelect } from '../../components/SearchableSelect'
-import { usePartners } from '../../lib/queries/masters'
+import { useProfiles } from '../../lib/queries/admin'
 import { useCreateCapitalTx } from '../../lib/queries/capital'
 import { parseINR } from '../../lib/calc/format'
 
@@ -11,7 +11,7 @@ function todayStr() {
 }
 
 export function CapitalForm() {
-  const { data: partners } = usePartners()
+  const { data: profiles } = useProfiles()
   const createCapitalTx = useCreateCapitalTx()
 
   const [partnerId, setPartnerId] = useState('')
@@ -58,7 +58,7 @@ export function CapitalForm() {
         <div className="field">
           <label>Partner</label>
           <SearchableSelect
-            items={partners}
+            items={profiles}
             value={partnerId}
             onChange={setPartnerId}
             getId={(p) => p.id}
