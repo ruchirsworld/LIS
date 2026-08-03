@@ -1,11 +1,11 @@
 import { supabase } from '../supabase'
+import { str, num, toDateStr, isBlankRow, paymentModeOf } from './helpers'
 import {
   SHEET_PROJECTS,
   SHEET_INVOICES,
   SHEET_PAYMENTS,
   SHEET_VENDOR_BILLS,
   SHEET_VENDOR_BILL_PAYMENTS,
-  SHEET_EXPENSES,
   SHEET_LOANS,
   SHEET_LOAN_PAYMENTS,
   COLUMNS_PROJECTS,
@@ -13,7 +13,6 @@ import {
   COLUMNS_PAYMENTS,
   COLUMNS_VENDOR_BILLS,
   COLUMNS_VENDOR_BILL_PAYMENTS,
-  COLUMNS_EXPENSES,
   COLUMNS_LOANS,
   COLUMNS_LOAN_PAYMENTS,
 } from './sheets'
@@ -23,30 +22,6 @@ export interface ImportResultRow {
   row: number
   status: 'ok' | 'error' | 'skipped'
   message: string
-}
-
-function str(v: unknown): string {
-  return String(v ?? '').trim()
-}
-
-function num(v: unknown): number | null {
-  const s = str(v)
-  if (!s) return null
-  const n = Number(s)
-  return Number.isFinite(n) ? n : null
-}
-
-function toDateStr(v: unknown): string | null {
-  if (v instanceof Date && !isNaN(v.getTime())) return v.toISOString().slice(0, 10)
-  const s = str(v)
-  if (!s) return null
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
-  const d = new Date(s)
-  return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10)
-}
-
-function isBlankRow(row: Record<string, unknown>): boolean {
-  return Object.values(row).every((v) => str(v) === '')
 }
 
 function invoiceStatus(v: unknown, hasDate: boolean): 'draft' | 'sent' {
@@ -64,34 +39,17 @@ function loanTypeOf(v: unknown): 'private' | 'bank' {
   return str(v).toLowerCase() === 'bank' ? 'bank' : 'private'
 }
 
-function paymentModeOf(v: unknown): 'UPI' | 'Cash' | 'Bank' | null {
-  const s = str(v)
-  return s === 'UPI' || s === 'Cash' || s === 'Bank' ? s : null
-}
-
 function vendorBillPaymentModeOf(v: unknown): 'UPI' | 'NEFT' | 'Cash' | null {
   const s = str(v)
   return s === 'UPI' || s === 'NEFT' || s === 'Cash' ? s : null
 }
 
-function expenseCategoryOf(v: unknown): 'General' | 'Purchase' | 'Project' {
-  const s = str(v).toLowerCase()
-  if (s === 'general') return 'General'
-  if (s === 'purchase') return 'Purchase'
-  if (s === 'project') return 'Project'
-  throw new Error('Category must be General, Purchase, or Project')
-}
-
-function yesNo(v: unknown): boolean {
-  return str(v).toLowerCase() === 'yes'
-}
-
 /** Parses the uploaded workbook and writes every row it can, sheet by sheet
  * (Projects → Invoices → Payments Received → Vendor Bills → Vendor Bill
- * Payments → Expenses → Loans → Loan Payments), so later sheets can resolve
- * the Clients/Projects/Vendors/Invoices/Bills/Loans earlier sheets just
- * created. One bad row is reported and skipped, not fatal to the rest of
- * the file. */
+ * Payments → Loans → Loan Payments), so later sheets can resolve the
+ * Clients/Projects/Vendors/Invoices/Bills earlier sheets just created. One
+ * bad row is reported and skipped, not fatal to the rest of the file.
+ * Expenses have their own separate import file — see runExpensesImport.ts. */
 export async function runImport(file: File): Promise<ImportResultRow[]> {
   // SheetJS has two known CVEs (prototype pollution, ReDoS), both only
   // reachable via XLSX.read/readFile on untrusted input. This *is* that read
@@ -349,57 +307,7 @@ export async function runImport(file: File): Promise<ImportResultRow[]> {
     }
   }
 
-  // ---- 6. Expenses ----
-  for (const [i, row] of sheetRows(SHEET_EXPENSES).entries()) {
-    const rowNum = i + 2
-    if (isBlankRow(row)) continue
-    try {
-      const category = expenseCategoryOf(row[COLUMNS_EXPENSES[0]])
-      const tags = str(row[COLUMNS_EXPENSES[1]])
-      const amount = num(row[COLUMNS_EXPENSES[6]])
-      const date = toDateStr(row[COLUMNS_EXPENSES[7]])
-      if (!tags) throw new Error('Tags are required')
-      if (amount === null) throw new Error('Amount is required')
-      if (!date) throw new Error('Date is required')
-
-      let vendorId: string | null = null
-      let clientId: string | null = null
-      let projectId: string | null = null
-      let costCenter: string | null = null
-
-      if (category === 'Purchase') {
-        const vendorName = str(row[COLUMNS_EXPENSES[3]])
-        if (!vendorName) throw new Error('Vendor Name is required for Purchase')
-        vendorId = await resolveVendorId(vendorName)
-      } else if (category === 'Project') {
-        const clientName = str(row[COLUMNS_EXPENSES[4]])
-        const projectName = str(row[COLUMNS_EXPENSES[5]])
-        if (!projectName) throw new Error('Project Name is required for Project')
-        clientId = clientName ? await resolveClientId(clientName) : null
-        projectId = clientId ? await resolveProjectId(clientId, projectName) : null
-      } else {
-        costCenter = str(row[COLUMNS_EXPENSES[2]]) || null
-      }
-
-      const { error } = await supabase.from('expenses').insert({
-        type: category,
-        description: tags,
-        cost_center: costCenter,
-        vendor_id: vendorId,
-        project_id: projectId,
-        amount,
-        date,
-        payment_mode: paymentModeOf(row[COLUMNS_EXPENSES[8]]),
-        reimbursable: yesNo(row[COLUMNS_EXPENSES[9]]),
-      })
-      if (error) throw error
-      results.push({ sheet: SHEET_EXPENSES, row: rowNum, status: 'ok', message: `Created ${category} expense` })
-    } catch (err) {
-      results.push({ sheet: SHEET_EXPENSES, row: rowNum, status: 'error', message: err instanceof Error ? err.message : String(err) })
-    }
-  }
-
-  // ---- 7. Loans ----
+  // ---- 6. Loans ----
   const loanRefMap = new Map<string, string>()
   for (const [i, row] of sheetRows(SHEET_LOANS).entries()) {
     const rowNum = i + 2
@@ -434,7 +342,7 @@ export async function runImport(file: File): Promise<ImportResultRow[]> {
     }
   }
 
-  // ---- 8. Loan Payments ----
+  // ---- 7. Loan Payments ----
   for (const [i, row] of sheetRows(SHEET_LOAN_PAYMENTS).entries()) {
     const rowNum = i + 2
     if (isBlankRow(row)) continue

@@ -2,9 +2,71 @@ import { useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '../../components/ui'
 import { downloadImportTemplate } from '../../lib/import/template'
+import { downloadExpensesImportTemplate } from '../../lib/import/expensesTemplate'
 import { runImport, type ImportResultRow } from '../../lib/import/runImport'
+import { runExpensesImport } from '../../lib/import/runExpensesImport'
 
-export function DataImportSection() {
+function ImportResultsTable({ results }: { results: ImportResultRow[] }) {
+  const okCount = results.filter((r) => r.status === 'ok').length
+  const skippedCount = results.filter((r) => r.status === 'skipped').length
+  const errorCount = results.filter((r) => r.status === 'error').length
+
+  return (
+    <>
+      <div style={{ marginTop: 16, fontSize: 13 }}>
+        <strong>{okCount}</strong> imported
+        {skippedCount > 0 && (
+          <>
+            {' · '}
+            <strong>{skippedCount}</strong> skipped
+          </>
+        )}
+        {errorCount > 0 && (
+          <>
+            {' · '}
+            <strong style={{ color: 'var(--red)' }}>{errorCount}</strong> failed
+          </>
+        )}
+      </div>
+      <div className="table-scroll" style={{ marginTop: 8 }}>
+        <table className="data">
+          <thead>
+            <tr>
+              <th>Sheet</th>
+              <th>Row</th>
+              <th>Status</th>
+              <th>Detail</th>
+            </tr>
+          </thead>
+          <tbody>
+            {results.map((r, i) => (
+              <tr key={i} className={r.status === 'error' ? 'row-overdue' : undefined}>
+                <td>{r.sheet}</td>
+                <td>{r.row}</td>
+                <td>{r.status}</td>
+                <td>{r.message}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  )
+}
+
+/** One file-download + upload + results block, reused for each entity
+ * group's own separate import file. */
+function ImportFileBlock({
+  label,
+  onDownload,
+  onImport,
+  invalidateKeys,
+}: {
+  label: string
+  onDownload: () => Promise<void>
+  onImport: (file: File) => Promise<ImportResultRow[]>
+  invalidateKeys: string[]
+}) {
   const qc = useQueryClient()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [fileName, setFileName] = useState<string | null>(null)
@@ -12,10 +74,6 @@ export function DataImportSection() {
   const [importing, setImporting] = useState(false)
   const [results, setResults] = useState<ImportResultRow[] | null>(null)
   const [fatalError, setFatalError] = useState<string | null>(null)
-
-  async function handleDownload() {
-    await downloadImportTemplate()
-  }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0] ?? null
@@ -31,14 +89,9 @@ export function DataImportSection() {
     setResults(null)
     setFatalError(null)
     try {
-      const rows = await runImport(file)
+      const rows = await onImport(file)
       setResults(rows)
-      qc.invalidateQueries({ queryKey: ['clients'] })
-      qc.invalidateQueries({ queryKey: ['projects'] })
-      qc.invalidateQueries({ queryKey: ['invoices'] })
-      qc.invalidateQueries({ queryKey: ['invoice_payments'] })
-      qc.invalidateQueries({ queryKey: ['loans'] })
-      qc.invalidateQueries({ queryKey: ['loan_payments'] })
+      invalidateKeys.forEach((key) => qc.invalidateQueries({ queryKey: [key] }))
       qc.invalidateQueries({ queryKey: ['dashboard-kpis'] })
     } catch (err) {
       setFatalError(err instanceof Error ? err.message : 'Could not read that file.')
@@ -50,16 +103,13 @@ export function DataImportSection() {
     }
   }
 
-  const okCount = results?.filter((r) => r.status === 'ok').length ?? 0
-  const skippedCount = results?.filter((r) => r.status === 'skipped').length ?? 0
-  const errorCount = results?.filter((r) => r.status === 'error').length ?? 0
-
   return (
-    <details className="toggle-section">
-      <summary>Data import</summary>
-
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 16 }}>
-        <Button type="button" variant="secondary" onClick={handleDownload}>
+    <div style={{ marginTop: 16 }}>
+      <div className="note" style={{ marginBottom: 6, fontWeight: 600 }}>
+        {label}
+      </div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <Button type="button" variant="secondary" onClick={onDownload}>
           Download sample file
         </Button>
         <input ref={fileInputRef} type="file" accept=".xlsx" onChange={handleFileChange} style={{ maxWidth: 260 }} />
@@ -75,47 +125,29 @@ export function DataImportSection() {
         </div>
       )}
 
-      {results && (
-        <>
-          <div style={{ marginTop: 16, fontSize: 13 }}>
-            <strong>{okCount}</strong> imported
-            {skippedCount > 0 && (
-              <>
-                {' · '}
-                <strong>{skippedCount}</strong> skipped
-              </>
-            )}
-            {errorCount > 0 && (
-              <>
-                {' · '}
-                <strong style={{ color: 'var(--red)' }}>{errorCount}</strong> failed
-              </>
-            )}
-          </div>
-          <div className="table-scroll" style={{ marginTop: 8 }}>
-            <table className="data">
-              <thead>
-                <tr>
-                  <th>Sheet</th>
-                  <th>Row</th>
-                  <th>Status</th>
-                  <th>Detail</th>
-                </tr>
-              </thead>
-              <tbody>
-                {results.map((r, i) => (
-                  <tr key={i} className={r.status === 'error' ? 'row-overdue' : undefined}>
-                    <td>{r.sheet}</td>
-                    <td>{r.row}</td>
-                    <td>{r.status}</td>
-                    <td>{r.message}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
+      {results && <ImportResultsTable results={results} />}
+    </div>
+  )
+}
+
+export function DataImportSection() {
+  return (
+    <details className="toggle-section">
+      <summary>Data import</summary>
+
+      <ImportFileBlock
+        label="Expenses"
+        onDownload={downloadExpensesImportTemplate}
+        onImport={runExpensesImport}
+        invalidateKeys={['expenses']}
+      />
+
+      <ImportFileBlock
+        label="Other data (Projects, Invoices, Vendor Bills, Loans)"
+        onDownload={downloadImportTemplate}
+        onImport={runImport}
+        invalidateKeys={['clients', 'projects', 'invoices', 'invoice_payments', 'vendor_bills', 'vendor_bill_payments', 'loans', 'loan_payments']}
+      />
     </details>
   )
 }
