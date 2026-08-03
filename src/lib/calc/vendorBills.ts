@@ -3,6 +3,7 @@
 export interface VendorBillRow {
   amount: number
   gst_pct: number | null
+  other_cost?: number | null
 }
 
 export interface VendorBillPaymentRow {
@@ -13,8 +14,12 @@ export function billGstAmt(bill: VendorBillRow): number {
   return Number(bill.amount || 0) * Number(bill.gst_pct || 0) / 100
 }
 
+// amount (MenPower labor cost, or the plain bill value) and other_cost are
+// tracked separately — other_cost feeds a distinct KPI in Projects rather
+// than being blended into the labor-cost figure — but both still count
+// toward what's actually owed to the vendor, so the payable total sums them.
 export function billTotal(bill: VendorBillRow): number {
-  return Number(bill.amount || 0) + billGstAmt(bill)
+  return Number(bill.amount || 0) + billGstAmt(bill) + Number(bill.other_cost || 0)
 }
 
 export function billPaid(payments: VendorBillPaymentRow[]): number {

@@ -77,6 +77,7 @@ export function VendorBillForm({
   const [gstPct, setGstPct] = useState('0')
   const [qty, setQty] = useState('')
   const [rate, setRate] = useState('0')
+  const [otherCost, setOtherCost] = useState('0')
   const [receiptBlob, setReceiptBlob] = useState<Blob | null>(null)
   const [receiptStatus, setReceiptStatus] = useState('Take photo')
   const [submitting, setSubmitting] = useState(false)
@@ -109,6 +110,7 @@ export function VendorBillForm({
     setGstPct(String(editingBill.gst_pct ?? 0))
     setQty(editingBill.qty != null ? String(editingBill.qty) : '')
     setRate(editingBill.rate != null ? String(editingBill.rate) : '0')
+    setOtherCost(editingBill.other_cost != null ? String(editingBill.other_cost) : '0')
     setReceiptBlob(null)
     setReceiptStatus(editingBill.receipt_path ? 'Photo attached' : 'Take photo')
     setFormError(null)
@@ -127,6 +129,7 @@ export function VendorBillForm({
     setGstPct('0')
     setQty('')
     setRate('0')
+    setOtherCost('0')
     setReceiptBlob(null)
     setReceiptStatus('Take photo')
   }
@@ -210,6 +213,10 @@ export function VendorBillForm({
       setFormError('Enter a quantity.')
       return
     }
+    if (isMenPower && parseINR(otherCost) > 0 && !remarks.trim()) {
+      setFormError('Remarks are required when Other Cost has a value.')
+      return
+    }
     setSubmitting(true)
     try {
       const basePatch = {
@@ -223,6 +230,7 @@ export function VendorBillForm({
         gst_pct: isMenPower ? 0 : Number(gstPct) || 0,
         qty: isMenPower ? Number(qty) || 0 : null,
         rate: isMenPower ? parseINR(rate) : null,
+        other_cost: isMenPower ? parseINR(otherCost) || 0 : null,
       }
 
       if (editingBill) {
@@ -354,16 +362,35 @@ export function VendorBillForm({
           </div>
         )}
 
-        {/* Row 6: Remarks */}
-        <div className="field full">
-          <label>Remarks (optional)</label>
-          <input
-            type="text"
-            placeholder="Any extra context"
-            value={remarks}
-            onChange={(e) => setRemarks(e.target.value)}
-          />
-        </div>
+        {/* Row 6: Remarks (or Other cost + Remarks for MenPower) */}
+        {isMenPower ? (
+          <div className="field-row">
+            <div className="field">
+              <label>Other cost (₹)</label>
+              <CurrencyInput value={otherCost} onValueChange={setOtherCost} />
+            </div>
+            <div className="field">
+              <label>Remarks{parseINR(otherCost) > 0 ? '' : ' (optional)'}</label>
+              <input
+                type="text"
+                required={parseINR(otherCost) > 0}
+                placeholder="Any extra context"
+                value={remarks}
+                onChange={(e) => setRemarks(e.target.value)}
+              />
+            </div>
+          </div>
+        ) : (
+          <div className="field full">
+            <label>Remarks (optional)</label>
+            <input
+              type="text"
+              placeholder="Any extra context"
+              value={remarks}
+              onChange={(e) => setRemarks(e.target.value)}
+            />
+          </div>
+        )}
 
         {/* Row 7: Total + Add bill */}
         <div className="field-row vb-row5">
@@ -374,7 +401,7 @@ export function VendorBillForm({
               readOnly
               value={
                 isMenPower
-                  ? fmt((Number(qty) || 0) * parseINR(rate))
+                  ? fmt(billTotal({ amount: (Number(qty) || 0) * parseINR(rate), gst_pct: 0, other_cost: parseINR(otherCost) }))
                   : fmt(billTotal({ amount: parseINR(amount), gst_pct: Number(gstPct) || 0 }))
               }
             />

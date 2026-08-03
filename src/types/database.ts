@@ -822,6 +822,7 @@ export type Database = {
           display_id: string | null
           gst_pct: number
           id: string
+          other_cost: number | null
           project_id: string | null
           qty: number | null
           rate: number | null
@@ -839,6 +840,7 @@ export type Database = {
           display_id?: string | null
           gst_pct?: number
           id?: string
+          other_cost?: number | null
           project_id?: string | null
           qty?: number | null
           rate?: number | null
@@ -856,6 +858,7 @@ export type Database = {
           display_id?: string | null
           gst_pct?: number
           id?: string
+          other_cost?: number | null
           project_id?: string | null
           qty?: number | null
           rate?: number | null
