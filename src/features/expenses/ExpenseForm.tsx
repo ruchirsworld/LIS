@@ -552,6 +552,11 @@ export function ExpenseForm({
               <div className="field">
                 <label>Vendor</label>
                 <VendorCombobox vendors={filteredVendors} value={vendorId} onChange={handleVendorChange} allowCreate={canAddVendor} />
+                {vendorId && (
+                  <div className="note" style={{ marginTop: 2 }}>
+                    Due to this vendor: {fmt(vendorOpenBills.reduce((s, row) => s + row.due, 0))}
+                  </div>
+                )}
               </div>
               {!settlingBill && (
                 <div className="field">
