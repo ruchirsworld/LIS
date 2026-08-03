@@ -1,13 +1,14 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ModuleHeader, KpiCard } from '../../components/ui'
 import { SearchableSelect } from '../../components/SearchableSelect'
 import { useAuth } from '../../lib/auth'
-import { useProjects, useClients } from '../../lib/queries/masters'
+import { useProjects, useClients, useVendors } from '../../lib/queries/masters'
 import { useUpdateProject } from '../../lib/queries/admin'
 import { useExpenses } from '../../lib/queries/expenses'
 import { useVendorBills } from '../../lib/queries/purchases'
 import { useInvoices, useInvoicePayments } from '../../lib/queries/invoices'
 import { fmt, fmtDate } from '../../lib/calc/format'
+import { billTotal } from '../../lib/calc/vendorBills'
 import { clientLabel } from '../../lib/labels'
 import type { Database } from '../../types/database'
 import {
@@ -19,11 +20,15 @@ import {
 
 type Project = Database['public']['Tables']['projects']['Row']
 
+const CLIENT_FILTER_KEY = 'lis.projects.clientFilter'
+const SELECTED_PROJECT_KEY = 'lis.projects.selectedId'
+
 export function ProjectsPage() {
   const { profile } = useAuth()
   const canEditStatus = profile?.role === 'admin'
   const { data: projects } = useProjects()
   const { data: clients } = useClients()
+  const { data: vendors } = useVendors()
   const { data: expenses } = useExpenses(null)
   const { data: vendorBills } = useVendorBills(null)
   const { data: invoices } = useInvoices(null)
@@ -31,18 +36,35 @@ export function ProjectsPage() {
   const updateProject = useUpdateProject()
 
   const activeProjects = projects?.filter((p) => p.status === 'active') ?? []
-  const [clientFilter, setClientFilter] = useState('')
-  const [selectedId, setSelectedId] = useState('')
+  // Client/Project picks persist across visits (until the user changes them)
+  // rather than resetting to the first project every time this page loads.
+  const [clientFilter, setClientFilterState] = useState(() => localStorage.getItem(CLIENT_FILTER_KEY) ?? '')
+  const [selectedId, setSelectedIdState] = useState(() => localStorage.getItem(SELECTED_PROJECT_KEY) ?? '')
   const [updatingId, setUpdatingId] = useState<string | null>(null)
+  const [breakdown, setBreakdown] = useState<'purchases' | 'expenses' | null>(null)
   const selected = projects?.find((p) => p.id === selectedId) ?? activeProjects[0] ?? projects?.[0]
 
   const visibleProjects = clientFilter ? projects?.filter((p) => p.client_id === clientFilter) : projects
+
+  function setClientFilter(id: string) {
+    setClientFilterState(id)
+    localStorage.setItem(CLIENT_FILTER_KEY, id)
+  }
+
+  function setSelectedId(id: string) {
+    setSelectedIdState(id)
+    localStorage.setItem(SELECTED_PROJECT_KEY, id)
+  }
 
   function handleClientChange(id: string) {
     setClientFilter(id)
     const proj = projects?.find((p) => p.id === selectedId)
     if (id && proj?.client_id !== id) setSelectedId('')
   }
+
+  useEffect(() => {
+    setBreakdown(null)
+  }, [selected?.id])
 
   async function handleToggleStatus(p: Project) {
     const nextStatus = p.status === 'completed' ? 'active' : 'completed'
@@ -66,7 +88,22 @@ export function ProjectsPage() {
   const balanceDue = invoicedRevenue - receivedRevenue
   const profit = invoicedRevenue - costTotal
   const budget = selected?.budget ?? null
-  const budgetRemaining = budget !== null ? budget - costTotal : null
+  const utilizedPct = budget !== null && budget > 0 ? Math.round((costTotal / budget) * 100) : null
+
+  const projectExpenseRows = selected ? (expenses ?? []).filter((e) => e.project_id === selected.id) : []
+  const projectBillRows = selected ? (vendorBills ?? []).filter((b) => b.project_id === selected.id) : []
+
+  const expensesByType = new Map<string, number>()
+  projectExpenseRows.forEach((e) => {
+    expensesByType.set(e.type, (expensesByType.get(e.type) ?? 0) + Number(e.amount || 0))
+  })
+
+  const purchasesByVendorType = new Map<string, number>()
+  projectBillRows.forEach((b) => {
+    const vendor = vendors?.find((v) => v.id === b.vendor_id)
+    const cat = vendor?.category ?? 'Uncategorized'
+    purchasesByVendorType.set(cat, (purchasesByVendorType.get(cat) ?? 0) + billTotal(b))
+  })
 
   return (
     <div>
@@ -113,14 +150,58 @@ export function ProjectsPage() {
               <div className="kpi-grid-2col">
                 <KpiCard label="Project value" value={selected.value_ex_gst ? fmt(selected.value_ex_gst) : '—'} />
                 <KpiCard label="Profit" value={<span style={{ color: 'var(--red)' }}>{fmt(profit)}</span>} />
-                <KpiCard label="Budget" value={budget !== null ? fmt(budget) : '—'} />
-                <KpiCard label="Available budget" value={budgetRemaining !== null ? fmt(budgetRemaining) : '—'} />
-                <div className="kpi-grid-divider" />
-                <KpiCard label="Total expenses" value={fmt(costTotal)} />
+                <KpiCard label="Invoiced" value={fmt(invoicedRevenue)} />
                 <KpiCard label="Due" value={fmt(balanceDue)} />
-                <KpiCard label="Invoices raised" value={fmt(invoicedRevenue)} />
-                <KpiCard label="Amount received" value={fmt(receivedRevenue)} />
+                <div className="kpi-grid-divider terracotta" />
+                <KpiCard label="Budget" value={budget !== null ? fmt(budget) : '—'} />
+                <KpiCard label="Utilized" value={utilizedPct !== null ? `${utilizedPct}%` : '—'} />
+                <KpiCard
+                  label="Purchases"
+                  value={fmt(vendorBillTotal)}
+                  active={breakdown === 'purchases'}
+                  onClick={() => setBreakdown(breakdown === 'purchases' ? null : 'purchases')}
+                />
+                <KpiCard
+                  label="Expenses"
+                  value={fmt(expenseTotal)}
+                  active={breakdown === 'expenses'}
+                  onClick={() => setBreakdown(breakdown === 'expenses' ? null : 'expenses')}
+                />
               </div>
+
+              {breakdown === 'purchases' && (
+                <div style={{ marginBottom: 18 }}>
+                  <div className="note" style={{ marginBottom: 8 }}>
+                    Purchases by vendor type
+                  </div>
+                  {purchasesByVendorType.size === 0 ? (
+                    <div className="note">No purchases recorded for this project.</div>
+                  ) : (
+                    <div className="kpi-grid-2col">
+                      {Array.from(purchasesByVendorType.entries()).map(([cat, amt]) => (
+                        <KpiCard key={cat} label={cat} value={fmt(amt)} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {breakdown === 'expenses' && (
+                <div style={{ marginBottom: 18 }}>
+                  <div className="note" style={{ marginBottom: 8 }}>
+                    Expenses by type
+                  </div>
+                  {expensesByType.size === 0 ? (
+                    <div className="note">No expenses recorded for this project.</div>
+                  ) : (
+                    <div className="kpi-grid-2col">
+                      {Array.from(expensesByType.entries()).map(([type, amt]) => (
+                        <KpiCard key={type} label={type} value={fmt(amt)} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </details>
           )}
 

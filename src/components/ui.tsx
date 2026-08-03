@@ -14,10 +14,29 @@ export function ModuleHeader({ children }: { children: ReactNode }) {
   return <div className="module-header">{children}</div>
 }
 
-export function KpiCard({ label, value }: { label: string; value: ReactNode }) {
+export function KpiCard({
+  label,
+  value,
+  onClick,
+  active,
+}: {
+  label: string
+  value: ReactNode
+  onClick?: () => void
+  active?: boolean
+}) {
   return (
-    <div className="dash-card">
-      <div className="dash-label">{label}</div>
+    <div
+      className={onClick ? 'dash-card dash-card-clickable' : 'dash-card'}
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      style={active ? { borderColor: 'var(--accent)' } : undefined}
+    >
+      <div className="dash-label">
+        {label}
+        {onClick && <span className="dash-card-caret">{active ? '▾' : '▸'}</span>}
+      </div>
       <div className="dash-value">{value}</div>
     </div>
   )

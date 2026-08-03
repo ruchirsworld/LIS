@@ -1019,11 +1019,26 @@ table.data tr:last-child td {
   background: var(--line);
   margin: 2px 0;
 }
+.kpi-grid-divider.terracotta {
+  background: var(--red);
+  height: 2px;
+}
 .dash-card {
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 16px;
+}
+.dash-card-clickable {
+  cursor: pointer;
+}
+.dash-card-clickable:hover {
+  border-color: var(--accent);
+}
+.dash-card-caret {
+  float: right;
+  color: var(--ink-soft);
+  text-transform: none;
 }
 .dash-label {
   font-size: 11px;
