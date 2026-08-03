@@ -10,14 +10,16 @@ import { useClients, useProjects, useVendors, useCostCenters, useExpenseCategori
 import { useProfiles } from '../../lib/queries/admin'
 import { useCreateExpense, useUpdateExpense } from '../../lib/queries/expenses'
 import { useLoans, useLoanPayments, useCreateLoanPayment } from '../../lib/queries/loans'
+import { useVendorBills, useVendorBillPayments, useCreateVendorBillPayment } from '../../lib/queries/purchases'
 import { useCreateCapitalTx } from '../../lib/queries/capital'
 import { useGeolocation } from '../../lib/useGeolocation'
 import { compressImage } from '../../lib/compressImage'
 import { uploadReceipt } from '../../lib/storage'
-import { parseINR, fmt, fmtPlain } from '../../lib/calc/format'
+import { parseINR, fmt, fmtDate, fmtPlain } from '../../lib/calc/format'
 import { getErrorMessage } from '../../lib/errors'
 import { clientLabel, matchesCategoryLabel } from '../../lib/labels'
 import { loanOutstanding, monthlyInterestDue, monthsInterestDue, totalInterestDue } from '../../lib/calc/loans'
+import { billDue } from '../../lib/calc/vendorBills'
 import { VendorCombobox } from '../purchases/VendorCombobox'
 import { useVendorCategoryFilter, VendorCategoryPills } from '../purchases/VendorCategoryFilter'
 import type { Database } from '../../types/database'
@@ -94,12 +96,15 @@ export function ExpenseForm({
   const { data: categories } = useExpenseCategories()
   const { data: loans } = useLoans(null)
   const { data: loanPayments } = useLoanPayments()
+  const { data: vendorBills } = useVendorBills(null)
+  const { data: vendorBillPayments } = useVendorBillPayments()
   // No visible GPS UI — still silently captured on mount and submitted with the transaction.
   const { geo } = useGeolocation()
 
   const createExpense = useCreateExpense()
   const updateExpense = useUpdateExpense()
   const createLoanPayment = useCreateLoanPayment()
+  const createVendorBillPayment = useCreateVendorBillPayment()
   const createCapitalTx = useCreateCapitalTx()
 
   const [toggleCategory, setToggleCategory] = useState<ToggleCategory>('general')
@@ -118,6 +123,7 @@ export function ExpenseForm({
   // Row 2 fields — one set per category, only the relevant one is shown/used.
   const [costCenter, setCostCenter] = useState('')
   const [vendorId, setVendorId] = useState('')
+  const [billId, setBillId] = useState('')
   const [clientId, setClientId] = useState('')
   const [projectId, setProjectId] = useState('')
   const [loanId, setLoanId] = useState('')
@@ -156,7 +162,20 @@ export function ExpenseForm({
   const suggestedInterestDueMonths = selectedLoan ? monthsInterestDue(selectedLoan, selectedLoanPayments) : 0
   const suggestedInterestDue = selectedLoan ? totalInterestDue(selectedLoan, selectedLoanPayments) : 0
 
-  const writesToExpenses = toggleCategory === 'general' || toggleCategory === 'purchase' || toggleCategory === 'project'
+  // Vendor's open bills — picking one turns this entry into an actual bill
+  // payment (vendor_bill_payments) instead of a generic Purchase expense,
+  // so it correctly reduces that bill's Due. Leaving it unset keeps today's
+  // behavior for ad-hoc vendor spend that was never raised as a formal bill.
+  const vendorOpenBills = (vendorBills ?? [])
+    .filter((b) => b.vendor_id === vendorId)
+    .map((b) => ({ bill: b, due: billDue(b, vendorBillPayments?.filter((p) => p.bill_id === b.id) ?? []) }))
+    .filter((row) => row.due > 0)
+    .sort((a, b) => (a.bill.date ?? '9999-99-99').localeCompare(b.bill.date ?? '9999-99-99'))
+  const selectedBill = vendorOpenBills.find((row) => row.bill.id === billId)
+  const settlingBill = toggleCategory === 'purchase' && !!selectedBill
+
+  const writesToExpenses =
+    toggleCategory === 'general' || toggleCategory === 'project' || (toggleCategory === 'purchase' && !settlingBill)
   // Project is no longer offered for new entries — project-related spend now
   // goes through Purchase (which already has its own Project selector).
   // Editing an existing Project-type expense still shows it, so old records
@@ -177,6 +196,7 @@ export function ExpenseForm({
     setRemarks(editingExpense.remarks ?? '')
     setCostCenter(editingExpense.cost_center ?? '')
     setVendorId(editingExpense.vendor_id ?? '')
+    setBillId('')
     setVendorCategory(null)
     setProjectId(editingExpense.project_id ?? '')
     const proj = projects?.find((p) => p.id === editingExpense.project_id)
@@ -194,6 +214,7 @@ export function ExpenseForm({
     setToggleCategory(next)
     setCostCenter('')
     setVendorId('')
+    setBillId('')
     setVendorCategory(null)
     setClientId('')
     // projectId deliberately not reset here — the selected project should
@@ -203,6 +224,11 @@ export function ExpenseForm({
     setPartnerId('')
     setInterestPaid('0')
     setPrincipalPaid('0')
+  }
+
+  function handleVendorChange(id: string) {
+    setVendorId(id)
+    setBillId('')
   }
 
   function handleClientChange(id: string) {
@@ -249,6 +275,7 @@ export function ExpenseForm({
     setDescription('')
     setCostCenter('')
     setVendorId('')
+    setBillId('')
     setClientId('')
     // projectId deliberately not reset — see handleToggleChange.
     setLoanId('')
@@ -323,6 +350,20 @@ export function ExpenseForm({
           date,
           notes: description.trim() || null,
           payment_mode: paymentMode,
+        })
+        setLastCreatedId(created.display_id)
+      } else if (settlingBill && selectedBill) {
+        const amt = parseINR(amount)
+        if (amt <= 0) {
+          setFormError('Enter an amount.')
+          setSubmitting(false)
+          return
+        }
+        const created = await createVendorBillPayment.mutateAsync({
+          bill_id: selectedBill.bill.id,
+          date,
+          amount: amt,
+          reference: description.trim() || null,
         })
         setLastCreatedId(created.display_id)
       } else {
@@ -417,7 +458,7 @@ export function ExpenseForm({
           </div>
         )}
 
-        {toggleCategory === 'purchase' && (
+        {toggleCategory === 'purchase' && !settlingBill && (
           <div className="field-row">
             <div className="field">
               <label>Project</label>
@@ -437,7 +478,7 @@ export function ExpenseForm({
           </div>
         )}
 
-        {toggleCategory === 'purchase' && (
+        {toggleCategory === 'purchase' && !settlingBill && (
           <div className="field full">
             <label>Vendor type</label>
             <VendorCategoryPills categories={vendorCategories} category={vendorCategory} onChange={setVendorCategory} />
@@ -506,22 +547,60 @@ export function ExpenseForm({
 
         {/* Row 3: Tags (alongside Vendor, for Purchase) */}
         {toggleCategory === 'purchase' ? (
-          <div className="field-row">
-            <div className="field">
-              <label>Vendor</label>
-              <VendorCombobox vendors={filteredVendors} value={vendorId} onChange={setVendorId} allowCreate={canAddVendor} />
+          <>
+            <div className="field-row">
+              <div className="field">
+                <label>Vendor</label>
+                <VendorCombobox vendors={filteredVendors} value={vendorId} onChange={handleVendorChange} allowCreate={canAddVendor} />
+              </div>
+              {!settlingBill && (
+                <div className="field">
+                  <label>Tags</label>
+                  <input
+                    type="text"
+                    required={writesToExpenses}
+                    placeholder="Use #tags to make it searchable"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                  />
+                </div>
+              )}
             </div>
-            <div className="field">
-              <label>Tags</label>
-              <input
-                type="text"
-                required={writesToExpenses}
-                placeholder="Use #tags to make it searchable"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-            </div>
-          </div>
+
+            {vendorId && vendorOpenBills.length > 0 && (
+              <div className="field full">
+                <label>Settle bill (optional)</label>
+                <SearchableSelect
+                  items={vendorOpenBills.map((row) => row.bill)}
+                  value={billId}
+                  onChange={setBillId}
+                  getId={(b) => b.id}
+                  getLabel={(b) => {
+                    const row = vendorOpenBills.find((r) => r.bill.id === b.id)
+                    return `${b.display_id ?? 'Bill'} — ${fmtDate(b.date)} — Due: ${fmt(row?.due ?? 0)}`
+                  }}
+                  placeholder="— No bill / general purchase spend —"
+                />
+                {selectedBill && (
+                  <div className="note" style={{ marginTop: 2 }}>
+                    This payment will be recorded against {selectedBill.bill.display_id ?? 'this bill'} — Due: {fmt(selectedBill.due)}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {settlingBill && (
+              <div className="field full">
+                <label>Reference (optional)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. UPI ref, cheque no."
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
+              </div>
+            )}
+          </>
         ) : (
           <div className="field full">
             <label>Tags</label>
@@ -535,7 +614,7 @@ export function ExpenseForm({
           </div>
         )}
 
-        {topTags.length > 0 && (
+        {topTags.length > 0 && !settlingBill && (
           <div style={{ gridColumn: '1 / -1' }}>
             {topTags.map((t) => (
               <button
