@@ -11,7 +11,7 @@ export function ExpensesPage() {
 
   return (
     <div>
-      <ModuleHeader>Expenses</ModuleHeader>
+      <ModuleHeader>Payments</ModuleHeader>
       <ExpenseForm editingExpense={editingExpense} onDoneEditing={() => setEditingExpense(null)} />
       <ExpenseTable onEdit={setEditingExpense} />
     </div>
