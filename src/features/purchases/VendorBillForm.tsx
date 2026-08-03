@@ -182,6 +182,54 @@ export function VendorBillForm({
         </div>
 
         <div className="field-row">
+          {isMenPower ? (
+            <>
+              <div className="field">
+                <label>MenPower qty</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  required
+                  value={qty}
+                  onChange={(e) => setQty(e.target.value)}
+                />
+              </div>
+              <div className="field">
+                <label>Rate (₹)</label>
+                <CurrencyInput value={rate} onValueChange={setRate} required />
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="field">
+                <label>Bill value (₹)</label>
+                <CurrencyInput value={amount} onValueChange={setAmount} required />
+              </div>
+              <div className="field">
+                <label>GST %</label>
+                <input type="number" min="0" step="0.01" value={gstPct} onChange={(e) => setGstPct(e.target.value)} />
+              </div>
+            </>
+          )}
+          <div className="field row-inline" style={{ flex: '0 0 auto', alignSelf: 'flex-end' }}>
+            <ReceiptUploadButton
+              idPrefix="vb-receipt"
+              hasFile={!!receiptBlob}
+              status={receiptStatus}
+              onFile={handleReceiptFile}
+            />
+          </div>
+        </div>
+        {receiptStatus === 'Could not process photo' && (
+          <div className="field full">
+            <div className="note" style={{ color: 'var(--red)', marginTop: -6 }}>
+              Could not process that photo — try again.
+            </div>
+          </div>
+        )}
+
+        <div className="field-row">
           <div className="field field-narrow">
             <label>Bill date</label>
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
@@ -231,54 +279,6 @@ export function VendorBillForm({
             onChange={(e) => setRemarks(e.target.value)}
           />
         </div>
-
-        <div className="field-row">
-          {isMenPower ? (
-            <>
-              <div className="field">
-                <label>MenPower qty</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  required
-                  value={qty}
-                  onChange={(e) => setQty(e.target.value)}
-                />
-              </div>
-              <div className="field">
-                <label>Rate (₹)</label>
-                <CurrencyInput value={rate} onValueChange={setRate} required />
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="field">
-                <label>Bill value (₹)</label>
-                <CurrencyInput value={amount} onValueChange={setAmount} required />
-              </div>
-              <div className="field">
-                <label>GST %</label>
-                <input type="number" min="0" step="0.01" value={gstPct} onChange={(e) => setGstPct(e.target.value)} />
-              </div>
-            </>
-          )}
-          <div className="field row-inline" style={{ flex: '0 0 auto', alignSelf: 'flex-end' }}>
-            <ReceiptUploadButton
-              idPrefix="vb-receipt"
-              hasFile={!!receiptBlob}
-              status={receiptStatus}
-              onFile={handleReceiptFile}
-            />
-          </div>
-        </div>
-        {receiptStatus === 'Could not process photo' && (
-          <div className="field full">
-            <div className="note" style={{ color: 'var(--red)', marginTop: -6 }}>
-              Could not process that photo — try again.
-            </div>
-          </div>
-        )}
 
         <div className="field-row vb-row5">
           <div className="field vb-total">
