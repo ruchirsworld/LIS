@@ -5,7 +5,7 @@ import { ReceiptUploadButton } from '../../components/ReceiptUploadButton'
 import { SearchableSelect } from '../../components/SearchableSelect'
 import { useAuth } from '../../lib/auth'
 import { useClients, useProjects, useVendors } from '../../lib/queries/masters'
-import { useCreateVendorBill, useUpdateVendorBill } from '../../lib/queries/purchases'
+import { useCreateVendorBill, useUpdateVendorBill, useCreateVendorBillPayment } from '../../lib/queries/purchases'
 import { fmt, fmtDate, parseINR } from '../../lib/calc/format'
 import { billTotal } from '../../lib/calc/vendorBills'
 import { compressImage } from '../../lib/compressImage'
@@ -28,6 +28,24 @@ function receiptFileName(displayId: string | null, dateStr: string): string {
   return `Ven-${fmtDate(dateStr)}-${refId}.jpg`
 }
 
+function IdBadge({ id }: { id: string | null }) {
+  return (
+    <span
+      style={{
+        background: 'var(--red-soft)',
+        color: 'var(--red)',
+        borderRadius: 6,
+        padding: '6px 12px',
+        fontSize: 13,
+        fontWeight: 600,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      Saved as {id}
+    </span>
+  )
+}
+
 export function VendorBillForm({
   editingBill,
   onDoneEditing,
@@ -42,6 +60,7 @@ export function VendorBillForm({
   const { data: projects } = useProjects()
   const createVendorBill = useCreateVendorBill()
   const updateVendorBill = useUpdateVendorBill()
+  const createVendorBillPayment = useCreateVendorBillPayment()
 
   const [vendorId, setVendorId] = useState('')
   const { categories: vendorCategories, category: vendorCategory, setCategory: setVendorCategory, filteredVendors } =
@@ -60,7 +79,17 @@ export function VendorBillForm({
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
-  const visibleProjects = clientId ? projects?.filter((p) => p.client_id === clientId) : projects
+  const [lastCreatedBill, setLastCreatedBill] = useState<VendorBill | null>(null)
+  const [showQuickPay, setShowQuickPay] = useState(false)
+  const [payDate, setPayDate] = useState(todayStr())
+  const [payAmount, setPayAmount] = useState('0')
+  const [payError, setPayError] = useState<string | null>(null)
+  const [payDone, setPayDone] = useState(false)
+  const [paySubmitting, setPaySubmitting] = useState(false)
+
+  const activeProjects = projects?.filter((p) => p.status === 'active')
+  const selectedProject = projects?.find((p) => p.id === projectId)
+  const selectedProjectClient = selectedProject ? clients?.find((c) => c.id === selectedProject.client_id) : null
   const selectedVendor = vendors?.find((v) => v.id === vendorId)
   const isMenPower = selectedVendor?.category === 'MenPower'
 
@@ -79,6 +108,7 @@ export function VendorBillForm({
     setReceiptBlob(null)
     setReceiptStatus(editingBill.receipt_path ? 'Photo attached' : 'Take photo')
     setFormError(null)
+    setLastCreatedBill(null)
   }, [editingBill])
 
   function resetForm() {
@@ -102,10 +132,38 @@ export function VendorBillForm({
     onDoneEditing()
   }
 
-  function handleClientChange(id: string) {
-    setClientId(id)
-    const proj = projects?.find((p) => p.id === projectId)
-    if (id && proj?.client_id !== id) setProjectId('')
+  function handleProjectChange(id: string) {
+    setProjectId(id)
+    const proj = activeProjects?.find((p) => p.id === id)
+    setClientId(proj?.client_id ?? '')
+  }
+
+  function resetQuickPay() {
+    setShowQuickPay(false)
+    setPayDate(todayStr())
+    setPayAmount('0')
+    setPayError(null)
+    setPayDone(false)
+  }
+
+  async function handleAddPayment(e: FormEvent) {
+    e.preventDefault()
+    if (!lastCreatedBill) return
+    const amt = parseINR(payAmount)
+    if (amt <= 0) {
+      setPayError('Enter a payment amount.')
+      return
+    }
+    setPaySubmitting(true)
+    setPayError(null)
+    try {
+      await createVendorBillPayment.mutateAsync({ bill_id: lastCreatedBill.id, date: payDate, amount: amt })
+      setPayDone(true)
+    } catch (err) {
+      setPayError(getErrorMessage(err, 'Could not save payment.'))
+    } finally {
+      setPaySubmitting(false)
+    }
   }
 
   async function handleReceiptFile(file: File) {
@@ -122,8 +180,20 @@ export function VendorBillForm({
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setFormError(null)
+    if (!projectId) {
+      setFormError('Pick a project.')
+      return
+    }
     if (!vendorId) {
       setFormError('Pick a vendor.')
+      return
+    }
+    if (!date) {
+      setFormError('Pick a bill date.')
+      return
+    }
+    if (!description.trim()) {
+      setFormError('Bill description is required.')
       return
     }
     if (isMenPower && (!qty || Number(qty) <= 0)) {
@@ -134,10 +204,10 @@ export function VendorBillForm({
     try {
       const basePatch = {
         vendor_id: vendorId,
-        description: description.trim() || null,
+        description: description.trim(),
         remarks: remarks.trim() || null,
         client_id: clientId || null,
-        project_id: projectId || null,
+        project_id: projectId,
         date,
         amount: isMenPower ? (Number(qty) || 0) * parseINR(rate) : parseINR(amount),
         gst_pct: isMenPower ? 0 : Number(gstPct) || 0,
@@ -160,6 +230,8 @@ export function VendorBillForm({
           const receiptPath = await uploadReceiptToDrive(receiptBlob, receiptFileName(created.display_id, date))
           await updateVendorBill.mutateAsync({ id: created.id, patch: { receipt_path: receiptPath } })
         }
+        setLastCreatedBill(created)
+        resetQuickPay()
       }
       resetForm()
     } catch (err) {
@@ -174,13 +246,56 @@ export function VendorBillForm({
       <summary>Vendor bills</summary>
 
       <form className="form-grid" onSubmit={handleSubmit} style={{ marginTop: 16 }}>
-        <div className="field full vb-vendor">
+        {/* Row 1: Project (active only, mandatory) — Client auto-derived, mandatory */}
+        <div className="field-row">
+          <div className="field">
+            <label>Project</label>
+            <SearchableSelect
+              items={activeProjects}
+              value={projectId}
+              onChange={handleProjectChange}
+              getId={(p) => p.id}
+              getLabel={(p) => p.name}
+              placeholder="— Select project —"
+            />
+          </div>
+          <div className="field">
+            <label>Client</label>
+            <input type="text" value={projectId ? clientLabel(selectedProjectClient) : '—'} disabled />
+          </div>
+        </div>
+
+        {/* Row 2: Vendor type */}
+        <div className="field full">
           <label>Vendor type</label>
           <VendorCategoryPills categories={vendorCategories} category={vendorCategory} onChange={setVendorCategory} />
+        </div>
+
+        {/* Row 3: Vendor */}
+        <div className="field full">
           <label>Vendor</label>
           <VendorCombobox vendors={filteredVendors} value={vendorId} onChange={setVendorId} allowCreate={canAddVendor} />
         </div>
 
+        {/* Row 4: Date + Bill description (mandatory) */}
+        <div className="field-row">
+          <div className="field field-narrow">
+            <label>Bill date</label>
+            <input type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
+          </div>
+          <div className="field">
+            <label>Bill description</label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. plant stock, hardscape material"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {/* Row 5: Bill value + GST% (or Qty/Rate for MenPower), plus receipt upload */}
         <div className="field-row">
           {isMenPower ? (
             <>
@@ -229,47 +344,7 @@ export function VendorBillForm({
           </div>
         )}
 
-        <div className="field-row">
-          <div className="field field-narrow">
-            <label>Bill date</label>
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-          </div>
-          <div className="field">
-            <label>Bill description</label>
-            <input
-              type="text"
-              placeholder="e.g. plant stock, hardscape material"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
-          </div>
-        </div>
-
-        <div className="optional-row">
-          <div className="field">
-            <label>Client (optional)</label>
-            <SearchableSelect
-              items={clients}
-              value={clientId}
-              onChange={handleClientChange}
-              getId={(c) => c.id}
-              getLabel={(c) => clientLabel(c)}
-              placeholder="— No client / general —"
-            />
-          </div>
-          <div className="field">
-            <label>Project (optional)</label>
-            <SearchableSelect
-              items={visibleProjects}
-              value={projectId}
-              onChange={setProjectId}
-              getId={(p) => p.id}
-              getLabel={(p) => p.name}
-              placeholder="— No project / general —"
-            />
-          </div>
-        </div>
-
+        {/* Row 6: Remarks */}
         <div className="field full">
           <label>Remarks (optional)</label>
           <input
@@ -280,6 +355,7 @@ export function VendorBillForm({
           />
         </div>
 
+        {/* Row 7: Total + Add bill */}
         <div className="field-row vb-row5">
           <div className="field vb-total">
             <label>Total value (₹)</label>
@@ -295,7 +371,7 @@ export function VendorBillForm({
           </div>
           <div className="field vb-submit">
             <label>&nbsp;</label>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <Button type="submit" disabled={submitting}>
                 {submitting ? 'Saving…' : editingBill ? 'Save changes' : 'Add bill'}
               </Button>
@@ -304,10 +380,52 @@ export function VendorBillForm({
                   Cancel
                 </Button>
               )}
+              {lastCreatedBill && <IdBadge id={lastCreatedBill.display_id} />}
             </div>
           </div>
         </div>
       </form>
+
+      {lastCreatedBill && !payDone && (
+        <div style={{ marginTop: 12 }}>
+          {!showQuickPay ? (
+            <Button type="button" variant="secondary" onClick={() => setShowQuickPay(true)}>
+              Add payment
+            </Button>
+          ) : (
+            <form className="form-grid" onSubmit={handleAddPayment} style={{ marginTop: 4 }}>
+              <div className="field-row">
+                <div className="field field-narrow">
+                  <label>Payment date</label>
+                  <input type="date" required value={payDate} onChange={(e) => setPayDate(e.target.value)} />
+                </div>
+                <div className="field">
+                  <label>Amount (₹)</label>
+                  <CurrencyInput value={payAmount} onValueChange={setPayAmount} required />
+                </div>
+              </div>
+              <div className="field full" style={{ display: 'flex', gap: 8 }}>
+                <Button type="submit" disabled={paySubmitting}>
+                  {paySubmitting ? 'Saving…' : 'Add payment'}
+                </Button>
+                <Button type="button" variant="secondary" onClick={resetQuickPay}>
+                  Cancel
+                </Button>
+              </div>
+              {payError && (
+                <div className="note" style={{ color: 'var(--red)' }}>
+                  {payError}
+                </div>
+              )}
+            </form>
+          )}
+        </div>
+      )}
+      {payDone && (
+        <div className="note" style={{ marginTop: 12, color: 'var(--accent)' }}>
+          Payment recorded against {lastCreatedBill?.display_id}.
+        </div>
+      )}
 
       {formError && (
         <div className="note" style={{ color: 'var(--red)', marginTop: -10 }}>

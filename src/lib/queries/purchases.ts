@@ -107,3 +107,17 @@ export function useUpdateVendorBillPayment() {
     },
   })
 }
+
+export function useDeleteVendorBillPayment() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('vendor_bill_payments').delete().eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['vendor_bill_payments'] })
+      qc.invalidateQueries({ queryKey: ['dashboard-kpis'] })
+    },
+  })
+}

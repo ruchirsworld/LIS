@@ -1,5 +1,6 @@
 import { Fragment, useState } from 'react'
 import { PeriodFilter } from '../../components/PeriodFilter'
+import { SearchableSelect } from '../../components/SearchableSelect'
 import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
 import { TableScroll } from '../../components/TableScroll'
@@ -33,6 +34,7 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
   const [editingPayment, setEditingPayment] = useState<VendorBillPayment | null>(null)
   const [editListId, setEditListId] = useState<string | null>(null)
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
+  const [vendorFilter, setVendorFilter] = useState('')
 
   function closePayForm() {
     setPayFormId(null)
@@ -50,9 +52,10 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
   }
 
   const categories = Array.from(new Set(vendors?.map((v) => v.category).filter((c): c is string => !!c))).sort()
-  const visibleBills = categoryFilter
+  const categoryFiltered = categoryFilter
     ? bills?.filter((b) => vendors?.find((v) => v.id === b.vendor_id)?.category === categoryFilter)
     : bills
+  const visibleBills = vendorFilter ? categoryFiltered?.filter((b) => b.vendor_id === vendorFilter) : categoryFiltered
 
   const vendorNameOf = (b: NonNullable<typeof bills>[number]) => vendors?.find((v) => v.id === b.vendor_id)?.name ?? ''
   const clientNameOf = (b: NonNullable<typeof bills>[number]) => {
@@ -87,7 +90,7 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
 
   const exportSections: ExportSection[] = [
     {
-      title: 'Vendor bill records',
+      title: 'Bill records',
       columns: ['Ref ID', 'Vendor', 'Description', 'Remarks', 'Client', 'Project', 'Date', 'Qty', 'Rate', 'Amount', 'GST', 'Total', 'Paid', 'Due'],
       rows: (sortedBills ?? []).map((b) => [
         b.display_id ?? '',
@@ -110,11 +113,24 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
 
   return (
     <details className="toggle-section" open>
-      <summary>Vendor bill records</summary>
+      <summary>Bill records</summary>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 12, marginTop: 16 }}>
-        <PeriodFilter onChange={setRange} allowCustom style={{ marginBottom: 0 }} />
-        <ReportExportButtons title="Vendor bill records" sections={exportSections} range={range} style={{ marginTop: 0 }} />
+        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <PeriodFilter onChange={setRange} allowCustom style={{ marginBottom: 0 }} />
+          <div className="field" style={{ maxWidth: 220, marginBottom: 0 }}>
+            <label>Search vendor</label>
+            <SearchableSelect
+              items={vendors}
+              value={vendorFilter}
+              onChange={setVendorFilter}
+              getId={(v) => v.id}
+              getLabel={(v) => v.name}
+              placeholder="— All vendors —"
+            />
+          </div>
+        </div>
+        <ReportExportButtons title="Bill records" sections={exportSections} range={range} style={{ marginTop: 0 }} />
       </div>
 
       {categories.length > 0 && (
