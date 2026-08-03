@@ -61,4 +61,23 @@
   .topbar-mark {
     display: inline-flex;
   }
+
+  /* Header stays reachable — it just hides while scrolling down (more room
+     for content) and reveals again on scroll up or near the top. */
+  .shell-header {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    background: var(--bg);
+    padding: 10px 0;
+    margin: -20px -14px 12px;
+    padding-left: 14px;
+    padding-right: 14px;
+    transition: transform 0.2s ease, opacity 0.2s ease;
+  }
+  .shell-header.hide-on-scroll {
+    transform: translateY(-100%);
+    opacity: 0;
+    pointer-events: none;
+  }
 }

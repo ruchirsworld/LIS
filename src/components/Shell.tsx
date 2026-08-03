@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useAuth } from '../lib/auth'
 import { Sidebar } from './Sidebar'
 import { MobileFooter } from './MobileFooter'
@@ -30,6 +30,28 @@ export function Shell({
 }) {
   const { signOut, profile } = useAuth()
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [headerHidden, setHeaderHidden] = useState(false)
+  const lastScrollY = useRef(0)
+
+  // Mobile-only: hide the header while scrolling down (more room for content),
+  // reveal it again on scroll up or near the top — menu/logout stay reachable,
+  // just not permanently taking up space. CSS gates the actual hide effect to
+  // narrow viewports, so this is a no-op on desktop.
+  useEffect(() => {
+    function handleScroll() {
+      const y = window.scrollY
+      if (y < 24) {
+        setHeaderHidden(false)
+      } else if (y > lastScrollY.current) {
+        setHeaderHidden(true)
+      } else if (y < lastScrollY.current) {
+        setHeaderHidden(false)
+      }
+      lastScrollY.current = y
+    }
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
 
   const designation = profile ? ROLE_LABEL[profile.role] : ''
 
@@ -39,7 +61,7 @@ export function Shell({
 
       <div className="app-main">
         <div className="wrap">
-          <div className="shell-header">
+          <div className={headerHidden ? 'shell-header hide-on-scroll' : 'shell-header'}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <button className="topbar-mark" onClick={() => setDrawerOpen(true)} aria-label="Open menu">
                 <img src={laavinMark} alt="" />

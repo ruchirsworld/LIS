@@ -7,6 +7,9 @@ import { getErrorMessage } from '../../lib/errors'
 import type { Database } from '../../types/database'
 
 type VendorBillPayment = Database['public']['Tables']['vendor_bill_payments']['Row']
+type PaymentMode = 'UPI' | 'NEFT' | 'Cash'
+
+const PAYMENT_MODES: PaymentMode[] = ['UPI', 'NEFT', 'Cash']
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
@@ -32,6 +35,7 @@ export function VendorBillPaymentForm({
     fmtPlain(editingPayment ? editingPayment.amount : due).replace(/,/g, ''),
   )
   const [reference, setReference] = useState(editingPayment?.reference ?? '')
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>((editingPayment?.payment_mode as PaymentMode) ?? 'UPI')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -44,7 +48,7 @@ export function VendorBillPaymentForm({
       if (editingPayment) {
         await updatePayment.mutateAsync({
           id: editingPayment.id,
-          patch: { date, amount: amt, reference: reference.trim() || null },
+          patch: { date, amount: amt, reference: reference.trim() || null, payment_mode: paymentMode },
         })
       } else {
         await createPayment.mutateAsync({
@@ -52,6 +56,7 @@ export function VendorBillPaymentForm({
           date,
           amount: amt,
           reference: reference.trim() || null,
+          payment_mode: paymentMode,
         })
       }
       onClose()
@@ -73,6 +78,21 @@ export function VendorBillPaymentForm({
           <div className="field">
             <label>Amount (₹)</label>
             <CurrencyInput value={amount} onValueChange={setAmount} />
+          </div>
+          <div className="field">
+            <label>Mode of payment</label>
+            <div className="pill-tabs">
+              {PAYMENT_MODES.map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  className={paymentMode === m ? 'pill active' : 'pill'}
+                  onClick={() => setPaymentMode(m)}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="field">
             <label>Reference</label>

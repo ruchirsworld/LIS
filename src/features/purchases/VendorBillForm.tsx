@@ -17,6 +17,9 @@ import { useVendorCategoryFilter, VendorCategoryPills } from './VendorCategoryFi
 import type { Database } from '../../types/database'
 
 type VendorBill = Database['public']['Tables']['vendor_bills']['Row']
+type PaymentMode = 'UPI' | 'NEFT' | 'Cash'
+
+const PAYMENT_MODES: PaymentMode[] = ['UPI', 'NEFT', 'Cash']
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
@@ -83,6 +86,7 @@ export function VendorBillForm({
   const [showQuickPay, setShowQuickPay] = useState(false)
   const [payDate, setPayDate] = useState(todayStr())
   const [payAmount, setPayAmount] = useState('0')
+  const [payMode, setPayMode] = useState<PaymentMode>('UPI')
   const [payError, setPayError] = useState<string | null>(null)
   const [payDone, setPayDone] = useState(false)
   const [paySubmitting, setPaySubmitting] = useState(false)
@@ -142,6 +146,7 @@ export function VendorBillForm({
     setShowQuickPay(false)
     setPayDate(todayStr())
     setPayAmount('0')
+    setPayMode('UPI')
     setPayError(null)
     setPayDone(false)
   }
@@ -157,7 +162,12 @@ export function VendorBillForm({
     setPaySubmitting(true)
     setPayError(null)
     try {
-      await createVendorBillPayment.mutateAsync({ bill_id: lastCreatedBill.id, date: payDate, amount: amt })
+      await createVendorBillPayment.mutateAsync({
+        bill_id: lastCreatedBill.id,
+        date: payDate,
+        amount: amt,
+        payment_mode: payMode,
+      })
       setPayDone(true)
     } catch (err) {
       setPayError(getErrorMessage(err, 'Could not save payment.'))
@@ -245,7 +255,7 @@ export function VendorBillForm({
     <details className="toggle-section" open>
       <summary>Vendor bills</summary>
 
-      <form className="form-grid" onSubmit={handleSubmit} style={{ marginTop: 16 }}>
+      <form className="form-grid vb-form" onSubmit={handleSubmit} style={{ marginTop: 16 }}>
         {/* Row 1: Project (active only, mandatory) — Client auto-derived, mandatory */}
         <div className="field-row">
           <div className="field">
@@ -402,6 +412,21 @@ export function VendorBillForm({
                 <div className="field">
                   <label>Amount (₹)</label>
                   <CurrencyInput value={payAmount} onValueChange={setPayAmount} required />
+                </div>
+              </div>
+              <div className="field full">
+                <label>Mode of payment</label>
+                <div className="pill-tabs">
+                  {PAYMENT_MODES.map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      className={payMode === m ? 'pill active' : 'pill'}
+                      onClick={() => setPayMode(m)}
+                    >
+                      {m}
+                    </button>
+                  ))}
                 </div>
               </div>
               <div className="field full" style={{ display: 'flex', gap: 8 }}>

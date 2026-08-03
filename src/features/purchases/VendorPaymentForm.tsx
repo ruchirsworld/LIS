@@ -7,6 +7,10 @@ import { useVendorBills, useVendorBillPayments, useCreateVendorBillPayment } fro
 import { billDue } from '../../lib/calc/vendorBills'
 import { fmt, parseINR } from '../../lib/calc/format'
 
+type PaymentMode = 'UPI' | 'NEFT' | 'Cash'
+
+const PAYMENT_MODES: PaymentMode[] = ['UPI', 'NEFT', 'Cash']
+
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
 }
@@ -20,6 +24,7 @@ export function VendorPaymentForm() {
   const [vendorId, setVendorId] = useState('')
   const [date, setDate] = useState(todayStr())
   const [amount, setAmount] = useState('0')
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>('UPI')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -58,10 +63,12 @@ export function VendorPaymentForm() {
         bill_id: target.bill.id,
         date,
         amount: amt,
+        payment_mode: paymentMode,
       })
       setVendorId('')
       setDate(todayStr())
       setAmount('0')
+      setPaymentMode('UPI')
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Could not record payment.')
     } finally {
@@ -103,6 +110,22 @@ export function VendorPaymentForm() {
           <div className="field">
             <label>Amount (₹)</label>
             <CurrencyInput value={amount} onValueChange={setAmount} required />
+          </div>
+        </div>
+
+        <div className="field full">
+          <label>Mode of payment</label>
+          <div className="pill-tabs">
+            {PAYMENT_MODES.map((m) => (
+              <button
+                key={m}
+                type="button"
+                className={paymentMode === m ? 'pill active' : 'pill'}
+                onClick={() => setPaymentMode(m)}
+              >
+                {m}
+              </button>
+            ))}
           </div>
         </div>
 

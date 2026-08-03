@@ -399,6 +399,36 @@ button:focus-visible {
   white-space: nowrap;
 }
 
+/* Vendor bill form — every row's control should sit at the same height, so
+   the camera icon-button and vendor-type pills (naturally shorter) are
+   bumped up to match the plain text/date/select inputs (~40px). The final
+   Total/Add row is then deliberately taller than the rest — it's the row
+   that commits the whole form, so it earns the extra visual weight. */
+.form-grid.vb-form .field-row > .field input,
+.form-grid.vb-form .field-row > .field select {
+  height: 40px;
+  box-sizing: border-box;
+}
+.form-grid.vb-form .icon-btn {
+  height: 40px;
+  width: 40px;
+}
+.form-grid.vb-form .pill-tabs .pill {
+  height: 40px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+}
+.form-grid.vb-form .vb-total input {
+  height: 52px;
+  font-size: 18px;
+  font-weight: 600;
+}
+.form-grid.vb-form .vb-row5 .btn {
+  height: 52px;
+  font-size: 15px;
+}
+
 @media (max-width: 640px) {
   .form-grid {
     grid-template-columns: 1fr;
