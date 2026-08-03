@@ -213,7 +213,7 @@ export function VendorBillForm({
       setFormError('Enter a quantity.')
       return
     }
-    if (isMenPower && parseINR(otherCost) > 0 && !remarks.trim()) {
+    if (parseINR(otherCost) > 0 && !remarks.trim()) {
       setFormError('Remarks are required when Other Cost has a value.')
       return
     }
@@ -230,7 +230,7 @@ export function VendorBillForm({
         gst_pct: isMenPower ? 0 : Number(gstPct) || 0,
         qty: isMenPower ? Number(qty) || 0 : null,
         rate: isMenPower ? parseINR(rate) : null,
-        other_cost: isMenPower ? parseINR(otherCost) || 0 : null,
+        other_cost: parseINR(otherCost) || 0,
       }
 
       if (editingBill) {
@@ -362,35 +362,23 @@ export function VendorBillForm({
           </div>
         )}
 
-        {/* Row 6: Remarks (or Other cost + Remarks for MenPower) */}
-        {isMenPower ? (
-          <div className="field-row">
-            <div className="field">
-              <label>Other cost (₹)</label>
-              <CurrencyInput value={otherCost} onValueChange={setOtherCost} />
-            </div>
-            <div className="field">
-              <label>Remarks{parseINR(otherCost) > 0 ? '' : ' (optional)'}</label>
-              <input
-                type="text"
-                required={parseINR(otherCost) > 0}
-                placeholder="Any extra context"
-                value={remarks}
-                onChange={(e) => setRemarks(e.target.value)}
-              />
-            </div>
+        {/* Row 6: Other cost + Remarks (Remarks becomes mandatory once Other cost has a value) */}
+        <div className="field-row">
+          <div className="field">
+            <label>Other cost (₹)</label>
+            <CurrencyInput value={otherCost} onValueChange={setOtherCost} />
           </div>
-        ) : (
-          <div className="field full">
-            <label>Remarks (optional)</label>
+          <div className="field">
+            <label>Remarks{parseINR(otherCost) > 0 ? '' : ' (optional)'}</label>
             <input
               type="text"
+              required={parseINR(otherCost) > 0}
               placeholder="Any extra context"
               value={remarks}
               onChange={(e) => setRemarks(e.target.value)}
             />
           </div>
-        )}
+        </div>
 
         {/* Row 7: Total + Add bill */}
         <div className="field-row vb-row5">
@@ -402,7 +390,7 @@ export function VendorBillForm({
               value={
                 isMenPower
                   ? fmt(billTotal({ amount: (Number(qty) || 0) * parseINR(rate), gst_pct: 0, other_cost: parseINR(otherCost) }))
-                  : fmt(billTotal({ amount: parseINR(amount), gst_pct: Number(gstPct) || 0 }))
+                  : fmt(billTotal({ amount: parseINR(amount), gst_pct: Number(gstPct) || 0, other_cost: parseINR(otherCost) }))
               }
             />
           </div>
