@@ -1,15 +1,23 @@
 import { useState } from 'react'
+import { Button } from '../../components/ui'
 import { PeriodFilter } from '../../components/PeriodFilter'
 import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
 import { TableScroll } from '../../components/TableScroll'
 import { RowMenu } from '../../components/RowMenu'
+import { CostCenterPicker } from '../../components/CostCenterPicker'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
-import { useExpenses, useDeleteExpense, useUpdateExpense } from '../../lib/queries/expenses'
-import { useProjects, useClients, useVendors } from '../../lib/queries/masters'
+import {
+  useExpenses,
+  useDeleteExpense,
+  useUpdateExpense,
+  useBulkUpdateExpenses,
+  useBulkDeleteExpenses,
+} from '../../lib/queries/expenses'
+import { useProjects, useClients, useVendors, useCostCenters } from '../../lib/queries/masters'
 import { useProfiles } from '../../lib/queries/admin'
 import { fmt, fmtDate } from '../../lib/calc/format'
 import type { DateRange } from '../../lib/calc/period'
@@ -27,8 +35,47 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
   const { data: clients } = useClients()
   const { data: vendors } = useVendors()
   const { data: profiles } = useProfiles()
+  const { data: costCenters } = useCostCenters()
   const deleteExpense = useDeleteExpense()
   const updateExpense = useUpdateExpense()
+  const bulkUpdateExpenses = useBulkUpdateExpenses()
+  const bulkDeleteExpenses = useBulkDeleteExpenses()
+
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkCostCenter, setBulkCostCenter] = useState('')
+
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set())
+    setBulkCostCenter('')
+  }
+
+  async function applyBulkCostCenter() {
+    if (!bulkCostCenter || selectedIds.size === 0) return
+    await bulkUpdateExpenses.mutateAsync({ ids: Array.from(selectedIds), patch: { cost_center: bulkCostCenter } })
+    clearSelection()
+  }
+
+  async function applyBulkReimbursable(value: boolean) {
+    if (selectedIds.size === 0) return
+    await bulkUpdateExpenses.mutateAsync({ ids: Array.from(selectedIds), patch: { reimbursable: value } })
+    clearSelection()
+  }
+
+  async function removeSelected() {
+    if (selectedIds.size === 0) return
+    if (!window.confirm(`Remove ${selectedIds.size} selected expense${selectedIds.size === 1 ? '' : 's'}? This cannot be undone.`)) return
+    await bulkDeleteExpenses.mutateAsync(Array.from(selectedIds))
+    clearSelection()
+  }
 
   const projLabelOf = (e: NonNullable<typeof expenses>[number]) => {
     const project = projects?.find((p) => p.id === e.project_id)
@@ -61,6 +108,17 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
     'id'
   )
   const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedExpenses)
+
+  const pageIds = (pageRows ?? []).map((e) => e.id)
+  const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id))
+  function toggleSelectAllOnPage() {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (allPageSelected) pageIds.forEach((id) => next.delete(id))
+      else pageIds.forEach((id) => next.add(id))
+      return next
+    })
+  }
 
   const exportSections: ExportSection[] = [
     {
@@ -110,10 +168,49 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
         </div>
       </div>
 
+      {selectedIds.size > 0 && (
+        <div
+          style={{
+            display: 'flex',
+            gap: 12,
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            background: 'var(--paper-2)',
+            border: '1px solid var(--line)',
+            borderRadius: 8,
+            padding: '8px 12px',
+            marginTop: 10,
+          }}
+        >
+          <strong style={{ fontSize: 13 }}>{selectedIds.size} selected</strong>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <CostCenterPicker value={bulkCostCenter} onChange={setBulkCostCenter} costCenters={costCenters} />
+            <Button type="button" variant="secondary" disabled={!bulkCostCenter} onClick={applyBulkCostCenter}>
+              Set cost center
+            </Button>
+          </div>
+          <Button type="button" variant="secondary" onClick={() => applyBulkReimbursable(true)}>
+            Mark reimbursable
+          </Button>
+          <Button type="button" variant="secondary" onClick={() => applyBulkReimbursable(false)}>
+            Mark not reimbursable
+          </Button>
+          <Button type="button" className="danger-link" onClick={removeSelected}>
+            Remove selected
+          </Button>
+          <Button type="button" variant="secondary" onClick={clearSelection}>
+            Clear
+          </Button>
+        </div>
+      )}
+
       <TableScroll>
         <table className="data">
           <thead>
             <tr>
+              <th>
+                <input type="checkbox" checked={allPageSelected} onChange={toggleSelectAllOnPage} aria-label="Select all on page" />
+              </th>
               <SortableTh label="ID" sortKey="id" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Date" sortKey="date" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Amount" sortKey="amount" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
@@ -127,14 +224,14 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={8} className="empty-row">
+                <td colSpan={9} className="empty-row">
                   Loading…
                 </td>
               </tr>
             )}
             {!isLoading && (!sortedExpenses || sortedExpenses.length === 0) && (
               <tr>
-                <td colSpan={8} className="empty-row">
+                <td colSpan={9} className="empty-row">
                   {idSearch.trim() ? `No expenses match "${idSearch.trim()}"` : 'No expenses in this period'}
                 </td>
               </tr>
@@ -145,6 +242,9 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
 
               return (
                 <tr key={e.id}>
+                  <td>
+                    <input type="checkbox" checked={selectedIds.has(e.id)} onChange={() => toggleSelected(e.id)} aria-label={`Select ${e.display_id ?? 'row'}`} />
+                  </td>
                   <td>{e.display_id ?? '—'}</td>
                   <td>{fmtDate(e.date)}</td>
                   <td className="amt">{fmt(e.amount)}</td>

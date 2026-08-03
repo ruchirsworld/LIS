@@ -64,6 +64,34 @@ export function useDeleteExpense() {
   })
 }
 
+export function useBulkUpdateExpenses() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ ids, patch }: { ids: string[]; patch: ExpenseUpdate }) => {
+      const { error } = await supabase.from('expenses').update(patch).in('id', ids)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['expenses'] })
+      qc.invalidateQueries({ queryKey: ['dashboard-kpis'] })
+    },
+  })
+}
+
+export function useBulkDeleteExpenses() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { error } = await supabase.from('expenses').delete().in('id', ids)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['expenses'] })
+      qc.invalidateQueries({ queryKey: ['dashboard-kpis'] })
+    },
+  })
+}
+
 export function useCreateVendor() {
   const qc = useQueryClient()
   return useMutation({
