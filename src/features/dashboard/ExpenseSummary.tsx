@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { useExpenses } from '../../lib/queries/expenses'
+import { useExpenses, useExpenseReimbursements } from '../../lib/queries/expenses'
 import { useExpenseCategories } from '../../lib/queries/masters'
 import { useProfiles } from '../../lib/queries/admin'
 import { matchesCategoryLabel } from '../../lib/labels'
+import { expenseDue } from '../../lib/calc/expenses'
 import { fmt, fmtDate } from '../../lib/calc/format'
 import type { DateRange } from '../../lib/calc/reportPeriod'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
@@ -29,14 +30,17 @@ export function ExpenseSummary({ range }: { range: DateRange | null }) {
   const { data: allExpenses } = useExpenses(null)
   const { data: categories } = useExpenseCategories()
   const { data: profiles } = useProfiles()
+  const { data: reimbursements } = useExpenseReimbursements()
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [selectedCostCenter, setSelectedCostCenter] = useState<string | null>(null)
 
   const dueByUser = new Map<string, number>()
   ;(allExpenses ?? []).forEach((e) => {
-    if (!e.reimbursable || e.reimbursed) return
+    if (!e.reimbursable) return
+    const due = expenseDue(e.amount, (reimbursements ?? []).filter((r) => r.expense_id === e.id))
+    if (due <= 0) return
     const name = (e.created_by && profiles?.find((p) => p.id === e.created_by)?.name) || UNKNOWN_USER
-    dueByUser.set(name, (dueByUser.get(name) ?? 0) + Number(e.amount || 0))
+    dueByUser.set(name, (dueByUser.get(name) ?? 0) + due)
   })
   const dueByUserRows = Array.from(dueByUser.entries()).sort((a, b) => b[1] - a[1])
   const totalDue = dueByUserRows.reduce((s, [, a]) => s + a, 0)

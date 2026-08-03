@@ -47,6 +47,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "bank_accounts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_capital_summary"
+            referencedColumns: ["partner_id"]
+          },
         ]
       }
       capital_transactions: {
@@ -93,6 +100,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "capital_transactions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_capital_summary"
+            referencedColumns: ["partner_id"]
           },
           {
             foreignKeyName: "capital_transactions_partner_id_fkey"
@@ -161,6 +175,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "clients_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_capital_summary"
+            referencedColumns: ["partner_id"]
+          },
         ]
       }
       cost_centers: {
@@ -192,6 +213,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cost_centers_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_capital_summary"
+            referencedColumns: ["partner_id"]
           },
         ]
       }
@@ -225,6 +253,71 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "expense_categories_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_capital_summary"
+            referencedColumns: ["partner_id"]
+          },
+        ]
+      }
+      expense_reimbursements: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          date: string
+          display_id: string | null
+          expense_id: string
+          id: string
+          payment_mode: string | null
+          reference: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by?: string | null
+          date: string
+          display_id?: string | null
+          expense_id: string
+          id?: string
+          payment_mode?: string | null
+          reference?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          display_id?: string | null
+          expense_id?: string
+          id?: string
+          payment_mode?: string | null
+          reference?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expense_reimbursements_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_reimbursements_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_capital_summary"
+            referencedColumns: ["partner_id"]
+          },
+          {
+            foreignKeyName: "expense_reimbursements_expense_id_fkey"
+            columns: ["expense_id"]
+            isOneToOne: false
+            referencedRelation: "expenses"
+            referencedColumns: ["id"]
+          },
         ]
       }
       expenses: {
@@ -243,7 +336,6 @@ export type Database = {
           project_id: string | null
           receipt_path: string | null
           reimbursable: boolean
-          reimbursed: boolean
           remarks: string | null
           type: string
           vendor_id: string | null
@@ -263,7 +355,6 @@ export type Database = {
           project_id?: string | null
           receipt_path?: string | null
           reimbursable?: boolean
-          reimbursed?: boolean
           remarks?: string | null
           type: string
           vendor_id?: string | null
@@ -283,7 +374,6 @@ export type Database = {
           project_id?: string | null
           receipt_path?: string | null
           reimbursable?: boolean
-          reimbursed?: boolean
           remarks?: string | null
           type?: string
           vendor_id?: string | null
@@ -295,6 +385,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_capital_summary"
+            referencedColumns: ["partner_id"]
           },
           {
             foreignKeyName: "expenses_project_id_fkey"
@@ -379,6 +476,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_payments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_capital_summary"
+            referencedColumns: ["partner_id"]
           },
           {
             foreignKeyName: "invoice_payments_invoice_id_fkey"
@@ -475,6 +579,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "invoices_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_capital_summary"
+            referencedColumns: ["partner_id"]
+          },
+          {
             foreignKeyName: "invoices_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
@@ -536,6 +647,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "loan_payments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_capital_summary"
+            referencedColumns: ["partner_id"]
+          },
+          {
             foreignKeyName: "loan_payments_loan_id_fkey"
             columns: ["loan_id"]
             isOneToOne: false
@@ -595,6 +713,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loans_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_capital_summary"
+            referencedColumns: ["partner_id"]
           },
         ]
       }
@@ -693,6 +818,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "projects_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_capital_summary"
+            referencedColumns: ["partner_id"]
+          },
         ]
       }
       transfers: {
@@ -736,6 +868,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transfers_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_capital_summary"
+            referencedColumns: ["partner_id"]
           },
           {
             foreignKeyName: "transfers_from_account_id_fkey"
@@ -808,6 +947,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_bill_payments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_capital_summary"
+            referencedColumns: ["partner_id"]
           },
         ]
       }
@@ -889,6 +1035,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "vendor_bills_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_capital_summary"
+            referencedColumns: ["partner_id"]
+          },
+          {
             foreignKeyName: "vendor_bills_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
@@ -962,6 +1115,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendors_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_capital_summary"
+            referencedColumns: ["partner_id"]
           },
         ]
       }
@@ -1083,6 +1243,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "invoices_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_capital_summary"
+            referencedColumns: ["partner_id"]
+          },
+          {
             foreignKeyName: "invoices_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
@@ -1188,6 +1355,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "invoices_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_capital_summary"
+            referencedColumns: ["partner_id"]
+          },
+          {
             foreignKeyName: "invoices_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
@@ -1253,6 +1427,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loans_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_capital_summary"
+            referencedColumns: ["partner_id"]
           },
         ]
       }
@@ -1337,6 +1518,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_bills_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_capital_summary"
+            referencedColumns: ["partner_id"]
           },
           {
             foreignKeyName: "vendor_bills_project_id_fkey"

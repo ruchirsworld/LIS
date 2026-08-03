@@ -5,6 +5,8 @@ import type { Database } from '../../types/database'
 
 type ExpenseInsert = Database['public']['Tables']['expenses']['Insert']
 type ExpenseUpdate = Database['public']['Tables']['expenses']['Update']
+type ExpenseReimbursementInsert = Database['public']['Tables']['expense_reimbursements']['Insert']
+type ExpenseReimbursementUpdate = Database['public']['Tables']['expense_reimbursements']['Update']
 
 export function useExpenses(range: DateRange | null) {
   return useQuery({
@@ -87,6 +89,61 @@ export function useBulkDeleteExpenses() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['expenses'] })
+      qc.invalidateQueries({ queryKey: ['dashboard-kpis'] })
+    },
+  })
+}
+
+export function useExpenseReimbursements() {
+  return useQuery({
+    queryKey: ['expense_reimbursements'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('expense_reimbursements').select('*').order('date')
+      if (error) throw error
+      return data
+    },
+  })
+}
+
+export function useCreateExpenseReimbursement() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (row: ExpenseReimbursementInsert) => {
+      const { data, error } = await supabase.from('expense_reimbursements').insert(row).select().single()
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['expense_reimbursements'] })
+      qc.invalidateQueries({ queryKey: ['dashboard-kpis'] })
+    },
+  })
+}
+
+export function useUpdateExpenseReimbursement() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, patch }: { id: string; patch: ExpenseReimbursementUpdate }) => {
+      const { data, error } = await supabase.from('expense_reimbursements').update(patch).eq('id', id).select().single()
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['expense_reimbursements'] })
+      qc.invalidateQueries({ queryKey: ['dashboard-kpis'] })
+    },
+  })
+}
+
+export function useDeleteExpenseReimbursement() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('expense_reimbursements').delete().eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['expense_reimbursements'] })
       qc.invalidateQueries({ queryKey: ['dashboard-kpis'] })
     },
   })
