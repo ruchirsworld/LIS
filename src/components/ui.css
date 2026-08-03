@@ -1004,6 +1004,21 @@ table.data tr:last-child td {
   gap: 12px;
   margin-bottom: 18px;
 }
+
+/* Fixed 2-column KPI grid (Project tab) — unlike .dash-grid's auto-fit,
+   this always pairs cards two-to-a-row regardless of screen width. */
+.kpi-grid-2col {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.kpi-grid-divider {
+  grid-column: 1 / -1;
+  height: 1px;
+  background: var(--line);
+  margin: 2px 0;
+}
 .dash-card {
   background: var(--paper);
   border: 1px solid var(--line);

@@ -110,16 +110,16 @@ export function ProjectsPage() {
                 {selected.end_date ? ` · Completed ${fmtDate(selected.end_date)}` : ''}
               </div>
 
-              <div className="dash-grid">
-                <KpiCard label="Contract value" value={selected.value_ex_gst ? fmt(selected.value_ex_gst) : '—'} />
+              <div className="kpi-grid-2col">
+                <KpiCard label="Project value" value={selected.value_ex_gst ? fmt(selected.value_ex_gst) : '—'} />
+                <KpiCard label="Profit" value={<span style={{ color: 'var(--red)' }}>{fmt(profit)}</span>} />
                 <KpiCard label="Budget" value={budget !== null ? fmt(budget) : '—'} />
-                <KpiCard label="Total expenses incurred" value={fmt(expenseTotal)} />
-                <KpiCard label="Budget remaining" value={budgetRemaining !== null ? fmt(budgetRemaining) : '—'} />
-                <KpiCard label="Total purchases" value={fmt(vendorBillTotal)} />
-                <KpiCard label="Total invoice raised" value={fmt(invoicedRevenue)} />
+                <KpiCard label="Available budget" value={budgetRemaining !== null ? fmt(budgetRemaining) : '—'} />
+                <div className="kpi-grid-divider" />
+                <KpiCard label="Total expenses" value={fmt(costTotal)} />
+                <KpiCard label="Due" value={fmt(balanceDue)} />
+                <KpiCard label="Invoices raised" value={fmt(invoicedRevenue)} />
                 <KpiCard label="Amount received" value={fmt(receivedRevenue)} />
-                <KpiCard label="Balance amount due" value={fmt(balanceDue)} />
-                <KpiCard label="Project profit" value={fmt(profit)} />
               </div>
             </details>
           )}
