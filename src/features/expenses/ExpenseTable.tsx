@@ -52,7 +52,6 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
   const [bulkCostCenter, setBulkCostCenter] = useState('')
   const [payFormId, setPayFormId] = useState<string | null>(null)
   const [editingReimbursement, setEditingReimbursement] = useState<ExpenseReimbursement | null>(null)
-  const [editListId, setEditListId] = useState<string | null>(null)
 
   function toggleSelected(id: string) {
     setSelectedIds((prev) => {
@@ -292,7 +291,6 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
               const reimbursed = reimbursedOf(e)
               const due = dueOf(e)
               const hasHistory = expReimbursements.length > 0
-              const showEditList = editListId === e.id
 
               return (
                 <Fragment key={e.id}>
@@ -347,24 +345,20 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
                                       {r.payment_mode ? ` · ${r.payment_mode}` : ''}
                                       {r.reference ? ` · ${r.reference}` : ''}
                                     </span>
-                                    {showEditList && (
-                                      <>
-                                        <button
-                                          type="button"
-                                          className="pay-history-edit"
-                                          onClick={() => openEditReimbursement(e.id, r)}
-                                        >
-                                          Edit
-                                        </button>
-                                        <button
-                                          type="button"
-                                          className="pay-history-edit"
-                                          onClick={() => deleteReimbursement.mutate(r.id)}
-                                        >
-                                          Remove
-                                        </button>
-                                      </>
-                                    )}
+                                    <button
+                                      type="button"
+                                      className="pay-history-edit"
+                                      onClick={() => openEditReimbursement(e.id, r)}
+                                    >
+                                      Edit
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="pay-history-edit"
+                                      onClick={() => deleteReimbursement.mutate(r.id)}
+                                    >
+                                      Remove
+                                    </button>
                                   </div>
                                 ))}
                               </div>
@@ -378,11 +372,6 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
                             label: 'Record reimbursement',
                             disabled: !e.reimbursable || due <= 0,
                             onClick: () => openAddReimbursement(e.id),
-                          },
-                          {
-                            label: 'Edit reimbursements',
-                            disabled: !hasHistory,
-                            onClick: () => setEditListId(e.id),
                           },
                         ]}
                       />
