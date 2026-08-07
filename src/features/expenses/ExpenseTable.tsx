@@ -1,6 +1,7 @@
 import { Fragment, useState } from 'react'
 import { Button } from '../../components/ui'
 import { PeriodFilter } from '../../components/PeriodFilter'
+import { SearchableSelect } from '../../components/SearchableSelect'
 import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
 import { TableScroll } from '../../components/TableScroll'
@@ -34,6 +35,7 @@ type ExpenseReimbursement = Database['public']['Tables']['expense_reimbursements
 export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void }) {
   const [range, setRange] = useState<DateRange | null>(null)
   const [idSearch, setIdSearch] = useState('')
+  const [userFilter, setUserFilter] = useState('')
   const { data: expenses, isLoading } = useExpenses(range)
   const { data: projects } = useProjects()
   const { data: clients } = useClients()
@@ -121,8 +123,9 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
   const idFiltered = idSearch.trim()
     ? expenses?.filter((e) => e.display_id?.toLowerCase().includes(idSearch.trim().toLowerCase()))
     : expenses
+  const userFiltered = userFilter ? idFiltered?.filter((e) => e.created_by === userFilter) : idFiltered
   const { sorted: sortedExpenses, sortKey, direction, toggleSort } = useSort(
-    idFiltered,
+    userFiltered,
     {
       id: (e) => e.display_id,
       date: (e) => e.date,
@@ -184,6 +187,17 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
               placeholder="e.g. Exp/23"
               value={idSearch}
               onChange={(e) => setIdSearch(e.target.value)}
+            />
+          </div>
+          <div className="field" style={{ maxWidth: 220, marginBottom: 0 }}>
+            <label>By user</label>
+            <SearchableSelect
+              items={profiles}
+              value={userFilter}
+              onChange={setUserFilter}
+              getId={(p) => p.id}
+              getLabel={(p) => p.name}
+              placeholder="— All users —"
             />
           </div>
         </div>
@@ -263,7 +277,11 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
             {!isLoading && (!sortedExpenses || sortedExpenses.length === 0) && (
               <tr>
                 <td colSpan={11} className="empty-row">
-                  {idSearch.trim() ? `No expenses match "${idSearch.trim()}"` : 'No expenses in this period'}
+                  {idSearch.trim()
+                    ? `No expenses match "${idSearch.trim()}"`
+                    : userFilter
+                      ? 'No expenses for this user in this period'
+                      : 'No expenses in this period'}
                 </td>
               </tr>
             )}
