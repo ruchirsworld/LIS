@@ -75,8 +75,6 @@ export function VendorBillForm({
   const [date, setDate] = useState(todayStr())
   const [amount, setAmount] = useState('0')
   const [gstPct, setGstPct] = useState('0')
-  const [qty, setQty] = useState('')
-  const [rate, setRate] = useState('0')
   const [otherCost, setOtherCost] = useState('0')
   const [receiptBlob, setReceiptBlob] = useState<Blob | null>(null)
   const [receiptStatus, setReceiptStatus] = useState('Take photo')
@@ -96,7 +94,7 @@ export function VendorBillForm({
   const selectedProject = projects?.find((p) => p.id === projectId)
   const selectedProjectClient = selectedProject ? clients?.find((c) => c.id === selectedProject.client_id) : null
   const selectedVendor = vendors?.find((v) => v.id === vendorId)
-  const isMenPower = selectedVendor?.category === 'MenPower'
+  const isSupervisor = selectedVendor?.category === 'Supervisor'
 
   useEffect(() => {
     if (!editingBill) return
@@ -108,8 +106,6 @@ export function VendorBillForm({
     setDate(editingBill.date ?? todayStr())
     setAmount(String(editingBill.amount))
     setGstPct(String(editingBill.gst_pct ?? 0))
-    setQty(editingBill.qty != null ? String(editingBill.qty) : '')
-    setRate(editingBill.rate != null ? String(editingBill.rate) : '0')
     setOtherCost(editingBill.other_cost != null ? String(editingBill.other_cost) : '0')
     setReceiptBlob(null)
     setReceiptStatus(editingBill.receipt_path ? 'Photo attached' : 'Take photo')
@@ -127,8 +123,6 @@ export function VendorBillForm({
     setDate(todayStr())
     setAmount('0')
     setGstPct('0')
-    setQty('')
-    setRate('0')
     setOtherCost('0')
     setReceiptBlob(null)
     setReceiptStatus('Take photo')
@@ -209,11 +203,7 @@ export function VendorBillForm({
       setFormError('Bill description is required.')
       return
     }
-    if (isMenPower && (!qty || Number(qty) <= 0)) {
-      setFormError('Enter a quantity.')
-      return
-    }
-    if (parseINR(otherCost) > 0 && !remarks.trim()) {
+    if (!isSupervisor && parseINR(otherCost) > 0 && !remarks.trim()) {
       setFormError('Remarks are required when Other Cost has a value.')
       return
     }
@@ -226,11 +216,11 @@ export function VendorBillForm({
         client_id: clientId || null,
         project_id: projectId,
         date,
-        amount: isMenPower ? (Number(qty) || 0) * parseINR(rate) : parseINR(amount),
-        gst_pct: isMenPower ? 0 : Number(gstPct) || 0,
-        qty: isMenPower ? Number(qty) || 0 : null,
-        rate: isMenPower ? parseINR(rate) : null,
-        other_cost: parseINR(otherCost) || 0,
+        amount: parseINR(amount),
+        gst_pct: isSupervisor ? 0 : Number(gstPct) || 0,
+        qty: null,
+        rate: null,
+        other_cost: isSupervisor ? 0 : parseINR(otherCost) || 0,
       }
 
       if (editingBill) {
@@ -313,26 +303,13 @@ export function VendorBillForm({
           </div>
         </div>
 
-        {/* Row 5: Bill value + GST% (or Qty/Rate for MenPower), plus receipt upload */}
+        {/* Row 5: Amount only for Supervisor, or Bill value + GST% otherwise, plus receipt upload */}
         <div className="field-row">
-          {isMenPower ? (
-            <>
-              <div className="field">
-                <label>MenPower qty</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  required
-                  value={qty}
-                  onChange={(e) => setQty(e.target.value)}
-                />
-              </div>
-              <div className="field">
-                <label>Rate (₹)</label>
-                <CurrencyInput value={rate} onValueChange={setRate} required />
-              </div>
-            </>
+          {isSupervisor ? (
+            <div className="field">
+              <label>Amount (₹)</label>
+              <CurrencyInput value={amount} onValueChange={setAmount} required />
+            </div>
           ) : (
             <>
               <div className="field">
@@ -362,17 +339,19 @@ export function VendorBillForm({
           </div>
         )}
 
-        {/* Row 6: Other cost + Remarks (Remarks becomes mandatory once Other cost has a value) */}
+        {/* Row 6: Other cost + Remarks (Remarks becomes mandatory once Other cost has a value) — Other cost doesn't apply to Supervisor */}
         <div className="field-row">
+          {!isSupervisor && (
+            <div className="field">
+              <label>Other cost (₹)</label>
+              <CurrencyInput value={otherCost} onValueChange={setOtherCost} />
+            </div>
+          )}
           <div className="field">
-            <label>Other cost (₹)</label>
-            <CurrencyInput value={otherCost} onValueChange={setOtherCost} />
-          </div>
-          <div className="field">
-            <label>Remarks{parseINR(otherCost) > 0 ? '' : ' (optional)'}</label>
+            <label>Remarks{!isSupervisor && parseINR(otherCost) > 0 ? '' : ' (optional)'}</label>
             <input
               type="text"
-              required={parseINR(otherCost) > 0}
+              required={!isSupervisor && parseINR(otherCost) > 0}
               placeholder="Any extra context"
               value={remarks}
               onChange={(e) => setRemarks(e.target.value)}
@@ -387,11 +366,13 @@ export function VendorBillForm({
             <input
               type="text"
               readOnly
-              value={
-                isMenPower
-                  ? fmt(billTotal({ amount: (Number(qty) || 0) * parseINR(rate), gst_pct: 0, other_cost: parseINR(otherCost) }))
-                  : fmt(billTotal({ amount: parseINR(amount), gst_pct: Number(gstPct) || 0, other_cost: parseINR(otherCost) }))
-              }
+              value={fmt(
+                billTotal({
+                  amount: parseINR(amount),
+                  gst_pct: isSupervisor ? 0 : Number(gstPct) || 0,
+                  other_cost: isSupervisor ? 0 : parseINR(otherCost),
+                })
+              )}
             />
           </div>
           <div className="field vb-submit">
