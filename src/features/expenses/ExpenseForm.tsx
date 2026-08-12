@@ -15,9 +15,9 @@ import { clientLabel, matchesCategoryLabel } from '../../lib/labels'
 import type { Database } from '../../types/database'
 
 type ExpenseRow = Database['public']['Tables']['expenses']['Row']
-type PaymentMode = 'UPI' | 'Cash' | 'Bank'
+type Settlement = 'UPI' | 'Cash' | 'Bank' | 'Reimbursable'
 
-const PAYMENT_MODES: PaymentMode[] = ['UPI', 'Cash', 'Bank']
+const SETTLEMENT_OPTIONS: Settlement[] = ['UPI', 'Cash', 'Bank', 'Reimbursable']
 const PROJECT_STORAGE_KEY = 'lis.expenses.lastProject'
 
 function todayStr() {
@@ -100,11 +100,10 @@ export function ExpenseForm({
   const [showCalc, setShowCalc] = useState(false)
   const [description, setDescription] = useState('')
   const [date, setDate] = useState(todayStr())
-  const [reimbursable, setReimbursable] = useState(false)
   const [remarks, setRemarks] = useState('')
   const [receiptBlob, setReceiptBlob] = useState<Blob | null>(null)
   const [receiptStatus, setReceiptStatus] = useState('Take photo')
-  const [paymentMode, setPaymentMode] = useState<PaymentMode>('UPI')
+  const [settlement, setSettlement] = useState<Settlement>('UPI')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [lastCreatedId, setLastCreatedId] = useState<string | null>(null)
@@ -129,9 +128,8 @@ export function ExpenseForm({
     setAmount(String(editingExpense.amount))
     setDescription(editingExpense.description)
     setDate(editingExpense.date)
-    setReimbursable(editingExpense.reimbursable)
     setRemarks(editingExpense.remarks ?? '')
-    setPaymentMode((editingExpense.payment_mode as PaymentMode) ?? 'UPI')
+    setSettlement(editingExpense.reimbursable ? 'Reimbursable' : (editingExpense.payment_mode as Settlement) ?? 'UPI')
     setReceiptBlob(null)
     setReceiptStatus(editingExpense.receipt_path ? 'Photo attached' : 'Take photo')
     setShowCalc(false)
@@ -169,8 +167,7 @@ export function ExpenseForm({
     setDescription('')
     // projectId deliberately not reset — it stays the default for the rest
     // of the day (see loadStoredProject), across repeated entries.
-    setPaymentMode('UPI')
-    setReimbursable(false)
+    setSettlement('UPI')
     setRemarks('')
     setReceiptBlob(null)
     setReceiptStatus('Take photo')
@@ -214,10 +211,10 @@ export function ExpenseForm({
         cost_center: costCenter || null,
         amount: amt,
         date,
-        reimbursable,
+        reimbursable: settlement === 'Reimbursable',
         remarks: remarks.trim() || null,
         receipt_path: receiptPath,
-        payment_mode: paymentMode,
+        payment_mode: settlement === 'Reimbursable' ? null : settlement,
       }
       if (editingExpense) {
         await updateExpense.mutateAsync({
@@ -393,23 +390,16 @@ export function ExpenseForm({
           <div className="field" style={{ flex: '1 1 auto', minWidth: 0 }}>
             <label>Payment mode</label>
             <div className="pill-tabs">
-              {PAYMENT_MODES.map((m) => (
+              {SETTLEMENT_OPTIONS.map((m) => (
                 <button
                   key={m}
                   type="button"
-                  className={paymentMode === m ? 'pill active' : 'pill'}
-                  onClick={() => setPaymentMode(m)}
+                  className={settlement === m ? 'pill active' : 'pill'}
+                  onClick={() => setSettlement(m)}
                 >
                   {m}
                 </button>
               ))}
-              <button
-                type="button"
-                className={reimbursable ? 'pill active' : 'pill'}
-                onClick={() => setReimbursable((v) => !v)}
-              >
-                Reimbursable
-              </button>
             </div>
           </div>
           <div className="field" style={{ flex: '0 0 auto' }}>

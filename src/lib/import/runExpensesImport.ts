@@ -53,6 +53,7 @@ export async function runExpensesImport(file: File): Promise<ImportResultRow[]> 
         projectId = found
       }
 
+      const reimbursable = yesNo(row[COLUMNS_EXPENSES[7]])
       const { error } = await supabase.from('expenses').insert({
         type: 'General',
         description: tags,
@@ -61,8 +62,11 @@ export async function runExpensesImport(file: File): Promise<ImportResultRow[]> 
         amount,
         date,
         remarks: remarks || null,
-        payment_mode: paymentModeOf(row[COLUMNS_EXPENSES[6]]),
-        reimbursable: yesNo(row[COLUMNS_EXPENSES[7]]),
+        // Payment mode and Reimbursable are mutually exclusive — an expense
+        // is either settled a specific way, or still owed back to whoever
+        // fronted it, never both.
+        payment_mode: reimbursable ? null : paymentModeOf(row[COLUMNS_EXPENSES[6]]),
+        reimbursable,
       })
       if (error) throw error
       results.push({ sheet: SHEET_EXPENSES, row: rowNum, status: 'ok', message: 'Created expense' })
