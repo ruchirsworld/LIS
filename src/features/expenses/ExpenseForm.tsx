@@ -403,6 +403,13 @@ export function ExpenseForm({
                   {m}
                 </button>
               ))}
+              <button
+                type="button"
+                className={reimbursable ? 'pill active' : 'pill'}
+                onClick={() => setReimbursable((v) => !v)}
+              >
+                Reimbursable
+              </button>
             </div>
           </div>
           <div className="field" style={{ flex: '0 0 auto' }}>
@@ -412,15 +419,6 @@ export function ExpenseForm({
               status={receiptStatus}
               onFile={handleReceiptFile}
             />
-          </div>
-          <div className="field row-inline" style={{ flex: '0 0 auto' }}>
-            <input
-              type="checkbox"
-              id="e-reimb"
-              checked={reimbursable}
-              onChange={(e) => setReimbursable(e.target.checked)}
-            />
-            <label htmlFor="e-reimb">Reimbursable</label>
           </div>
         </div>
         <div className="field full" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
