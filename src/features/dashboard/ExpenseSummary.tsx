@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { useExpenses, useExpenseReimbursements } from '../../lib/queries/expenses'
 import { useExpenseCategories } from '../../lib/queries/masters'
 import { useProfiles } from '../../lib/queries/admin'
@@ -8,6 +8,7 @@ import { fmt, fmtDate } from '../../lib/calc/format'
 import type { DateRange } from '../../lib/calc/reportPeriod'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
+import { SettleReimbursementForm } from './SettleReimbursementForm'
 
 const UNKNOWN_USER = 'Unknown'
 const UNASSIGNED_CC = 'Unassigned'
@@ -33,17 +34,32 @@ export function ExpenseSummary({ range }: { range: DateRange | null }) {
   const { data: reimbursements } = useExpenseReimbursements()
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [selectedCostCenter, setSelectedCostCenter] = useState<string | null>(null)
+  const [settlingUserId, setSettlingUserId] = useState<string>('')
 
-  const dueByUser = new Map<string, number>()
+  interface DueUserRow {
+    userId: string | null
+    name: string
+    due: number
+    outstanding: { id: string; due: number; date: string }[]
+  }
+  const dueByUserId = new Map<string, DueUserRow>()
   ;(allExpenses ?? []).forEach((e) => {
     if (!e.reimbursable) return
     const due = expenseDue(e.amount, (reimbursements ?? []).filter((r) => r.expense_id === e.id))
     if (due <= 0) return
+    const key = e.created_by ?? 'unknown'
     const name = (e.created_by && profiles?.find((p) => p.id === e.created_by)?.name) || UNKNOWN_USER
-    dueByUser.set(name, (dueByUser.get(name) ?? 0) + due)
+    const existing = dueByUserId.get(key)
+    if (existing) {
+      existing.due += due
+      existing.outstanding.push({ id: e.id, due, date: e.date })
+    } else {
+      dueByUserId.set(key, { userId: e.created_by, name, due, outstanding: [{ id: e.id, due, date: e.date }] })
+    }
   })
-  const dueByUserRows = Array.from(dueByUser.entries()).sort((a, b) => b[1] - a[1])
-  const totalDue = dueByUserRows.reduce((s, [, a]) => s + a, 0)
+  dueByUserId.forEach((row) => row.outstanding.sort((a, b) => a.date.localeCompare(b.date)))
+  const dueByUserRows = Array.from(dueByUserId.values()).sort((a, b) => b.due - a.due)
+  const totalDue = dueByUserRows.reduce((s, r) => s + r.due, 0)
 
   const tagsOf = (typeName: string) => {
     const cat = categories?.find((c) => matchesCategoryLabel(c.name, typeName))
@@ -99,7 +115,7 @@ export function ExpenseSummary({ range }: { range: DateRange | null }) {
     {
       title: 'Reimbursement due by user',
       columns: ['User', 'Amount due'],
-      rows: dueByUserRows.map(([name, amount]) => [name, amount]),
+      rows: dueByUserRows.map((r) => [r.name, r.due]),
     },
   ]
 
@@ -219,15 +235,39 @@ export function ExpenseSummary({ range }: { range: DateRange | null }) {
                 <tr>
                   <th>User</th>
                   <th style={{ textAlign: 'right' }}>Amount due</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
-                {dueByUserRows.map(([name, amount]) => (
-                  <tr key={name}>
-                    <td>{name}</td>
-                    <td className="amt">{fmt(amount)}</td>
-                  </tr>
-                ))}
+                {dueByUserRows.map((r) => {
+                  const rowKey = r.userId ?? 'unknown'
+                  return (
+                    <Fragment key={rowKey}>
+                      <tr>
+                        <td>{r.name}</td>
+                        <td className="amt">{fmt(r.due)}</td>
+                        <td>
+                          <button
+                            type="button"
+                            className="pay-btn"
+                            disabled={!r.userId}
+                            onClick={() => setSettlingUserId(settlingUserId === rowKey ? '' : rowKey)}
+                          >
+                            Settle
+                          </button>
+                        </td>
+                      </tr>
+                      {settlingUserId === rowKey && (
+                        <SettleReimbursementForm
+                          due={r.due}
+                          outstandingExpenses={r.outstanding}
+                          colSpan={3}
+                          onClose={() => setSettlingUserId('')}
+                        />
+                      )}
+                    </Fragment>
+                  )
+                })}
               </tbody>
             </table>
           </div>
