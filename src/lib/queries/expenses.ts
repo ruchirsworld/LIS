@@ -149,6 +149,23 @@ export function useDeleteExpenseReimbursement() {
   })
 }
 
+export function useApproveExpenseReimbursement() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, approverId }: { id: string; approverId: string }) => {
+      const { data, error } = await supabase
+        .from('expense_reimbursements')
+        .update({ approved_by: approverId, approved_at: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['expense_reimbursements'] }),
+  })
+}
+
 export function useCreateVendor() {
   const qc = useQueryClient()
   return useMutation({

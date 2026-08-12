@@ -18,9 +18,11 @@ import {
   useBulkDeleteExpenses,
   useExpenseReimbursements,
   useDeleteExpenseReimbursement,
+  useApproveExpenseReimbursement,
 } from '../../lib/queries/expenses'
 import { useProjects, useClients, useVendors, useCostCenters } from '../../lib/queries/masters'
 import { useProfiles } from '../../lib/queries/admin'
+import { useAuth } from '../../lib/auth'
 import { fmt, fmtDate } from '../../lib/calc/format'
 import { expenseReimbursed, expenseDue } from '../../lib/calc/expenses'
 import type { DateRange } from '../../lib/calc/period'
@@ -33,6 +35,7 @@ type Expense = Database['public']['Tables']['expenses']['Row']
 type ExpenseReimbursement = Database['public']['Tables']['expense_reimbursements']['Row']
 
 export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void }) {
+  const { profile } = useAuth()
   const [range, setRange] = useState<DateRange | null>(null)
   const [idSearch, setIdSearch] = useState('')
   const [userFilter, setUserFilter] = useState('')
@@ -47,6 +50,7 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
   const bulkUpdateExpenses = useBulkUpdateExpenses()
   const bulkDeleteExpenses = useBulkDeleteExpenses()
   const deleteReimbursement = useDeleteExpenseReimbursement()
+  const approveReimbursement = useApproveExpenseReimbursement()
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkCostCenter, setBulkCostCenter] = useState('')
@@ -116,6 +120,8 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
   }
   const reimbursementsOf = (e: NonNullable<typeof expenses>[number]) =>
     reimbursements?.filter((r) => r.expense_id === e.id) ?? []
+  const approverNameOf = (r: NonNullable<typeof reimbursements>[number]) =>
+    (r.approved_by && profiles?.find((p) => p.id === r.approved_by)?.name) || '—'
   const reimbursedOf = (e: NonNullable<typeof expenses>[number]) => expenseReimbursed(reimbursementsOf(e))
   const dueOf = (e: NonNullable<typeof expenses>[number]) => (e.reimbursable ? expenseDue(e.amount, reimbursementsOf(e)) : 0)
 
@@ -338,29 +344,48 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
                             </div>
                             {hasHistory && (
                               <div className="pay-history" style={{ marginTop: 6 }}>
-                                {expReimbursements.map((r) => (
-                                  <div key={r.id} className="pay-history-line">
-                                    <span>
-                                      {r.display_id} — {fmtDate(r.date)} — {fmt(r.amount)}
-                                      {r.payment_mode ? ` · ${r.payment_mode}` : ''}
-                                      {r.reference ? ` · ${r.reference}` : ''}
-                                    </span>
-                                    <button
-                                      type="button"
-                                      className="pay-history-edit"
-                                      onClick={() => openEditReimbursement(e.id, r)}
-                                    >
-                                      Edit
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className="pay-history-edit"
-                                      onClick={() => deleteReimbursement.mutate(r.id)}
-                                    >
-                                      Remove
-                                    </button>
-                                  </div>
-                                ))}
+                                {expReimbursements.map((r) => {
+                                  const isApproved = !!r.approved_by
+                                  const canApprove = !isApproved && r.created_by !== profile?.id
+                                  return (
+                                    <div key={r.id} className="pay-history-line">
+                                      <span>
+                                        {r.display_id} — {fmtDate(r.date)} — {fmt(r.amount)}
+                                        {r.payment_mode ? ` · ${r.payment_mode}` : ''}
+                                        {r.reference ? ` · ${r.reference}` : ''}
+                                        {' · '}
+                                        {isApproved ? `Approved · ${approverNameOf(r)}` : 'Pending'}
+                                      </span>
+                                      {canApprove && (
+                                        <button
+                                          type="button"
+                                          className="pay-history-edit"
+                                          onClick={() => approveReimbursement.mutate({ id: r.id, approverId: profile!.id })}
+                                        >
+                                          Approve
+                                        </button>
+                                      )}
+                                      {!isApproved && (
+                                        <>
+                                          <button
+                                            type="button"
+                                            className="pay-history-edit"
+                                            onClick={() => openEditReimbursement(e.id, r)}
+                                          >
+                                            Edit
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="pay-history-edit"
+                                            onClick={() => deleteReimbursement.mutate(r.id)}
+                                          >
+                                            Remove
+                                          </button>
+                                        </>
+                                      )}
+                                    </div>
+                                  )
+                                })}
                               </div>
                             )}
                           </>

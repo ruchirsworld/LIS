@@ -265,6 +265,8 @@ export type Database = {
       expense_reimbursements: {
         Row: {
           amount: number
+          approved_at: string | null
+          approved_by: string | null
           created_at: string
           created_by: string | null
           date: string
@@ -276,6 +278,8 @@ export type Database = {
         }
         Insert: {
           amount: number
+          approved_at?: string | null
+          approved_by?: string | null
           created_at?: string
           created_by?: string | null
           date: string
@@ -287,6 +291,8 @@ export type Database = {
         }
         Update: {
           amount?: number
+          approved_at?: string | null
+          approved_by?: string | null
           created_at?: string
           created_by?: string | null
           date?: string
@@ -297,6 +303,20 @@ export type Database = {
           reference?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "expense_reimbursements_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_reimbursements_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "v_capital_summary"
+            referencedColumns: ["partner_id"]
+          },
           {
             foreignKeyName: "expense_reimbursements_created_by_fkey"
             columns: ["created_by"]
