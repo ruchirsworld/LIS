@@ -4,14 +4,14 @@ import { CurrencyInput } from '../../components/CurrencyInput'
 import { InlineCalculator } from '../../components/InlineCalculator'
 import { SearchableSelect } from '../../components/SearchableSelect'
 import { ReceiptUploadButton } from '../../components/ReceiptUploadButton'
-import { useClients, useProjects, useCostCenters, useExpenseCategories } from '../../lib/queries/masters'
+import { useClients, useProjects, useCostCenters } from '../../lib/queries/masters'
 import { useCreateExpense, useUpdateExpense } from '../../lib/queries/expenses'
 import { useGeolocation } from '../../lib/useGeolocation'
 import { compressImage } from '../../lib/compressImage'
 import { uploadReceipt } from '../../lib/storage'
 import { parseINR } from '../../lib/calc/format'
 import { getErrorMessage } from '../../lib/errors'
-import { clientLabel, matchesCategoryLabel } from '../../lib/labels'
+import { clientLabel } from '../../lib/labels'
 import type { Database } from '../../types/database'
 
 type ExpenseRow = Database['public']['Tables']['expenses']['Row']
@@ -87,7 +87,6 @@ export function ExpenseForm({
   const { data: clients } = useClients()
   const { data: projects } = useProjects()
   const { data: costCenters } = useCostCenters()
-  const { data: categories } = useExpenseCategories()
   // No visible GPS UI — still silently captured on mount and submitted with the transaction.
   const { geo } = useGeolocation()
 
@@ -115,11 +114,10 @@ export function ExpenseForm({
   const selectedProject = projects?.find((p) => p.id === projectId)
   const selectedProjectClient = selectedProject ? clients?.find((c) => c.id === selectedProject.client_id) : null
 
-  // Every transaction is General now — the old Purchase/Project/Loan/Capital
-  // category toggle is gone (vendor spend moved to Procurements; Loan/Capital
-  // have their own tabs), so tags always come from the General category.
-  const generalCategory = categories?.find((c) => matchesCategoryLabel(c.name, 'General'))
-  const topTags = (generalCategory?.tags ?? []).map((t) => `#${t}`)
+  // Tags are scoped per cost center (managed in Admin → Cost centers) —
+  // whichever cost center is selected above determines the quick-tag list.
+  const selectedCostCenter = costCenters?.find((cc) => cc.name === costCenter)
+  const topTags = (selectedCostCenter?.tags ?? []).map((t) => `#${t}`)
 
   useEffect(() => {
     if (!editingExpense) return

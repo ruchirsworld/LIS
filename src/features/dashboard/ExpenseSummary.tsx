@@ -1,8 +1,7 @@
 import { Fragment, useState } from 'react'
 import { useExpenses, useExpenseReimbursements } from '../../lib/queries/expenses'
-import { useExpenseCategories } from '../../lib/queries/masters'
+import { useCostCenters } from '../../lib/queries/masters'
 import { useProfiles } from '../../lib/queries/admin'
-import { matchesCategoryLabel } from '../../lib/labels'
 import { expenseDue } from '../../lib/calc/expenses'
 import { fmt, fmtDate } from '../../lib/calc/format'
 import type { DateRange } from '../../lib/calc/reportPeriod'
@@ -29,7 +28,7 @@ export function ExpenseSummary({ range }: { range: DateRange | null }) {
   // Independent of the period filter — "amount still to claim" is a running
   // total, not scoped to whatever date range is currently selected.
   const { data: allExpenses } = useExpenses(null)
-  const { data: categories } = useExpenseCategories()
+  const { data: costCenters } = useCostCenters()
   const { data: profiles } = useProfiles()
   const { data: reimbursements } = useExpenseReimbursements()
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
@@ -61,9 +60,9 @@ export function ExpenseSummary({ range }: { range: DateRange | null }) {
   const dueByUserRows = Array.from(dueByUserId.values()).sort((a, b) => b.due - a.due)
   const totalDue = dueByUserRows.reduce((s, r) => s + r.due, 0)
 
-  const tagsOf = (typeName: string) => {
-    const cat = categories?.find((c) => matchesCategoryLabel(c.name, typeName))
-    return new Set((cat?.tags ?? []).map((t) => t.toLowerCase()))
+  const tagsOf = (costCenterName: string | null) => {
+    const cc = costCenters?.find((c) => c.name === costCenterName)
+    return new Set((cc?.tags ?? []).map((t) => t.toLowerCase()))
   }
 
   const byCategory = new Map<string, number>()
@@ -90,7 +89,7 @@ export function ExpenseSummary({ range }: { range: DateRange | null }) {
 
   const rows: TagRow[] = []
   scoped.forEach((e) => {
-    const adminTags = tagsOf(e.type)
+    const adminTags = tagsOf(e.cost_center)
     // \S+ (not \w+) so tags with punctuation like "#F&B" match in full —
     // \w+ stops at the "&", leaving just "#F" which never matches "F&B".
     const matches = (e.description || '').match(/#\S+/g) ?? []

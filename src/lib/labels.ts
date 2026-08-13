@@ -3,12 +3,3 @@ export function clientLabel(client: { name: string; client_code?: string | null 
   if (!client) return '—'
   return client.client_code ? `${client.client_code} — ${client.name}` : client.name
 }
-
-/** Matches a CoA category name against an Expense-form toggle label (e.g.
- * "Purchase"), tolerating a pluralized category name (e.g. "Purchases") —
- * admin may have set either up before this matching existed. */
-export function matchesCategoryLabel(categoryName: string, label: string): boolean {
-  const n = categoryName.trim().toLowerCase()
-  const l = label.trim().toLowerCase()
-  return n === l || n === `${l}s`
-}

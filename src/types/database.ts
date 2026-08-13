@@ -191,6 +191,7 @@ export type Database = {
           id: string
           name: string
           sort_order: number
+          tags: string[]
         }
         Insert: {
           created_at?: string
@@ -198,6 +199,7 @@ export type Database = {
           id?: string
           name: string
           sort_order: number
+          tags?: string[]
         }
         Update: {
           created_at?: string
@@ -205,6 +207,7 @@ export type Database = {
           id?: string
           name?: string
           sort_order?: number
+          tags?: string[]
         }
         Relationships: [
           {
@@ -229,21 +232,18 @@ export type Database = {
           created_by: string | null
           id: string
           name: string
-          tags: string[]
         }
         Insert: {
           created_at?: string
           created_by?: string | null
           id?: string
           name: string
-          tags?: string[]
         }
         Update: {
           created_at?: string
           created_by?: string | null
           id?: string
           name?: string
-          tags?: string[]
         }
         Relationships: [
           {

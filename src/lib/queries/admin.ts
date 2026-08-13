@@ -194,14 +194,14 @@ export function useDeleteExpenseCategory() {
   })
 }
 
-export function useUpdateExpenseCategoryTags() {
+export function useUpdateCostCenterTags() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async ({ id, tags }: { id: string; tags: string[] }) => {
-      const { error } = await supabase.from('expense_categories').update({ tags }).eq('id', id)
+      const { error } = await supabase.from('cost_centers').update({ tags }).eq('id', id)
       if (error) throw error
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['expense_categories'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['cost_centers'] }),
   })
 }
 
