@@ -5,7 +5,6 @@ import { SearchableSelect } from '../../components/SearchableSelect'
 import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
 import { TableScroll } from '../../components/TableScroll'
-import { RowMenu } from '../../components/RowMenu'
 import { CostCenterPicker } from '../../components/CostCenterPicker'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
@@ -34,6 +33,8 @@ import type { Database } from '../../types/database'
 type Expense = Database['public']['Tables']['expenses']['Row']
 type ExpenseReimbursement = Database['public']['Tables']['expense_reimbursements']['Row']
 
+const COL_SPAN = 7
+
 export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void }) {
   const { profile } = useAuth()
   const [range, setRange] = useState<DateRange | null>(null)
@@ -54,11 +55,21 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkCostCenter, setBulkCostCenter] = useState('')
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [payFormId, setPayFormId] = useState<string | null>(null)
   const [editingReimbursement, setEditingReimbursement] = useState<ExpenseReimbursement | null>(null)
 
   function toggleSelected(id: string) {
     setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleExpanded(id: string) {
+    setExpandedIds((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
       else next.add(id)
@@ -137,8 +148,6 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
       description: (e) => e.description,
       costCenter: (e) => e.cost_center,
       amount: (e) => e.amount,
-      reimbursable: (e) => (e.reimbursable ? 1 : 0),
-      due: (e) => dueOf(e),
     },
     'id'
   )
@@ -158,7 +167,7 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
   const exportSections: ExportSection[] = [
     {
       title: 'Expense records',
-      columns: ['ID', 'Date', 'Vendor', 'Description', 'Remarks', 'Project / client', 'Cost center', 'Amount', 'Reimbursable', 'Reimbursed', 'Due', 'Recorded by'],
+      columns: ['ID', 'Date', 'Vendor', 'Description', 'Remarks', 'Project / client', 'Cost center', 'Purpose', 'Amount', 'Reimbursable', 'Reimbursed', 'Due', 'Recorded by'],
       rows: (sortedExpenses ?? []).map((e) => [
         e.display_id ?? '',
         fmtDate(e.date),
@@ -167,6 +176,7 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
         e.remarks ?? '',
         projLabelOf(e),
         e.cost_center ?? '',
+        e.purpose ?? '',
         e.amount,
         e.reimbursable ? 'Yes' : 'No',
         e.reimbursable ? reimbursedOf(e) : '—',
@@ -257,28 +267,25 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
               <th>
                 <input type="checkbox" checked={allPageSelected} onChange={toggleSelectAllOnPage} aria-label="Select all on page" />
               </th>
+              <th></th>
               <SortableTh label="ID" sortKey="id" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Date" sortKey="date" activeKey={sortKey} direction={direction} onSort={toggleSort} />
-              <SortableTh label="Amount" sortKey="amount" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
               <SortableTh label="Description" sortKey="description" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Cost center" sortKey="costCenter" activeKey={sortKey} direction={direction} onSort={toggleSort} />
-              <SortableTh label="Reimbursable" sortKey="reimbursable" activeKey={sortKey} direction={direction} onSort={toggleSort} />
-              <th style={{ textAlign: 'right' }}>Reimbursed</th>
-              <SortableTh label="Due" sortKey="due" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
-              <th></th>
+              <SortableTh label="Amount" sortKey="amount" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
             </tr>
           </thead>
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={10} className="empty-row">
+                <td colSpan={COL_SPAN} className="empty-row">
                   Loading…
                 </td>
               </tr>
             )}
             {!isLoading && (!sortedExpenses || sortedExpenses.length === 0) && (
               <tr>
-                <td colSpan={10} className="empty-row">
+                <td colSpan={COL_SPAN} className="empty-row">
                   {idSearch.trim()
                     ? `No expenses match "${idSearch.trim()}"`
                     : userFilter
@@ -294,6 +301,7 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
               const reimbursed = reimbursedOf(e)
               const due = dueOf(e)
               const hasHistory = expReimbursements.length > 0
+              const isExpanded = expandedIds.has(e.id)
 
               return (
                 <Fragment key={e.id}>
@@ -301,109 +309,141 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
                     <td>
                       <input type="checkbox" checked={selectedIds.has(e.id)} onChange={() => toggleSelected(e.id)} aria-label={`Select ${e.display_id ?? 'row'}`} />
                     </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="row-expand-btn"
+                        onClick={() => toggleExpanded(e.id)}
+                        aria-label={isExpanded ? 'Hide details' : 'Show details'}
+                      >
+                        {isExpanded ? '▾' : '▸'}
+                      </button>
+                    </td>
                     <td>{e.display_id ?? '—'}</td>
                     <td>{fmtDate(e.date)}</td>
-                    <td className="amt">{fmt(e.amount)}</td>
                     <td>{e.description}</td>
-                    <td>{e.cost_center ?? '—'}</td>
-                    <td>{e.reimbursable ? 'Yes' : 'No'}</td>
-                    <td className="amt">{e.reimbursable ? fmt(reimbursed) : '—'}</td>
-                    <td className="amt">{e.reimbursable ? fmt(due) : '—'}</td>
                     <td>
-                      <RowMenu
-                        info={
-                          <>
-                            <div>
-                              <strong>Project / client:</strong> {projLabel || '—'}
-                            </div>
-                            <div>
-                              <strong>Vendor:</strong> {vendorName || '—'}
-                            </div>
-                            <div>
-                              <strong>Remarks:</strong> {e.remarks ?? '—'}
-                            </div>
-                            <div>
-                              <strong>Recorded by:</strong> {userNameOf(e) || '—'}
-                            </div>
-                            <div>
-                              <strong>Location:</strong>{' '}
-                              {e.geo_lat != null && e.geo_lng != null ? (
-                                <a href={`https://maps.google.com/?q=${e.geo_lat},${e.geo_lng}`} target="_blank" rel="noopener">
-                                  view
-                                </a>
-                              ) : (
-                                '—'
-                              )}
-                            </div>
-                            <div>
-                              <strong>Receipt:</strong> {e.receipt_path ? <ReceiptLink path={e.receipt_path} /> : '—'}
-                            </div>
-                            {hasHistory && (
-                              <div className="pay-history" style={{ marginTop: 6 }}>
-                                {expReimbursements.map((r) => {
-                                  const isApproved = !!r.approved_by
-                                  const canApprove = !isApproved && r.created_by !== profile?.id
-                                  return (
-                                    <div key={r.id} className="pay-history-line">
-                                      <span>
-                                        {r.display_id} — {fmtDate(r.date)} — {fmt(r.amount)}
-                                        {r.payment_mode ? ` · ${r.payment_mode}` : ''}
-                                        {r.reference ? ` · ${r.reference}` : ''}
-                                        {' · '}
-                                        {isApproved ? `Approved · ${approverNameOf(r)}` : 'Pending'}
-                                      </span>
-                                      {canApprove && (
-                                        <button
-                                          type="button"
-                                          className="pay-history-edit"
-                                          onClick={() => approveReimbursement.mutate({ id: r.id, approverId: profile!.id })}
-                                        >
-                                          Approve
-                                        </button>
-                                      )}
-                                      {!isApproved && (
-                                        <>
-                                          <button
-                                            type="button"
-                                            className="pay-history-edit"
-                                            onClick={() => openEditReimbursement(e.id, r)}
-                                          >
-                                            Edit
-                                          </button>
-                                          <button
-                                            type="button"
-                                            className="pay-history-edit"
-                                            onClick={() => deleteReimbursement.mutate(r.id)}
-                                          >
-                                            Remove
-                                          </button>
-                                        </>
-                                      )}
-                                    </div>
-                                  )
-                                })}
-                              </div>
-                            )}
-                          </>
-                        }
-                        items={[
-                          { label: 'Edit', onClick: () => onEdit(e) },
-                          { label: 'Remove', onClick: () => deleteExpense.mutate(e.id) },
-                          {
-                            label: 'Record reimbursement',
-                            disabled: !e.reimbursable || due <= 0,
-                            onClick: () => openAddReimbursement(e.id),
-                          },
-                        ]}
-                      />
+                      {e.cost_center ?? '—'}
+                      {e.cost_center === 'Projects' && e.purpose && (
+                        <div style={{ fontSize: 11, color: 'var(--ink-soft)', marginTop: 2 }}>{e.purpose}</div>
+                      )}
                     </td>
+                    <td className="amt">{fmt(e.amount)}</td>
                   </tr>
+                  {isExpanded && (
+                    <tr className="pay-form-row">
+                      <td colSpan={COL_SPAN}>
+                        <div className="row-menu-info" style={{ padding: 0, border: 'none' }}>
+                          <div>
+                            <strong>Project / client:</strong> {projLabel || '—'}
+                          </div>
+                          <div>
+                            <strong>Vendor:</strong> {vendorName || '—'}
+                          </div>
+                          <div>
+                            <strong>Remarks:</strong> {e.remarks ?? '—'}
+                          </div>
+                          <div>
+                            <strong>Recorded by:</strong> {userNameOf(e) || '—'}
+                          </div>
+                          <div>
+                            <strong>Location:</strong>{' '}
+                            {e.geo_lat != null && e.geo_lng != null ? (
+                              <a href={`https://maps.google.com/?q=${e.geo_lat},${e.geo_lng}`} target="_blank" rel="noopener">
+                                view
+                              </a>
+                            ) : (
+                              '—'
+                            )}
+                          </div>
+                          <div>
+                            <strong>Receipt:</strong> {e.receipt_path ? <ReceiptLink path={e.receipt_path} /> : '—'}
+                          </div>
+                          <div>
+                            <strong>Reimbursable:</strong> {e.reimbursable ? 'Yes' : 'No'}
+                          </div>
+                          {e.reimbursable && (
+                            <>
+                              <div>
+                                <strong>Reimbursed:</strong> {fmt(reimbursed)}
+                              </div>
+                              <div>
+                                <strong>Due:</strong> {fmt(due)}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                        {hasHistory && (
+                          <div className="pay-history" style={{ marginTop: 6 }}>
+                            {expReimbursements.map((r) => {
+                              const isApproved = !!r.approved_by
+                              const canApprove = !isApproved && r.created_by !== profile?.id
+                              return (
+                                <div key={r.id} className="pay-history-line">
+                                  <span>
+                                    {r.display_id} — {fmtDate(r.date)} — {fmt(r.amount)}
+                                    {r.payment_mode ? ` · ${r.payment_mode}` : ''}
+                                    {r.reference ? ` · ${r.reference}` : ''}
+                                    {' · '}
+                                    {isApproved ? `Approved · ${approverNameOf(r)}` : 'Pending'}
+                                  </span>
+                                  {canApprove && (
+                                    <button
+                                      type="button"
+                                      className="pay-history-edit"
+                                      onClick={() => approveReimbursement.mutate({ id: r.id, approverId: profile!.id })}
+                                    >
+                                      Approve
+                                    </button>
+                                  )}
+                                  {!isApproved && (
+                                    <>
+                                      <button
+                                        type="button"
+                                        className="pay-history-edit"
+                                        onClick={() => openEditReimbursement(e.id, r)}
+                                      >
+                                        Edit
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="pay-history-edit"
+                                        onClick={() => deleteReimbursement.mutate(r.id)}
+                                      >
+                                        Remove
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+                          <button type="button" className="pay-btn" onClick={() => onEdit(e)}>
+                            Edit
+                          </button>
+                          <button type="button" className="btn danger-link" onClick={() => deleteExpense.mutate(e.id)}>
+                            Remove
+                          </button>
+                          <button
+                            type="button"
+                            className="pay-btn"
+                            disabled={!e.reimbursable || due <= 0}
+                            onClick={() => openAddReimbursement(e.id)}
+                          >
+                            Record reimbursement
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
                   {payFormId === e.id && (
                     <ExpenseReimbursementForm
                       expenseId={e.id}
                       due={due}
                       editingReimbursement={editingReimbursement}
-                      colSpan={10}
+                      colSpan={COL_SPAN}
                       onClose={closePayForm}
                     />
                   )}

@@ -775,6 +775,23 @@ table.data tr:last-child td {
   cursor: pointer;
   margin-right: 6px;
 }
+.pay-btn:disabled {
+  color: var(--ink-soft);
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.row-expand-btn {
+  background: none;
+  border: none;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 6px;
+}
+.row-expand-btn:hover {
+  color: var(--accent);
+}
 .pay-form-row td {
   background: var(--paper-2);
   padding: 12px 14px;
