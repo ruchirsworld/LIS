@@ -759,6 +759,14 @@ table.data td {
 table.data tr:last-child td {
   border-bottom: none;
 }
+table.data.table-compact th {
+  padding: 6px 10px;
+  font-size: 10px;
+}
+table.data.table-compact td {
+  padding: 6px 10px;
+  font-size: 12.5px;
+}
 .amt {
   font-family: var(--font-mono);
   text-align: right;
@@ -781,16 +789,23 @@ table.data tr:last-child td {
   cursor: not-allowed;
 }
 .row-expand-btn {
-  background: none;
+  background: var(--accent-soft);
   border: none;
-  color: var(--ink-soft);
-  font-size: 13px;
+  color: var(--accent);
+  font-size: 15px;
+  font-weight: 700;
   line-height: 1;
   cursor: pointer;
-  padding: 4px 6px;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .row-expand-btn:hover {
-  color: var(--accent);
+  background: var(--accent);
+  color: #fff;
 }
 .pay-form-row td {
   background: var(--paper-2);

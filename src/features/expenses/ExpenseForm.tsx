@@ -268,7 +268,7 @@ export function ExpenseForm({
 
   return (
     <details className="toggle-section" open>
-      <summary>Add transaction</summary>
+      <summary>{editingExpense ? 'Edit transaction' : 'Add transaction'}</summary>
 
       <form className="form-grid" onSubmit={handleSubmit} style={{ marginTop: 16 }}>
         {/* Row 1: Cost center */}

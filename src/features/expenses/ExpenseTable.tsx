@@ -28,14 +28,14 @@ import type { DateRange } from '../../lib/calc/period'
 import { ReceiptLink } from '../../components/ReceiptLink'
 import { clientLabel } from '../../lib/labels'
 import { ExpenseReimbursementForm } from './ExpenseReimbursementForm'
+import { ExpenseForm } from './ExpenseForm'
 import type { Database } from '../../types/database'
 
-type Expense = Database['public']['Tables']['expenses']['Row']
 type ExpenseReimbursement = Database['public']['Tables']['expense_reimbursements']['Row']
 
 const COL_SPAN = 7
 
-export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void }) {
+export function ExpenseTable() {
   const { profile } = useAuth()
   const [range, setRange] = useState<DateRange | null>(null)
   const [idSearch, setIdSearch] = useState('')
@@ -56,6 +56,7 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkCostCenter, setBulkCostCenter] = useState('')
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [payFormId, setPayFormId] = useState<string | null>(null)
   const [editingReimbursement, setEditingReimbursement] = useState<ExpenseReimbursement | null>(null)
 
@@ -115,6 +116,8 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
     setEditingReimbursement(reimbursement)
     setPayFormId(expenseId)
   }
+
+  const projectCodeOf = (e: NonNullable<typeof expenses>[number]) => projects?.find((p) => p.id === e.project_id)?.display_id ?? ''
 
   const projLabelOf = (e: NonNullable<typeof expenses>[number]) => {
     const project = projects?.find((p) => p.id === e.project_id)
@@ -261,7 +264,7 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
       )}
 
       <TableScroll>
-        <table className="data">
+        <table className="data table-compact">
           <thead>
             <tr>
               <th>
@@ -324,13 +327,22 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
                     <td>{e.description}</td>
                     <td>
                       {e.cost_center ?? '—'}
-                      {e.cost_center === 'Projects' && e.purpose && (
-                        <div style={{ fontSize: 11, color: 'var(--ink-soft)', marginTop: 2 }}>{e.purpose}</div>
+                      {e.cost_center === 'Projects' && (projectCodeOf(e) || e.purpose) && (
+                        <div style={{ fontSize: 11, color: 'var(--ink-soft)', marginTop: 2 }}>
+                          {[projectCodeOf(e), e.purpose].filter(Boolean).join(' · ')}
+                        </div>
                       )}
                     </td>
                     <td className="amt">{fmt(e.amount)}</td>
                   </tr>
-                  {isExpanded && (
+                  {isExpanded && editingId === e.id && (
+                    <tr className="pay-form-row">
+                      <td colSpan={COL_SPAN}>
+                        <ExpenseForm editingExpense={e} onDoneEditing={() => setEditingId(null)} />
+                      </td>
+                    </tr>
+                  )}
+                  {isExpanded && editingId !== e.id && (
                     <tr className="pay-form-row">
                       <td colSpan={COL_SPAN}>
                         <div className="row-menu-info" style={{ padding: 0, border: 'none' }}>
@@ -420,7 +432,7 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
                           </div>
                         )}
                         <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
-                          <button type="button" className="pay-btn" onClick={() => onEdit(e)}>
+                          <button type="button" className="pay-btn" onClick={() => setEditingId(e.id)}>
                             Edit
                           </button>
                           <button type="button" className="btn danger-link" onClick={() => deleteExpense.mutate(e.id)}>
