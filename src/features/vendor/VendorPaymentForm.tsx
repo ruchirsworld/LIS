@@ -1,8 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
-import { SearchableSelect } from '../../components/SearchableSelect'
-import { useVendors } from '../../lib/queries/masters'
 import { useVendorBills, useVendorBillPayments, useCreateVendorBillPayment } from '../../lib/queries/purchases'
 import { billDue } from '../../lib/calc/vendorBills'
 import { fmt, parseINR } from '../../lib/calc/format'
@@ -15,20 +13,20 @@ function todayStr() {
   return new Date().toISOString().slice(0, 10)
 }
 
-export function VendorPaymentForm() {
-  const { data: vendors } = useVendors()
+/** Payment form for a vendor that's already selected on the page — the
+ * oldest outstanding bill for that vendor absorbs the payment (FIFO),
+ * same as before, just without its own vendor picker. */
+export function VendorPaymentForm({ vendorId, onDone }: { vendorId: string; onDone: () => void }) {
   const { data: bills } = useVendorBills(null)
   const { data: payments } = useVendorBillPayments()
   const createPayment = useCreateVendorBillPayment()
 
-  const [vendorId, setVendorId] = useState('')
   const [date, setDate] = useState(todayStr())
   const [amount, setAmount] = useState('0')
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('UPI')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
-  // Oldest outstanding bill for the selected vendor absorbs the payment (FIFO).
   const vendorOpenBills = (bills ?? [])
     .filter((b) => b.vendor_id === vendorId)
     .map((b) => ({ bill: b, due: billDue(b, payments?.filter((p) => p.bill_id === b.id) ?? []) }))
@@ -37,17 +35,9 @@ export function VendorPaymentForm() {
   const totalDue = vendorOpenBills.reduce((s, row) => s + row.due, 0)
   const target = vendorOpenBills[0]
 
-  function handleVendorChange(id: string) {
-    setVendorId(id)
-  }
-
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setFormError(null)
-    if (!vendorId) {
-      setFormError('Pick a vendor.')
-      return
-    }
     if (!target) {
       setFormError('This vendor has no outstanding bills.')
       return
@@ -65,10 +55,7 @@ export function VendorPaymentForm() {
         amount: amt,
         payment_mode: paymentMode,
       })
-      setVendorId('')
-      setDate(todayStr())
-      setAmount('0')
-      setPaymentMode('UPI')
+      onDone()
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Could not record payment.')
     } finally {
@@ -77,71 +64,55 @@ export function VendorPaymentForm() {
   }
 
   return (
-    <details className="toggle-section" open>
-      <summary>Add vendor payment</summary>
-      <form className="form-grid" onSubmit={handleSubmit} style={{ marginTop: 16 }}>
-        <div className="field full">
-          <label>Vendor</label>
-          <SearchableSelect
-            items={vendors}
-            value={vendorId}
-            onChange={handleVendorChange}
-            getId={(v) => v.id}
-            getLabel={(v) => v.name}
-            getSearchValue={(v) => `${v.name} ${v.phone ?? ''}`}
-            placeholder="— Select vendor —"
-          />
-          {vendorId && target && (
-            <div className="note" style={{ marginTop: 2 }}>
-              Total due: {fmt(totalDue)} — will auto-adjust against {target.bill.display_id ?? 'oldest bill'}
-            </div>
-          )}
-          {vendorId && !target && (
-            <div className="note" style={{ marginTop: 2, color: 'var(--red)' }}>
-              No outstanding bills for this vendor.
-            </div>
-          )}
+    <form className="form-grid" onSubmit={handleSubmit}>
+      {target ? (
+        <div className="note" style={{ marginTop: 0 }}>
+          Total due: {fmt(totalDue)} — will auto-adjust against {target.bill.display_id ?? 'oldest bill'}
         </div>
+      ) : (
+        <div className="note" style={{ marginTop: 0, color: 'var(--red)' }}>
+          No outstanding bills for this vendor.
+        </div>
+      )}
 
-        <div className="field-row">
-          <div className="field field-narrow">
-            <label>Date</label>
-            <input type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
-          </div>
-          <div className="field">
-            <label>Amount (₹)</label>
-            <CurrencyInput value={amount} onValueChange={setAmount} required />
-          </div>
+      <div className="field-row">
+        <div className="field field-narrow">
+          <label>Date</label>
+          <input type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
         </div>
+        <div className="field">
+          <label>Amount (₹)</label>
+          <CurrencyInput value={amount} onValueChange={setAmount} required />
+        </div>
+      </div>
 
-        <div className="field full">
-          <label>Mode of payment</label>
-          <div className="pill-tabs">
-            {PAYMENT_MODES.map((m) => (
-              <button
-                key={m}
-                type="button"
-                className={paymentMode === m ? 'pill active' : 'pill'}
-                onClick={() => setPaymentMode(m)}
-              >
-                {m}
-              </button>
-            ))}
-          </div>
+      <div className="field full">
+        <label>Mode of payment</label>
+        <div className="pill-tabs">
+          {PAYMENT_MODES.map((m) => (
+            <button
+              key={m}
+              type="button"
+              className={paymentMode === m ? 'pill active' : 'pill'}
+              onClick={() => setPaymentMode(m)}
+            >
+              {m}
+            </button>
+          ))}
         </div>
+      </div>
 
-        <div className="field full">
-          <Button type="submit" disabled={submitting || (!!vendorId && !target)}>
-            {submitting ? 'Adding…' : 'Add payment'}
-          </Button>
-        </div>
-      </form>
+      <div className="field full">
+        <Button type="submit" disabled={submitting || !target}>
+          {submitting ? 'Adding…' : 'Add payment'}
+        </Button>
+      </div>
 
       {formError && (
-        <div className="note" style={{ color: 'var(--red)', marginTop: -10 }}>
+        <div className="note" style={{ color: 'var(--red)' }}>
           {formError}
         </div>
       )}
-    </details>
+    </form>
   )
 }

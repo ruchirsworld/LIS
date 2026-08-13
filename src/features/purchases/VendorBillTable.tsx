@@ -69,7 +69,7 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
   const paidOf = (b: NonNullable<typeof bills>[number]) => billPaid(payments?.filter((p) => p.bill_id === b.id) ?? [])
   // Raw (unclamped) — a negative value here means this bill is overpaid, a
   // credit that should offset another underpaid bill for the same vendor
-  // rather than silently vanishing. See VendorSummaryTable for the net.
+  // rather than silently vanishing. See VendorPage for the net.
   const dueOf = (b: NonNullable<typeof bills>[number]) => billDueRaw(b, payments?.filter((p) => p.bill_id === b.id) ?? [])
 
   const { sorted: sortedBills, sortKey, direction, toggleSort } = useSort(
