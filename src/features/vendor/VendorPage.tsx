@@ -8,7 +8,7 @@ import { useExpenses } from '../../lib/queries/expenses'
 import { fmt } from '../../lib/calc/format'
 import { billTotal, billDueRaw } from '../../lib/calc/vendorBills'
 import { VendorPaymentForm } from './VendorPaymentForm'
-import { VendorPaymentRecordsTable } from './VendorPaymentRecordsTable'
+import { VendorLedgerTable } from './VendorLedgerTable'
 
 export function VendorPage() {
   const { data: vendors } = useVendors()
@@ -72,7 +72,7 @@ export function VendorPage() {
             </Modal>
           )}
 
-          <VendorPaymentRecordsTable vendorId={vendorId} />
+          <VendorLedgerTable vendorId={vendorId} />
         </>
       )}
     </div>
