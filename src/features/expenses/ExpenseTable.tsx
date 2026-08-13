@@ -135,7 +135,6 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
       id: (e) => e.display_id,
       date: (e) => e.date,
       description: (e) => e.description,
-      type: (e) => e.type,
       costCenter: (e) => e.cost_center,
       amount: (e) => e.amount,
       reimbursable: (e) => (e.reimbursable ? 1 : 0),
@@ -159,14 +158,13 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
   const exportSections: ExportSection[] = [
     {
       title: 'Expense records',
-      columns: ['ID', 'Date', 'Vendor', 'Description', 'Remarks', 'Type', 'Project / client', 'Cost center', 'Amount', 'Reimbursable', 'Reimbursed', 'Due', 'Recorded by'],
+      columns: ['ID', 'Date', 'Vendor', 'Description', 'Remarks', 'Project / client', 'Cost center', 'Amount', 'Reimbursable', 'Reimbursed', 'Due', 'Recorded by'],
       rows: (sortedExpenses ?? []).map((e) => [
         e.display_id ?? '',
         fmtDate(e.date),
         vendorNameOf(e),
         e.description,
         e.remarks ?? '',
-        e.type,
         projLabelOf(e),
         e.cost_center ?? '',
         e.amount,
@@ -263,7 +261,6 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
               <SortableTh label="Date" sortKey="date" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Amount" sortKey="amount" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
               <SortableTh label="Description" sortKey="description" activeKey={sortKey} direction={direction} onSort={toggleSort} />
-              <SortableTh label="Type" sortKey="type" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Cost center" sortKey="costCenter" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Reimbursable" sortKey="reimbursable" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <th style={{ textAlign: 'right' }}>Reimbursed</th>
@@ -274,14 +271,14 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={11} className="empty-row">
+                <td colSpan={10} className="empty-row">
                   Loading…
                 </td>
               </tr>
             )}
             {!isLoading && (!sortedExpenses || sortedExpenses.length === 0) && (
               <tr>
-                <td colSpan={11} className="empty-row">
+                <td colSpan={10} className="empty-row">
                   {idSearch.trim()
                     ? `No expenses match "${idSearch.trim()}"`
                     : userFilter
@@ -308,7 +305,6 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
                     <td>{fmtDate(e.date)}</td>
                     <td className="amt">{fmt(e.amount)}</td>
                     <td>{e.description}</td>
-                    <td>{e.type}</td>
                     <td>{e.cost_center ?? '—'}</td>
                     <td>{e.reimbursable ? 'Yes' : 'No'}</td>
                     <td className="amt">{e.reimbursable ? fmt(reimbursed) : '—'}</td>
@@ -407,7 +403,7 @@ export function ExpenseTable({ onEdit }: { onEdit: (expense: Expense) => void })
                       expenseId={e.id}
                       due={due}
                       editingReimbursement={editingReimbursement}
-                      colSpan={11}
+                      colSpan={10}
                       onClose={closePayForm}
                     />
                   )}

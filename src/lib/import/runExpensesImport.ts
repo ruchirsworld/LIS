@@ -55,7 +55,6 @@ export async function runExpensesImport(file: File): Promise<ImportResultRow[]> 
 
       const reimbursable = yesNo(row[COLUMNS_EXPENSES[7]])
       const { error } = await supabase.from('expenses').insert({
-        type: 'General',
         description: tags,
         cost_center: costCenter,
         project_id: projectId,

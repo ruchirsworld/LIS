@@ -9,7 +9,6 @@ export interface ReportSummary {
   total_invoiced: number
   total_received: number
   total_expenses: number
-  expenses_by_type: { type: string; amount: number }[]
   vendor_purchases: number
   vendor_paid: number
   loan_interest_paid: number

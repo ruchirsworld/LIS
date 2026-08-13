@@ -234,7 +234,6 @@ export function ExpenseForm({
       }
       const patch = {
         description: description.trim(),
-        type: 'General',
         project_id: isProjectCostCenter ? projectId || null : null,
         cost_center: costCenter || null,
         purpose: isProjectCostCenter ? purpose || null : null,

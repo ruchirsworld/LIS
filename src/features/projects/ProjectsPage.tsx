@@ -41,7 +41,7 @@ export function ProjectsPage() {
   const [clientFilter, setClientFilterState] = useState(() => localStorage.getItem(CLIENT_FILTER_KEY) ?? '')
   const [selectedId, setSelectedIdState] = useState(() => localStorage.getItem(SELECTED_PROJECT_KEY) ?? '')
   const [updatingId, setUpdatingId] = useState<string | null>(null)
-  const [breakdown, setBreakdown] = useState<'purchases' | 'expenses' | null>(null)
+  const [breakdown, setBreakdown] = useState<'purchases' | null>(null)
   const selected = projects?.find((p) => p.id === selectedId) ?? activeProjects[0] ?? projects?.[0]
 
   const visibleProjects = clientFilter ? projects?.filter((p) => p.client_id === clientFilter) : projects
@@ -90,13 +90,7 @@ export function ProjectsPage() {
   const budget = selected?.budget ?? null
   const utilizedPct = budget !== null && budget > 0 ? Math.round((costTotal / budget) * 100) : null
 
-  const projectExpenseRows = selected ? (expenses ?? []).filter((e) => e.project_id === selected.id) : []
   const projectBillRows = selected ? (vendorBills ?? []).filter((b) => b.project_id === selected.id) : []
-
-  const expensesByType = new Map<string, number>()
-  projectExpenseRows.forEach((e) => {
-    expensesByType.set(e.type, (expensesByType.get(e.type) ?? 0) + Number(e.amount || 0))
-  })
 
   const purchasesByVendorType = new Map<string, number>()
   projectBillRows.forEach((b) => {
@@ -161,12 +155,7 @@ export function ProjectsPage() {
                   active={breakdown === 'purchases'}
                   onClick={() => setBreakdown(breakdown === 'purchases' ? null : 'purchases')}
                 />
-                <KpiCard
-                  label="Expenses"
-                  value={fmt(expenseTotal)}
-                  active={breakdown === 'expenses'}
-                  onClick={() => setBreakdown(breakdown === 'expenses' ? null : 'expenses')}
-                />
+                <KpiCard label="Expenses" value={fmt(expenseTotal)} />
               </div>
 
               {breakdown === 'purchases' && (
@@ -180,23 +169,6 @@ export function ProjectsPage() {
                     <div className="kpi-grid-2col">
                       {Array.from(purchasesByVendorType.entries()).map(([cat, amt]) => (
                         <KpiCard key={cat} label={cat} value={fmt(amt)} />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {breakdown === 'expenses' && (
-                <div style={{ marginBottom: 18 }}>
-                  <div className="note" style={{ marginBottom: 8 }}>
-                    Expenses by type
-                  </div>
-                  {expensesByType.size === 0 ? (
-                    <div className="note">No expenses recorded for this project.</div>
-                  ) : (
-                    <div className="kpi-grid-2col">
-                      {Array.from(expensesByType.entries()).map(([type, amt]) => (
-                        <KpiCard key={type} label={type} value={fmt(amt)} />
                       ))}
                     </div>
                   )}

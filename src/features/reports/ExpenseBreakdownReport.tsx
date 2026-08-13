@@ -1,4 +1,3 @@
-import { useReportSummary } from '../../lib/queries/reports'
 import { useExpenses } from '../../lib/queries/expenses'
 import { useProjects, useClients, useVendors } from '../../lib/queries/masters'
 import { fmt, fmtDate } from '../../lib/calc/format'
@@ -8,7 +7,6 @@ import { ReportExportButtons } from './ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
 
 export function ExpenseBreakdownReport({ range }: { range: DateRange | null }) {
-  const { data: summary } = useReportSummary(range)
   const { data: expenses } = useExpenses(range)
   const { data: projects } = useProjects()
   const { data: clients } = useClients()
@@ -33,24 +31,18 @@ export function ExpenseBreakdownReport({ range }: { range: DateRange | null }) {
 
   const sections: ExportSection[] = [
     {
-      title: 'By category',
-      columns: ['Category', 'Amount'],
-      rows: (summary?.expenses_by_type ?? []).map((row) => [row.type, row.amount]),
-    },
-    {
       title: 'By cost center',
       columns: ['Cost center', 'Amount'],
       rows: costCenterRows.map(([center, amount]) => [center, amount]),
     },
     {
       title: 'Expense records',
-      columns: ['ID', 'Date', 'Description', 'Amount', 'Type', 'Vendor', 'Project / client', 'Cost center', 'Reimbursable'],
+      columns: ['ID', 'Date', 'Description', 'Amount', 'Vendor', 'Project / client', 'Cost center', 'Reimbursable'],
       rows: (expenses ?? []).map((e) => [
         e.display_id ?? '',
         fmtDate(e.date),
         e.description,
         e.amount,
-        e.type,
         vendorNameOf(e),
         projLabelOf(e),
         e.cost_center ?? '',
@@ -64,37 +56,6 @@ export function ExpenseBreakdownReport({ range }: { range: DateRange | null }) {
       <summary>Expense breakdown</summary>
       <ReportExportButtons title="Expense breakdown" sections={sections} range={range} />
       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 16 }}>
-        <div style={{ flex: '1 1 260px' }}>
-          <div className="note" style={{ marginTop: 0, marginBottom: 8 }}>
-            By category
-          </div>
-          <div className="table-scroll">
-            <table className="data">
-              <thead>
-                <tr>
-                  <th>Category</th>
-                  <th style={{ textAlign: 'right' }}>Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(!summary?.expenses_by_type || summary.expenses_by_type.length === 0) && (
-                  <tr>
-                    <td colSpan={2} className="empty-row">
-                      No expenses in this period
-                    </td>
-                  </tr>
-                )}
-                {summary?.expenses_by_type.map((row) => (
-                  <tr key={row.type}>
-                    <td>{row.type}</td>
-                    <td className="amt">{fmt(row.amount)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
         <div style={{ flex: '1 1 260px' }}>
           <div className="note" style={{ marginTop: 0, marginBottom: 8 }}>
             By cost center
@@ -138,7 +99,6 @@ export function ExpenseBreakdownReport({ range }: { range: DateRange | null }) {
               <th>Date</th>
               <th>Description</th>
               <th style={{ textAlign: 'right' }}>Amount</th>
-              <th>Type</th>
               <th>Vendor</th>
               <th>Project / client</th>
               <th>Cost center</th>
@@ -148,7 +108,7 @@ export function ExpenseBreakdownReport({ range }: { range: DateRange | null }) {
           <tbody>
             {(!expenses || expenses.length === 0) && (
               <tr>
-                <td colSpan={9} className="empty-row">
+                <td colSpan={8} className="empty-row">
                   No expenses in this period
                 </td>
               </tr>
@@ -159,7 +119,6 @@ export function ExpenseBreakdownReport({ range }: { range: DateRange | null }) {
                 <td>{fmtDate(e.date)}</td>
                 <td>{e.description}</td>
                 <td className="amt">{fmt(e.amount)}</td>
-                <td>{e.type}</td>
                 <td>{vendorNameOf(e) || '—'}</td>
                 <td>{projLabelOf(e) || '—'}</td>
                 <td>{e.cost_center ?? '—'}</td>
