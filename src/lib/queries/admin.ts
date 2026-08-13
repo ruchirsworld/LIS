@@ -205,6 +205,91 @@ export function useUpdateCostCenterTags() {
   })
 }
 
+// --- Expense purposes (Projects cost center's "for what use" breakdown,
+// each with its own tag list — same shape as cost center tags) ---
+
+export function useCreateExpensePurpose() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (name: string) => {
+      const { data: existing, error: maxErr } = await supabase
+        .from('expense_purposes')
+        .select('sort_order')
+        .order('sort_order', { ascending: false })
+        .limit(1)
+      if (maxErr) throw maxErr
+      const nextOrder = (existing?.[0]?.sort_order ?? 0) + 1
+      const { data, error } = await supabase
+        .from('expense_purposes')
+        .insert({ name, sort_order: nextOrder })
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['expense_purposes'] }),
+  })
+}
+
+export function useRenameExpensePurpose() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const { error } = await supabase.from('expense_purposes').update({ name }).eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['expense_purposes'] }),
+  })
+}
+
+export function useDeleteExpensePurpose() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('expense_purposes').delete().eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['expense_purposes'] }),
+  })
+}
+
+export function useUpdateExpensePurposeTags() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, tags }: { id: string; tags: string[] }) => {
+      const { error } = await supabase.from('expense_purposes').update({ tags }).eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['expense_purposes'] }),
+  })
+}
+
+// --- Expense units (Qty x Rate breakdown's unit-of-measure — open insert,
+// mirrors expense_types' inline "+ Add new" pattern) ---
+
+export function useCreateExpenseUnit() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (name: string) => {
+      const { data, error } = await supabase.from('expense_units').insert({ name }).select().single()
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['expense_units'] }),
+  })
+}
+
+export function useDeleteExpenseUnit() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('expense_units').delete().eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['expense_units'] }),
+  })
+}
+
 // --- Vendors (insert: admin/cxo; update/delete: admin only — enforced by RLS,
 // mirrored in the UI so Staff/CXO don't see controls that would just fail) ---
 

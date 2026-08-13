@@ -4,12 +4,13 @@ import { CurrencyInput } from '../../components/CurrencyInput'
 import { InlineCalculator } from '../../components/InlineCalculator'
 import { SearchableSelect } from '../../components/SearchableSelect'
 import { ReceiptUploadButton } from '../../components/ReceiptUploadButton'
-import { useClients, useProjects, useCostCenters } from '../../lib/queries/masters'
+import { useClients, useProjects, useCostCenters, useExpensePurposes, useExpenseUnits } from '../../lib/queries/masters'
 import { useCreateExpense, useUpdateExpense } from '../../lib/queries/expenses'
+import { useCreateExpenseUnit } from '../../lib/queries/admin'
 import { useGeolocation } from '../../lib/useGeolocation'
 import { compressImage } from '../../lib/compressImage'
 import { uploadReceipt } from '../../lib/storage'
-import { parseINR } from '../../lib/calc/format'
+import { fmt, parseINR } from '../../lib/calc/format'
 import { getErrorMessage } from '../../lib/errors'
 import { clientLabel } from '../../lib/labels'
 import type { Database } from '../../types/database'
@@ -87,15 +88,23 @@ export function ExpenseForm({
   const { data: clients } = useClients()
   const { data: projects } = useProjects()
   const { data: costCenters } = useCostCenters()
+  const { data: purposes } = useExpensePurposes()
+  const { data: units } = useExpenseUnits()
   // No visible GPS UI — still silently captured on mount and submitted with the transaction.
   const { geo } = useGeolocation()
 
   const createExpense = useCreateExpense()
   const updateExpense = useUpdateExpense()
+  const createUnit = useCreateExpenseUnit()
 
   const [costCenterOverride, setCostCenterOverride] = useState<string | null>(null)
   const [projectId, setProjectId] = useState(() => loadStoredProject())
+  const [purpose, setPurpose] = useState('')
   const [amount, setAmount] = useState('0')
+  const [qty, setQty] = useState('')
+  const [unit, setUnit] = useState('Nos')
+  const [rate, setRate] = useState('0')
+  const [additionalAmount, setAdditionalAmount] = useState('0')
   const [showCalc, setShowCalc] = useState(false)
   const [description, setDescription] = useState('')
   const [date, setDate] = useState(todayStr())
@@ -113,17 +122,26 @@ export function ExpenseForm({
   const isProjectCostCenter = costCenter === 'Projects'
   const selectedProject = projects?.find((p) => p.id === projectId)
   const selectedProjectClient = selectedProject ? clients?.find((c) => c.id === selectedProject.client_id) : null
+  const projectTotal = (Number(qty) || 0) * parseINR(rate) + parseINR(additionalAmount)
 
-  // Tags are scoped per cost center (managed in Admin → Cost centers) —
-  // whichever cost center is selected above determines the quick-tag list.
+  // Tags are scoped per cost center (managed in Admin → Cost centers) — except
+  // under Projects, where Purpose (managed in Admin → Purposes) is the finer
+  // breakdown and supplies the quick-tag list instead.
   const selectedCostCenter = costCenters?.find((cc) => cc.name === costCenter)
-  const topTags = (selectedCostCenter?.tags ?? []).map((t) => `#${t}`)
+  const selectedPurpose = purposes?.find((p) => p.name === purpose)
+  const tagSource = isProjectCostCenter ? selectedPurpose?.tags : selectedCostCenter?.tags
+  const topTags = (tagSource ?? []).map((t) => `#${t}`)
 
   useEffect(() => {
     if (!editingExpense) return
     setCostCenterOverride(editingExpense.cost_center ?? null)
     setProjectId(editingExpense.project_id ?? '')
+    setPurpose(editingExpense.purpose ?? '')
     setAmount(String(editingExpense.amount))
+    setQty(editingExpense.qty != null ? String(editingExpense.qty) : '')
+    setUnit(editingExpense.unit ?? 'Nos')
+    setRate(editingExpense.rate != null ? String(editingExpense.rate) : '0')
+    setAdditionalAmount(editingExpense.additional_amount != null ? String(editingExpense.additional_amount) : '0')
     setDescription(editingExpense.description)
     setDate(editingExpense.date)
     setRemarks(editingExpense.remarks ?? '')
@@ -161,7 +179,12 @@ export function ExpenseForm({
 
   function resetForm() {
     setCostCenterOverride(null)
+    setPurpose('')
     setAmount('0')
+    setQty('')
+    setUnit('Nos')
+    setRate('0')
+    setAdditionalAmount('0')
     setDescription('')
     // projectId deliberately not reset — it stays the default for the rest
     // of the day (see loadStoredProject), across repeated entries.
@@ -186,11 +209,15 @@ export function ExpenseForm({
       setFormError('Pick a project.')
       return
     }
+    if (isProjectCostCenter && (!qty || Number(qty) <= 0)) {
+      setFormError('Enter a quantity.')
+      return
+    }
     if (!description.trim()) {
       setFormError('Tags are required.')
       return
     }
-    const amt = parseINR(amount)
+    const amt = isProjectCostCenter ? projectTotal : parseINR(amount)
     if (amt <= 0) {
       setFormError('Enter an amount.')
       return
@@ -202,12 +229,20 @@ export function ExpenseForm({
       if (receiptBlob) {
         receiptPath = await uploadReceipt(receiptBlob)
       }
+      if (isProjectCostCenter && unit.trim() && !units?.some((u) => u.name === unit.trim())) {
+        createUnit.mutate(unit.trim())
+      }
       const patch = {
         description: description.trim(),
         type: 'General',
         project_id: isProjectCostCenter ? projectId || null : null,
         cost_center: costCenter || null,
+        purpose: isProjectCostCenter ? purpose || null : null,
         amount: amt,
+        qty: isProjectCostCenter ? Number(qty) || null : null,
+        unit: isProjectCostCenter ? unit.trim() || null : null,
+        rate: isProjectCostCenter ? parseINR(rate) || null : null,
+        additional_amount: isProjectCostCenter ? parseINR(additionalAmount) || 0 : null,
         date,
         reimbursable: settlement === 'Reimbursable',
         remarks: remarks.trim() || null,
@@ -275,6 +310,25 @@ export function ExpenseForm({
           </div>
         )}
 
+        {/* Row 2b: Purpose — Projects only, its tags feed future KPIs */}
+        {isProjectCostCenter && (
+          <div className="field full">
+            <label>Purpose</label>
+            <div className="pill-tabs">
+              {(purposes ?? []).map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  className={purpose === p.name ? 'pill active' : 'pill'}
+                  onClick={() => setPurpose(purpose === p.name ? '' : p.name)}
+                >
+                  {p.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Row 3: Tags */}
         <div className="field full">
           <label>Tags</label>
@@ -312,51 +366,86 @@ export function ExpenseForm({
           </div>
         )}
 
-        {/* Row 4: Date + Amount */}
-        <div className="field-row exp-row4">
-          <div className="field field-narrow">
-            <label>Date</label>
-            <input type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
-          </div>
-          <div className="field">
-            <label>Amount (₹)</label>
-            <div className="amount-row" style={{ display: 'flex', gap: 8, alignItems: 'center', minWidth: 0 }}>
-              <CurrencyInput
-                value={amount}
-                onValueChange={setAmount}
-                required
-                className="amount-input"
-                style={{
-                  minWidth: 0,
-                  height: 44,
-                  boxSizing: 'border-box',
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 21,
-                  fontWeight: 500,
-                  padding: '0 10px',
-                }}
-              />
-              <Button
-                type="button"
-                variant="secondary"
-                className="calc-btn"
-                style={{
-                  height: 44,
-                  padding: 0,
-                  flexShrink: 0,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-                title="Open calculator"
-                onClick={() => setShowCalc((v) => !v)}
-              >
-                <CalculatorIcon />
-              </Button>
+        {/* Row 4: Date + Amount — or, under Projects, Qty x Unit x Rate then
+            Additional amount + Date, with the total shown by the submit button. */}
+        {isProjectCostCenter ? (
+          <>
+            <div className="field-row">
+              <div className="field">
+                <label>Qty</label>
+                <input type="number" min="0" step="0.01" required value={qty} onChange={(e) => setQty(e.target.value)} />
+              </div>
+              <div className="field">
+                <label>Unit</label>
+                <input type="text" list="expense-units" value={unit} onChange={(e) => setUnit(e.target.value)} />
+                <datalist id="expense-units">
+                  {(units ?? []).map((u) => (
+                    <option key={u.id} value={u.name} />
+                  ))}
+                </datalist>
+              </div>
+              <div className="field">
+                <label>Rate (₹)</label>
+                <CurrencyInput value={rate} onValueChange={setRate} />
+              </div>
+            </div>
+            <div className="field-row exp-row4">
+              <div className="field">
+                <label>Additional amount (₹)</label>
+                <CurrencyInput value={additionalAmount} onValueChange={setAdditionalAmount} />
+              </div>
+              <div className="field field-narrow">
+                <label>Date</label>
+                <input type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="field-row exp-row4">
+            <div className="field field-narrow">
+              <label>Date</label>
+              <input type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
+            </div>
+            <div className="field">
+              <label>Amount (₹)</label>
+              <div className="amount-row" style={{ display: 'flex', gap: 8, alignItems: 'center', minWidth: 0 }}>
+                <CurrencyInput
+                  value={amount}
+                  onValueChange={setAmount}
+                  required
+                  className="amount-input"
+                  style={{
+                    minWidth: 0,
+                    height: 44,
+                    boxSizing: 'border-box',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 21,
+                    fontWeight: 500,
+                    padding: '0 10px',
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="calc-btn"
+                  style={{
+                    height: 44,
+                    padding: 0,
+                    flexShrink: 0,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  title="Open calculator"
+                  onClick={() => setShowCalc((v) => !v)}
+                >
+                  <CalculatorIcon />
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
-        {showCalc && (
+        )}
+        {showCalc && !isProjectCostCenter && (
           <InlineCalculator
             onResult={(value) => {
               setAmount(String(value))
@@ -410,6 +499,11 @@ export function ExpenseForm({
           </div>
         </div>
         <div className="field full" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {isProjectCostCenter && (
+            <div className="note" style={{ margin: 0, fontWeight: 600 }}>
+              Total: {fmt(projectTotal)}
+            </div>
+          )}
           <Button type="submit" disabled={submitting} style={{ flex: editingExpense ? undefined : '1 1 auto' }}>
             {submitting ? 'Saving…' : editingExpense ? 'Save changes' : 'Add expense'}
           </Button>

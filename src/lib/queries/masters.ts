@@ -59,6 +59,28 @@ export function useExpenseCategories() {
   })
 }
 
+export function useExpensePurposes() {
+  return useQuery({
+    queryKey: ['expense_purposes'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('expense_purposes').select('*').order('sort_order')
+      if (error) throw error
+      return data
+    },
+  })
+}
+
+export function useExpenseUnits() {
+  return useQuery({
+    queryKey: ['expense_units'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('expense_units').select('*').order('name')
+      if (error) throw error
+      return data
+    },
+  })
+}
+
 export function useBankAccounts() {
   return useQuery({
     queryKey: ['bank_accounts'],

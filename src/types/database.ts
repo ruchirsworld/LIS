@@ -262,6 +262,48 @@ export type Database = {
           },
         ]
       }
+      expense_purposes: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          sort_order: number
+          tags: string[]
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          sort_order?: number
+          tags?: string[]
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          sort_order?: number
+          tags?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expense_purposes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_purposes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_capital_summary"
+            referencedColumns: ["partner_id"]
+          },
+        ]
+      }
       expense_reimbursements: {
         Row: {
           amount: number
@@ -340,8 +382,45 @@ export type Database = {
           },
         ]
       }
+      expense_units: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expense_units_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_units_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_capital_summary"
+            referencedColumns: ["partner_id"]
+          },
+        ]
+      }
       expenses: {
         Row: {
+          additional_amount: number | null
           amount: number
           cost_center: string | null
           created_at: string
@@ -354,13 +433,18 @@ export type Database = {
           id: string
           payment_mode: string | null
           project_id: string | null
+          purpose: string | null
+          qty: number | null
+          rate: number | null
           receipt_path: string | null
           reimbursable: boolean
           remarks: string | null
           type: string
+          unit: string | null
           vendor_id: string | null
         }
         Insert: {
+          additional_amount?: number | null
           amount: number
           cost_center?: string | null
           created_at?: string
@@ -373,13 +457,18 @@ export type Database = {
           id?: string
           payment_mode?: string | null
           project_id?: string | null
+          purpose?: string | null
+          qty?: number | null
+          rate?: number | null
           receipt_path?: string | null
           reimbursable?: boolean
           remarks?: string | null
           type: string
+          unit?: string | null
           vendor_id?: string | null
         }
         Update: {
+          additional_amount?: number | null
           amount?: number
           cost_center?: string | null
           created_at?: string
@@ -392,10 +481,14 @@ export type Database = {
           id?: string
           payment_mode?: string | null
           project_id?: string | null
+          purpose?: string | null
+          qty?: number | null
+          rate?: number | null
           receipt_path?: string | null
           reimbursable?: boolean
           remarks?: string | null
           type?: string
+          unit?: string | null
           vendor_id?: string | null
         }
         Relationships: [
