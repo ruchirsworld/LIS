@@ -2,7 +2,9 @@
 // currency inputs, plus the display/parse helpers used everywhere else.
 
 export function fmt(n: number | string | null | undefined): string {
-  return '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })
+  const num = Number(n || 0)
+  const sign = num < 0 ? '-' : ''
+  return sign + '₹' + Math.abs(num).toLocaleString('en-IN', { maximumFractionDigits: 0 })
 }
 
 export function fmtPlain(n: number | string | null | undefined): string {

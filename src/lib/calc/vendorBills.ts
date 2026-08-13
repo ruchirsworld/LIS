@@ -26,6 +26,15 @@ export function billPaid(payments: VendorBillPaymentRow[]): number {
   return payments.reduce((s, p) => s + Number(p.amount || 0), 0)
 }
 
+// Unclamped — negative means this bill is overpaid (a credit). Payments
+// don't always land on the exact bill they were meant to settle, so a
+// vendor's real due is the NET across all their bills, not the sum of each
+// bill's due floored at zero (which would silently swallow an overpayment
+// on one bill instead of letting it offset an underpayment on another).
+export function billDueRaw(bill: VendorBillRow, payments: VendorBillPaymentRow[]): number {
+  return billTotal(bill) - billPaid(payments)
+}
+
 export function billDue(bill: VendorBillRow, payments: VendorBillPaymentRow[]): number {
-  return Math.max(0, billTotal(bill) - billPaid(payments))
+  return Math.max(0, billDueRaw(bill, payments))
 }

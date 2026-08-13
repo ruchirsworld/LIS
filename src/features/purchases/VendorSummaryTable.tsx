@@ -4,7 +4,7 @@ import { useVendors } from '../../lib/queries/masters'
 import { useVendorBills, useVendorBillPayments } from '../../lib/queries/purchases'
 import { useExpenses } from '../../lib/queries/expenses'
 import { fmt } from '../../lib/calc/format'
-import { billTotal, billPaid, billDue } from '../../lib/calc/vendorBills'
+import { billTotal, billPaid, billDueRaw } from '../../lib/calc/vendorBills'
 
 export function VendorSummaryTable() {
   const { data: vendors } = useVendors()
@@ -63,10 +63,16 @@ export function VendorSummaryTable() {
                 const billPayments = payments?.filter((p) => p.bill_id === b.id) ?? []
                 return s + billPaid(billPayments)
               }, 0)
-              const billsDue = vendorBills.reduce((s, b) => {
+              // Net across all of this vendor's bills, not the sum of each
+              // bill's due floored at zero — a payment recorded against the
+              // wrong bill overpays one and underpays another, and netting
+              // here is what makes those cancel out instead of both
+              // contributing to an inflated total due.
+              const billsDueNet = vendorBills.reduce((s, b) => {
                 const billPayments = payments?.filter((p) => p.bill_id === b.id) ?? []
-                return s + billDue(b, billPayments)
+                return s + billDueRaw(b, billPayments)
               }, 0)
+              const billsDue = Math.max(0, billsDueNet)
 
               // Expenses have no due balance — they're recorded already paid,
               // so they add equally to purchases and paid, never to due.

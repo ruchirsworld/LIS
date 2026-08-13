@@ -12,7 +12,7 @@ import type { ExportSection } from '../../lib/export/report'
 import { useVendorBills, useVendorBillPayments, useDeleteVendorBill } from '../../lib/queries/purchases'
 import { useVendors, useProjects, useClients } from '../../lib/queries/masters'
 import { fmt, fmtDate } from '../../lib/calc/format'
-import { billGstAmt, billTotal, billPaid, billDue } from '../../lib/calc/vendorBills'
+import { billGstAmt, billTotal, billPaid, billDue, billDueRaw } from '../../lib/calc/vendorBills'
 import type { DateRange } from '../../lib/calc/period'
 import { VendorBillPaymentForm } from './VendorBillPaymentForm'
 import { ReceiptLink } from '../../components/ReceiptLink'
@@ -67,7 +67,10 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
     return project?.name ?? ''
   }
   const paidOf = (b: NonNullable<typeof bills>[number]) => billPaid(payments?.filter((p) => p.bill_id === b.id) ?? [])
-  const dueOf = (b: NonNullable<typeof bills>[number]) => billDue(b, payments?.filter((p) => p.bill_id === b.id) ?? [])
+  // Raw (unclamped) — a negative value here means this bill is overpaid, a
+  // credit that should offset another underpaid bill for the same vendor
+  // rather than silently vanishing. See VendorSummaryTable for the net.
+  const dueOf = (b: NonNullable<typeof bills>[number]) => billDueRaw(b, payments?.filter((p) => p.bill_id === b.id) ?? [])
 
   const { sorted: sortedBills, sortKey, direction, toggleSort } = useSort(
     visibleBills,
@@ -198,6 +201,7 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
               const billPayments = payments?.filter((p) => p.bill_id === b.id) ?? []
               const paid = billPaid(billPayments)
               const due = billDue(b, billPayments)
+              const rawDue = billDueRaw(b, billPayments)
               const hasHistory = billPayments.length > 0
 
               const showEditList = editListId === b.id
@@ -219,7 +223,7 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
                     <td className="amt">{fmt(billGstAmt(b))}</td>
                     <td className="amt">{fmt(billTotal(b))}</td>
                     <td className="amt">{fmt(paid)}</td>
-                    <td className="amt">{fmt(due)}</td>
+                    <td className="amt">{fmt(rawDue)}</td>
                     <td>
                       <RowMenu
                         items={[
