@@ -117,7 +117,7 @@ export function ExpenseTable() {
     setPayFormId(expenseId)
   }
 
-  const projectCodeOf = (e: NonNullable<typeof expenses>[number]) => projects?.find((p) => p.id === e.project_id)?.display_id ?? ''
+  const projectNameOf = (e: NonNullable<typeof expenses>[number]) => projects?.find((p) => p.id === e.project_id)?.name ?? ''
 
   const projLabelOf = (e: NonNullable<typeof expenses>[number]) => {
     const project = projects?.find((p) => p.id === e.project_id)
@@ -273,9 +273,9 @@ export function ExpenseTable() {
               <th></th>
               <SortableTh label="ID" sortKey="id" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Date" sortKey="date" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Amount" sortKey="amount" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
               <SortableTh label="Description" sortKey="description" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Cost center" sortKey="costCenter" activeKey={sortKey} direction={direction} onSort={toggleSort} />
-              <SortableTh label="Amount" sortKey="amount" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
             </tr>
           </thead>
           <tbody>
@@ -324,16 +324,16 @@ export function ExpenseTable() {
                     </td>
                     <td>{e.display_id ?? '—'}</td>
                     <td>{fmtDate(e.date)}</td>
+                    <td className="amt">{fmt(e.amount)}</td>
                     <td>{e.description}</td>
                     <td>
                       {e.cost_center ?? '—'}
-                      {e.cost_center === 'Projects' && (projectCodeOf(e) || e.purpose) && (
+                      {e.cost_center === 'Projects' && (projectNameOf(e) || e.purpose) && (
                         <div style={{ fontSize: 11, color: 'var(--ink-soft)', marginTop: 2 }}>
-                          {[projectCodeOf(e), e.purpose].filter(Boolean).join(' · ')}
+                          {[projectNameOf(e), e.purpose].filter(Boolean).join(' · ')}
                         </div>
                       )}
                     </td>
-                    <td className="amt">{fmt(e.amount)}</td>
                   </tr>
                   {isExpanded && editingId === e.id && (
                     <tr className="pay-form-row">
