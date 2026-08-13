@@ -36,7 +36,9 @@ export function VendorCombobox({
   }, [value])
 
   const q = query.trim().toLowerCase()
-  const filtered = q ? list.filter((v) => v.name.toLowerCase().includes(q)) : list
+  const filtered = q
+    ? list.filter((v) => v.name.toLowerCase().includes(q) || (v.phone ?? '').toLowerCase().includes(q))
+    : list
   const exactMatch = list.some((v) => v.name.toLowerCase() === q)
   const showCreate = allowCreate && q.length > 0 && !exactMatch
   const items: Array<Vendor | typeof CREATE> = showCreate ? [...filtered, CREATE] : filtered

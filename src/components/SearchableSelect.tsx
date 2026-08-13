@@ -11,6 +11,7 @@ export function SearchableSelect<T>({
   onChange,
   getId,
   getLabel,
+  getSearchValue,
   placeholder = '— Select —',
 }: {
   items: T[] | undefined
@@ -18,6 +19,9 @@ export function SearchableSelect<T>({
   onChange: (id: string) => void
   getId: (item: T) => string
   getLabel: (item: T) => string
+  /** Text to match typed queries against, e.g. "name phone" so a vendor can
+   * be found by either — defaults to getLabel when omitted. */
+  getSearchValue?: (item: T) => string
   placeholder?: string
 }) {
   const list = items ?? []
@@ -32,7 +36,9 @@ export function SearchableSelect<T>({
   }, [value])
 
   const q = query.trim().toLowerCase()
-  const filtered = q ? list.filter((item) => getLabel(item).toLowerCase().includes(q)) : list
+  const filtered = q
+    ? list.filter((item) => (getSearchValue ? getSearchValue(item) : getLabel(item)).toLowerCase().includes(q))
+    : list
 
   function selectItem(item: T) {
     onChange(getId(item))

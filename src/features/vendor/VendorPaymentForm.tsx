@@ -88,6 +88,7 @@ export function VendorPaymentForm() {
             onChange={handleVendorChange}
             getId={(v) => v.id}
             getLabel={(v) => v.name}
+            getSearchValue={(v) => `${v.name} ${v.phone ?? ''}`}
             placeholder="— Select vendor —"
           />
           {vendorId && target && (

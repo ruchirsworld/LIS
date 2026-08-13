@@ -7,6 +7,7 @@ import type { TabId } from './lib/nav'
 const DashboardPage = lazy(() => import('./features/dashboard/DashboardPage').then((m) => ({ default: m.DashboardPage })))
 const ExpensesPage = lazy(() => import('./features/expenses/ExpensesPage').then((m) => ({ default: m.ExpensesPage })))
 const PurchasesPage = lazy(() => import('./features/purchases/PurchasesPage').then((m) => ({ default: m.PurchasesPage })))
+const VendorPage = lazy(() => import('./features/vendor/VendorPage').then((m) => ({ default: m.VendorPage })))
 const InvoicesPage = lazy(() => import('./features/invoices/InvoicesPage').then((m) => ({ default: m.InvoicesPage })))
 const LoansPage = lazy(() => import('./features/loans/LoansPage').then((m) => ({ default: m.LoansPage })))
 const CapitalPage = lazy(() => import('./features/capital/CapitalPage').then((m) => ({ default: m.CapitalPage })))
@@ -24,6 +25,7 @@ function AppShellRouter() {
         {tab === 'dashboard' && <DashboardPage />}
         {tab === 'expenses' && <ExpensesPage />}
         {tab === 'purchases' && <PurchasesPage />}
+        {tab === 'vendor' && <VendorPage />}
         {tab === 'invoices' && <InvoicesPage />}
         {tab === 'loans' && <LoansPage />}
         {tab === 'capital' && <CapitalPage />}

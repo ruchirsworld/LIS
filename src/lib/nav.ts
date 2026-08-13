@@ -2,6 +2,7 @@ export const TABS = [
   { id: 'dashboard', label: 'Dashboard', adminOnly: false },
   { id: 'expenses', label: 'Payments', adminOnly: false },
   { id: 'purchases', label: 'Procurements', adminOnly: false },
+  { id: 'vendor', label: 'Vendor', adminOnly: false },
   { id: 'invoices', label: 'Invoices', adminOnly: false },
   { id: 'loans', label: 'Loans', adminOnly: false },
   { id: 'capital', label: 'Capital', adminOnly: false },

@@ -31,6 +31,7 @@ export function VendorSummaryTable() {
           onChange={setSelectedVendorId}
           getId={(v) => v.id}
           getLabel={(v) => v.name}
+          getSearchValue={(v) => `${v.name} ${v.phone ?? ''}`}
           placeholder="— All vendors —"
         />
       </div>
