@@ -377,13 +377,20 @@ export interface Profile {
   created_at: string
 }
 
+// A leftover seed/test account — no phone (can't even log in) and zero
+// real activity on any record. Filtered out of every profiles fetch so it
+// never clutters a people-picker or "filter by user" dropdown anywhere in
+// the app (Dashboard, Expense records, Reports, etc.) — this only hides
+// it from queries, the row itself is untouched.
+const HIDDEN_PROFILE_IDS = new Set(['3abf3e3d-11ce-46c4-91d3-dad32fca324c'])
+
 export function useProfiles() {
   return useQuery({
     queryKey: ['profiles'],
     queryFn: async () => {
       const { data, error } = await supabase.from('profiles').select('*').order('name')
       if (error) throw error
-      return data as Profile[]
+      return (data as Profile[]).filter((p) => !HIDDEN_PROFILE_IDS.has(p.id))
     },
   })
 }

@@ -22,9 +22,20 @@ import { useAuth } from '../../lib/auth'
 
 const ROLE_LABEL: Record<string, string> = { admin: 'Admin', cxo: 'CXO', supervisor: 'Supervisor' }
 
+// Admin/CXO accounts shown here are locked down to exactly these two named
+// people — anything else with an admin/cxo role (e.g. the original seed
+// "Admin" test account) stays hidden from this list, though it isn't
+// deleted. Supervisors are unaffected — every supervisor account still
+// shows and is manageable as usual.
+const VISIBLE_ADMIN_CXO_IDS = new Set([
+  '38b45524-de46-4773-b642-caf9e6c2bd5b', // Ruchir Jain (Admin)
+  '31064f0e-a14d-4c52-b931-c65089bfa76f', // Shashank Pathak (CXO)
+])
+
 export function UsersSection() {
   const { profile: myProfile } = useAuth()
-  const { data: profiles, isLoading } = useProfiles()
+  const { data: allProfiles, isLoading } = useProfiles()
+  const profiles = allProfiles?.filter((p) => p.role === 'supervisor' || VISIBLE_ADMIN_CXO_IDS.has(p.id))
   const createUser = useCreateUser()
   const updateProfile = useUpdateProfile()
   const deleteUser = useDeleteUser()
