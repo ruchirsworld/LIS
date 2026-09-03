@@ -2,8 +2,7 @@ import { ModuleHeader } from '../../components/ui'
 import { PendingClaimApprovals } from '../expenses/PendingClaimApprovals'
 
 // Admin/CXO's approval inbox — a Supervisor's own Project expense claims
-// and field-worker claims from LIS_Fields both sit in one table until
-// reviewed. Neither becomes a real record (or posts to the GL) until
+// sit here until reviewed. Not a real record (or posted to the GL) until
 // approved here.
 export function ApprovalsPage() {
   return (
