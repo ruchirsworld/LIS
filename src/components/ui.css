@@ -886,6 +886,14 @@ table.data.table-compact td {
   padding: 6px 10px;
   font-size: 12.5px;
 }
+table.data tr.group-header-row td {
+  background: var(--paper-2);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
 .amt {
   font-family: var(--font-mono);
   text-align: right;

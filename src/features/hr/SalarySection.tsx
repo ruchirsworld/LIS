@@ -2,6 +2,7 @@ import { Fragment, useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
 import { useStaff, useBankAccounts } from '../../lib/queries/masters'
+import { useProfiles } from '../../lib/queries/admin'
 import { useAllStaffAttendance, useAllStaffProjectAssignments } from '../../lib/queries/teamTracking'
 import {
   useHolidays,
@@ -49,6 +50,7 @@ function shiftMonth(ym: string, delta: number): string {
 
 export function SalarySection() {
   const { data: staff } = useStaff()
+  const { data: profiles } = useProfiles()
   const { data: allLeave } = useAllStaffAttendance()
   const { data: holidays } = useHolidays()
   const { data: allAssignments } = useAllStaffProjectAssignments()
@@ -249,6 +251,23 @@ export function SalarySection() {
 
   const staffName = (id: string) => staff?.find((s) => s.id === id)?.name ?? '—'
   const bankAccountName = (id: string | null) => (id ? bankAccounts?.find((a) => a.id === id)?.name ?? '—' : 'Cash')
+  const supervisorName = (id: string | null) => (id ? profiles?.find((p) => p.id === id)?.name ?? '—' : '—')
+
+  // "Payable by staff" grouped by supervisor, so an Admin reviewing payroll
+  // sees each supervisor's team together instead of one flat alphabetical
+  // list. Staff with no supervisor set are grouped last.
+  const rowGroups = new Map<string, typeof rows>()
+  for (const r of rows) {
+    const key = r.staff.supervisor_id ?? ''
+    const list = rowGroups.get(key) ?? []
+    list.push(r)
+    rowGroups.set(key, list)
+  }
+  const rowGroupKeys = [...rowGroups.keys()].sort((a, b) => {
+    if (!a) return 1
+    if (!b) return -1
+    return supervisorName(a).localeCompare(supervisorName(b))
+  })
 
   // Reconstructs the days-worked breakdown for an already-recorded payroll
   // run, from the same attendance/holiday records the run itself used —
@@ -328,8 +347,18 @@ export function SalarySection() {
                   </td>
                 </tr>
               )}
-              {rows.map((r) => (
-                <Fragment key={r.staff.id}>
+              {rowGroupKeys.map((groupKey) => (
+                <Fragment key={groupKey || 'none'}>
+                  <tr className="group-header-row">
+                    <td colSpan={5}>
+                      {groupKey ? supervisorName(groupKey) : 'No supervisor'}{' '}
+                      <span className="note" style={{ margin: 0 }}>
+                        ({rowGroups.get(groupKey)!.length})
+                      </span>
+                    </td>
+                  </tr>
+                  {rowGroups.get(groupKey)!.map((r) => (
+                    <Fragment key={r.staff.id}>
                   <tr className={r.hasPastMonthUnpaid || r.priorGap ? 'row-overdue' : undefined}>
                     <td>{r.staff.name}</td>
                     <td
@@ -473,6 +502,8 @@ export function SalarySection() {
                       </td>
                     </tr>
                   )}
+                    </Fragment>
+                  ))}
                 </Fragment>
               ))}
             </tbody>
