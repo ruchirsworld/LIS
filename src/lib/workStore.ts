@@ -15,13 +15,17 @@ export function requestLocationPing(profileId: string): Promise<LocationPingResu
   if (!navigator.geolocation) return Promise.resolve('unavailable')
   return new Promise((resolve) => {
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        void supabase.from('staff_location_pings').insert({
+      async (pos) => {
+        // Awaited (not fire-and-forget) so a failed insert is actually
+        // logged instead of silently vanishing, and so the request can't
+        // get cut off by whatever happens right after the app unlocks.
+        const { error } = await supabase.from('staff_location_pings').insert({
           profile_id: profileId,
           lat: pos.coords.latitude,
           lon: pos.coords.longitude,
           taken_at: new Date().toISOString(),
         })
+        if (error) console.error('Location ping insert failed', error)
         resolve('ok')
       },
       (err) => {
