@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useAuth } from '../lib/auth'
 import { Sidebar } from './Sidebar'
+import { RowMenu } from './RowMenu'
 import { MobileFooter } from './MobileFooter'
 import { MobileFab } from './MobileFab'
 import { usePendingApprovalsCount } from '../lib/queries/approvals'
-import type { TabId } from '../lib/nav'
+import { TABS, isTabVisible, HEADER_MENU_TAB_IDS, type TabId } from '../lib/nav'
 import laavinMark from '../assets/laavin-mark.png'
 import './Shell.css'
 
@@ -29,7 +30,12 @@ export function Shell({
 }) {
   const { signOut, profile } = useAuth()
   const canApprove = profile?.role === 'admin' || profile?.role === 'cxo'
+  const isAdminSide = canApprove
   const pendingApprovalsCount = usePendingApprovalsCount(canApprove)
+  // Admin/CXO only — these tabs live in the hamburger instead of the
+  // Sidebar (see HEADER_MENU_TAB_IDS); a Supervisor's sidebar keeps them
+  // inline, so this list stays empty for that role.
+  const headerMenuTabs = TABS.filter((t) => isAdminSide && HEADER_MENU_TAB_IDS.includes(t.id) && isTabVisible(t, profile?.role))
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [headerHidden, setHeaderHidden] = useState(false)
   const lastScrollY = useRef(0)
@@ -77,9 +83,19 @@ export function Shell({
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-              <button type="button" className="icon-btn danger" onClick={() => signOut()} aria-label="Sign out" title="Sign out">
-                <SignOutIcon />
-              </button>
+              {isAdminSide ? (
+                <RowMenu
+                  badge={pendingApprovalsCount}
+                  items={[
+                    ...headerMenuTabs.map((t) => ({ label: t.label, onClick: () => onChange(t.id) })),
+                    { label: 'Sign out', onClick: () => signOut() },
+                  ]}
+                />
+              ) : (
+                <button type="button" className="icon-btn danger" onClick={() => signOut()} aria-label="Sign out" title="Sign out">
+                  <SignOutIcon />
+                </button>
+              )}
             </div>
           </div>
 

@@ -1,4 +1,4 @@
-import { TABS, isTabVisible, type TabId } from '../lib/nav'
+import { TABS, isTabVisible, HEADER_MENU_TAB_IDS, type TabId } from '../lib/nav'
 import { useAuth } from '../lib/auth'
 import { APP_VERSION } from '../lib/version'
 import { NavIcon } from './NavIcons'
@@ -21,6 +21,7 @@ export function Sidebar({
   approvalsBadge?: number
 }) {
   const { profile } = useAuth()
+  const isAdminSide = profile?.role === 'admin' || profile?.role === 'cxo'
 
   return (
     <>
@@ -38,7 +39,7 @@ export function Sidebar({
           <img src={laavinLogo} alt="Laavin InfraScapes" className="sidebar-logo" />
         </button>
         <nav className="sidebar-nav">
-          {TABS.filter((t) => isTabVisible(t, profile?.role)).map((t) => (
+          {TABS.filter((t) => isTabVisible(t, profile?.role) && !(isAdminSide && HEADER_MENU_TAB_IDS.includes(t.id))).map((t) => (
             <button
               key={t.id}
               className={t.id === active ? 'sidebar-item active' : 'sidebar-item'}

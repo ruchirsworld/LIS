@@ -38,6 +38,13 @@ export function isTabVisible(tab: { roles: readonly string[] | null }, role: Nav
   return !tab.roles || (!!role && (tab.roles as readonly string[]).includes(role))
 }
 
+// Admin/CXO only: these tabs sit in the header's hamburger menu (next to
+// Sign out) instead of the main Sidebar list — their sidebar would otherwise
+// be a long flat list of everything. A Supervisor's sidebar is short enough
+// already (Dashboard, Expenses, Calendar, Records) and keeps all of it
+// inline, so this set is never applied to that role.
+export const HEADER_MENU_TAB_IDS: readonly TabId[] = ['approvals', 'calendar', 'projects', 'reports', 'admin']
+
 // The Expenses tab's three flows, merged behind one cost-center switcher in
 // its header — was three separate tabs (Admin / Trips / Project) before
 // consolidation.
