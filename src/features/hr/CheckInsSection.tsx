@@ -32,10 +32,9 @@ function staffPresentOn(
   return !record || (record.day_type !== 'absent' && record.day_type !== 'leave')
 }
 
-// A Supervisor's "Start Work" button pings their location immediately, then
-// every 30 minutes while the tab stays open — plus one automatic ping just
-// from opening the app (see workStore.ts / App.tsx) — this is the Admin/CXO
-// view of those pings.
+// A Supervisor's location is pinged once per login, automatically, just
+// from opening the app (see workStore.ts / App.tsx) — this is the
+// Admin/CXO view of those pings.
 export function CheckInsSection() {
   const { data: profiles } = useProfiles()
   const { data: staff } = useStaff()
