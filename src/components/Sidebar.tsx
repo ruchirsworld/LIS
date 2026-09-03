@@ -2,6 +2,7 @@ import { TABS, isTabVisible, HEADER_MENU_TAB_IDS, type TabId } from '../lib/nav'
 import { useAuth } from '../lib/auth'
 import { APP_VERSION } from '../lib/version'
 import { NavIcon } from './NavIcons'
+import { InstallAppButton } from './InstallAppButton'
 import laavinLogo from '../assets/laavin-logo.jpg'
 import './Sidebar.css'
 
@@ -58,6 +59,7 @@ export function Sidebar({
             </button>
           ))}
         </nav>
+        <InstallAppButton />
         <div className="sidebar-version">{APP_VERSION}</div>
       </aside>
     </>
