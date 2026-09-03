@@ -116,8 +116,15 @@ function AttendanceMarkingSection() {
       await Promise.all(
         team.map(async (s) => {
           const dayType = draft[s.id] ?? ''
-          const current = recordFor(s.id)?.day_type ?? ''
-          if (dayType !== current) {
+          const record = recordFor(s.id)
+          const current = record?.day_type ?? ''
+          // Submit always finalizes every marked entry as approved — not
+          // just the ones edited in this session. Otherwise a Supervisor's
+          // untouched 'pending' mark (Admin agrees with it, so never
+          // changes the value) would never actually get approved, since
+          // there'd be no value change to trigger a write.
+          const needsWrite = dayType !== current || (!!dayType && record?.status !== 'approved')
+          if (needsWrite) {
             if (!dayType) {
               await removeAttendance.mutateAsync({ staffId: s.id, date })
             } else {
