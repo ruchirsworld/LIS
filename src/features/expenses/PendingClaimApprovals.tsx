@@ -29,7 +29,7 @@ type ExpenseRow = Database['public']['Tables']['expenses']['Row']
  * ERP2.0 Supervisor account at all (a separate app's own user roster), so
  * they're their own date-grouped list below, each needing its own Project
  * picked since LIS_Fields has no concept of one. */
-export function PendingExpenseApprovals() {
+export function PendingClaimApprovals() {
   const qc = useQueryClient()
   const { data: pendingSupervisor } = useExpenses(null, 'pending')
   const { data: pendingField, isLoading: fieldLoading, error: fieldError } = usePendingFieldExpenses()

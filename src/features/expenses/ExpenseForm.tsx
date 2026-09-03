@@ -29,7 +29,7 @@ const CASH = 'cash'
 const REIMBURSE = 'reimburse'
 // Also not a real account — set automatically when a Supervisor's own
 // Project claim is approved (see handleApproveSupervisor in
-// PendingExpenseApprovals.tsx), never picked here. Shown read-only so
+// PendingClaimApprovals.tsx), never picked here. Shown read-only so
 // editing one of these doesn't misrepresent it as Cash and doesn't silently
 // clear paid_from_imprest on save.
 const IMPREST = 'imprest'

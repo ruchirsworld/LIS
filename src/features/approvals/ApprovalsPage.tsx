@@ -1,5 +1,5 @@
 import { ModuleHeader } from '../../components/ui'
-import { PendingExpenseApprovals } from '../expenses/PendingExpenseApprovals'
+import { PendingClaimApprovals } from '../expenses/PendingClaimApprovals'
 
 // Admin/CXO's approval inbox — a Supervisor's own Project expense claims
 // and field-worker claims from LIS_Fields both sit in one table until
@@ -9,7 +9,7 @@ export function ApprovalsPage() {
   return (
     <div>
       <ModuleHeader>Approvals</ModuleHeader>
-      <PendingExpenseApprovals />
+      <PendingClaimApprovals />
     </div>
   )
 }
