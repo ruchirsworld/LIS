@@ -13,7 +13,7 @@ import {
   type PendingFieldExpense,
 } from '../../lib/queries/expenses'
 import { useSiteImprestBalances } from '../../lib/queries/ledger'
-import { FIELD_CATEGORY_TO_SUBHEAD_CODE } from '../../lib/fieldExpenseMapping'
+import { FIELD_CATEGORY_TO_SUBHEAD_CODE, FIELD_SITE_NAME_TO_PROJECT_NAME } from '../../lib/fieldExpenseMapping'
 import { FIXED_EXPENSE_CATEGORIES, LABOUR_SUB_HEAD_CODE } from '../../lib/supervisorProjectExpenseCategories'
 import { fmt, fmtDate } from '../../lib/calc/format'
 import { getErrorMessage } from '../../lib/errors'
@@ -392,7 +392,7 @@ export function PendingExpenseApprovals() {
                   </table>
                 </div>
                 {rows.some((e) => e.description) && (
-                  <details className="toggle-section" style={{ marginTop: 8 }}>
+                  <details className="toggle-section" style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
                     <summary>Comments</summary>
                     <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>
                       {rows
@@ -432,7 +432,6 @@ export function PendingExpenseApprovals() {
                     <tr>
                       <th>Category</th>
                       <th style={{ textAlign: 'right' }}>Amount</th>
-                      <th>Project</th>
                       <th></th>
                     </tr>
                   </thead>
@@ -440,14 +439,28 @@ export function PendingExpenseApprovals() {
                     {rows.map((exp) => {
                       // LIS_Fields' "site" and ERP2.0's "project" are the same
                       // place under two names — default the picker to
-                      // whichever project matches the site name, if one does.
+                      // whichever project matches the site name, if one does
+                      // (falling back to a known name mapping for sites named
+                      // differently between the two apps, e.g. "NH7 - GB").
                       const siteName = exp.sites?.name ?? ''
+                      const mappedProjectName = FIELD_SITE_NAME_TO_PROJECT_NAME[siteName] ?? siteName
                       const matchedProjectId = activeProjects?.find(
-                        (p) => p.name.trim().toLowerCase() === siteName.trim().toLowerCase()
+                        (p) => p.name.trim().toLowerCase() === mappedProjectName.trim().toLowerCase()
                       )?.id
                       const projectValue = projectByRow[exp.id] ?? matchedProjectId ?? ''
                       const override = fieldOverrides[exp.id]
                       const effectiveAmount = override?.amount ?? exp.amount
+                      const projectPicker = (
+                        <SearchableSelect
+                          items={activeProjects}
+                          value={projectValue}
+                          onChange={(id) => setProjectByRow((p) => ({ ...p, [exp.id]: id }))}
+                          getId={(p) => p.id}
+                          getLabel={(p) => p.name}
+                          placeholder="— Select project —"
+                          compact
+                        />
+                      )
 
                       if (editingFieldId === exp.id) {
                         return (
@@ -469,18 +482,7 @@ export function PendingExpenseApprovals() {
                                   value={fieldDraft.description}
                                   onChange={(ev) => setFieldDraft((d) => ({ ...d, description: ev.target.value }))}
                                 />
-                              </div>
-                            </td>
-                            <td>
-                              <div style={{ minWidth: 180 }}>
-                                <SearchableSelect
-                                  items={activeProjects}
-                                  value={projectValue}
-                                  onChange={(id) => setProjectByRow((p) => ({ ...p, [exp.id]: id }))}
-                                  getId={(p) => p.id}
-                                  getLabel={(p) => p.name}
-                                  placeholder="— Select project —"
-                                />
+                                <div style={{ minWidth: 180 }}>{projectPicker}</div>
                               </div>
                             </td>
                             <td>
@@ -504,25 +506,16 @@ export function PendingExpenseApprovals() {
 
                       return (
                         <tr key={exp.id}>
-                          <td>{exp.category}</td>
-                          <td className="amt">{fmt(effectiveAmount)}</td>
                           <td>
-                            <div style={{ minWidth: 180 }}>
-                              <SearchableSelect
-                                items={activeProjects}
-                                value={projectValue}
-                                onChange={(id) => setProjectByRow((p) => ({ ...p, [exp.id]: id }))}
-                                getId={(p) => p.id}
-                                getLabel={(p) => p.name}
-                                placeholder="— Select project —"
-                              />
-                            </div>
+                            {exp.category}
+                            <div style={{ marginTop: 2, maxWidth: 160 }}>{projectPicker}</div>
                             {siteName && !matchedProjectId && (
                               <div className="note" style={{ margin: '4px 0 0' }}>
                                 LIS_Fields site: {siteName}
                               </div>
                             )}
                           </td>
+                          <td className="amt">{fmt(effectiveAmount)}</td>
                         <td>
                           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                             <Button
@@ -571,7 +564,7 @@ export function PendingExpenseApprovals() {
                 </table>
               </div>
               {rows.some((exp) => exp.description || exp.receipt_url) && (
-                <details className="toggle-section" style={{ marginTop: 8 }}>
+                <details className="toggle-section" style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
                   <summary>Comments</summary>
                   <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>
                     {rows

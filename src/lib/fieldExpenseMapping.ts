@@ -8,3 +8,11 @@ export const FIELD_CATEGORY_TO_SUBHEAD_CODE: Record<string, string> = {
   'Tools & Equipment': '30.4', // Tools Repair
   Miscellaneous: '60.5', // Site Miscellaneous
 }
+
+// Maps a LIS_Fields site name (their `sites.name`, exact text match) to the
+// ERP2.0 project name it's the same place as — for sites named differently
+// between the two apps, where a plain exact-name match in
+// PendingExpenseApprovals.tsx wouldn't find the match on its own.
+export const FIELD_SITE_NAME_TO_PROJECT_NAME: Record<string, string> = {
+  'NH7 - GB': 'NH7 (Median)',
+}

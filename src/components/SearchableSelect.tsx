@@ -13,6 +13,7 @@ export function SearchableSelect<T>({
   getLabel,
   getSearchValue,
   placeholder = '— Select —',
+  compact = false,
 }: {
   items: T[] | undefined
   value: string
@@ -23,6 +24,9 @@ export function SearchableSelect<T>({
    * be found by either — defaults to getLabel when omitted. */
   getSearchValue?: (item: T) => string
   placeholder?: string
+  /** Smaller, muted styling for use as a subtext-level picker under a label
+   * (e.g. the project picker under a category name) rather than a full field. */
+  compact?: boolean
 }) {
   const list = items ?? []
   const selected = list.find((item) => getId(item) === value) ?? null
@@ -73,7 +77,7 @@ export function SearchableSelect<T>({
   }
 
   return (
-    <div className="combobox">
+    <div className={compact ? 'combobox combobox-compact' : 'combobox'}>
       <input
         type="text"
         value={query}

@@ -151,6 +151,16 @@ button:focus-visible {
 .combobox {
   position: relative;
 }
+/* Subtext-level picker (e.g. a project picker shown under a category name)
+ * — form controls don't inherit font-size/color from ancestors by default,
+ * so these need setting explicitly rather than via a wrapping font-size. */
+.combobox-compact input {
+  font-size: 11px;
+  color: var(--ink-soft);
+  padding: 2px 6px;
+  height: auto;
+  min-height: 0;
+}
 .combobox-list {
   position: absolute;
   top: calc(100% + 4px);
