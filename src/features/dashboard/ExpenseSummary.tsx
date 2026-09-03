@@ -1,6 +1,5 @@
 import { Fragment, useState } from 'react'
 import { useExpenses, useExpenseReimbursements } from '../../lib/queries/expenses'
-import { useCostCenters } from '../../lib/queries/masters'
 import { useProfiles } from '../../lib/queries/admin'
 import { expenseDue } from '../../lib/calc/expenses'
 import { fmt, fmtDate } from '../../lib/calc/format'
@@ -12,10 +11,11 @@ import { SettleReimbursementForm } from './SettleReimbursementForm'
 const UNKNOWN_USER = 'Unknown'
 const UNASSIGNED_CC = 'Unassigned'
 
-interface TagRow {
-  tag: string
+interface DetailRow {
   id: string
   date: string
+  description: string
+  remarks: string
   amount: number
 }
 
@@ -24,7 +24,6 @@ export function ExpenseSummary({ range }: { range: DateRange | null }) {
   // Independent of the period filter — "amount still to claim" is a running
   // total, not scoped to whatever date range is currently selected.
   const { data: allExpenses } = useExpenses(null)
-  const { data: costCenters } = useCostCenters()
   const { data: profiles } = useProfiles()
   const { data: reimbursements } = useExpenseReimbursements()
   const [selectedCostCenter, setSelectedCostCenter] = useState<string | null>(null)
@@ -55,11 +54,6 @@ export function ExpenseSummary({ range }: { range: DateRange | null }) {
   const dueByUserRows = Array.from(dueByUserId.values()).sort((a, b) => b.due - a.due)
   const totalDue = dueByUserRows.reduce((s, r) => s + r.due, 0)
 
-  const tagsOf = (costCenterName: string | null) => {
-    const cc = costCenters?.find((c) => c.name === costCenterName)
-    return new Set((cc?.tags ?? []).map((t) => t.toLowerCase()))
-  }
-
   const byCostCenter = new Map<string, number>()
   ;(expenses ?? []).forEach((e) => {
     const key = e.cost_center ?? UNASSIGNED_CC
@@ -71,17 +65,15 @@ export function ExpenseSummary({ range }: { range: DateRange | null }) {
     ? (expenses ?? []).filter((e) => (e.cost_center ?? UNASSIGNED_CC) === selectedCostCenter)
     : expenses ?? []
 
-  const rows: TagRow[] = []
-  scoped.forEach((e) => {
-    const adminTags = tagsOf(e.cost_center)
-    // \S+ (not \w+) so tags with punctuation like "#F&B" match in full —
-    // \w+ stops at the "&", leaving just "#F" which never matches "F&B".
-    const matches = (e.description || '').match(/#\S+/g) ?? []
-    const recognized = matches.filter((t) => adminTags.has(t.slice(1).toLowerCase()))
-    const tags = recognized.length > 0 ? recognized : ['Untagged']
-    tags.forEach((tag) => rows.push({ tag, id: e.display_id ?? '', date: e.date, amount: Number(e.amount || 0) }))
-  })
-  rows.sort((a, b) => a.tag.localeCompare(b.tag) || b.date.localeCompare(a.date))
+  const rows: DetailRow[] = scoped
+    .map((e) => ({
+      id: e.display_id ?? '',
+      date: e.date,
+      description: e.description || '—',
+      remarks: e.remarks || '—',
+      amount: Number(e.amount || 0),
+    }))
+    .sort((a, b) => b.date.localeCompare(a.date))
 
   const sections: ExportSection[] = [
     {
@@ -90,9 +82,9 @@ export function ExpenseSummary({ range }: { range: DateRange | null }) {
       rows: costCenterRows.map(([c, a]) => [c, a]),
     },
     {
-      title: 'By tag',
-      columns: ['Tag', 'ID', 'Date', 'Amount'],
-      rows: rows.map((r) => [r.tag, r.id, fmtDate(r.date), r.amount]),
+      title: 'Expense details',
+      columns: ['ID', 'Date', 'Description', 'Remarks', 'Amount'],
+      rows: rows.map((r) => [r.id, fmtDate(r.date), r.description, r.remarks, r.amount]),
     },
     {
       title: 'Reimbursement due by user',
@@ -130,31 +122,33 @@ export function ExpenseSummary({ range }: { range: DateRange | null }) {
       </div>
 
       <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-soft)', marginTop: 16, marginBottom: 8 }}>
-        By tag{selectedCostCenter ? ` — ${selectedCostCenter}` : ''}
+        Expense details{selectedCostCenter ? ` — ${selectedCostCenter}` : ''}
       </div>
       <div className="table-scroll">
         <table className="data">
           <thead>
             <tr>
-              <th>Tag</th>
               <th>ID</th>
               <th>Date</th>
+              <th>Description</th>
+              <th>Remarks</th>
               <th style={{ textAlign: 'right' }}>Amount</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 && (
               <tr>
-                <td colSpan={4} className="empty-row">
+                <td colSpan={5} className="empty-row">
                   No expenses in this period
                 </td>
               </tr>
             )}
             {rows.map((r, i) => (
               <tr key={i}>
-                <td>{r.tag}</td>
                 <td>{r.id || '—'}</td>
                 <td>{fmtDate(r.date)}</td>
+                <td>{r.description}</td>
+                <td>{r.remarks}</td>
                 <td className="amt">{fmt(r.amount)}</td>
               </tr>
             ))}
