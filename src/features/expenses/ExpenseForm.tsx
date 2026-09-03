@@ -230,9 +230,14 @@ export function ExpenseForm({
   // always "Trips"); everywhere else it follows the Project cost center.
   const hasProject = tripId ? !!effectiveProjectId : isProjectCostCenter
   const projectTotal = (Number(qty) || 0) * parseINR(rate) + parseINR(additionalAmount)
-  const baseAmount = showQtyRateFields ? projectTotal : parseINR(amount)
-  const gstAmount = addGst ? (baseAmount * gstPct) / 100 : 0
-  const displayAmount = baseAmount + gstAmount
+  // A Qty×Rate subtotal is pre-tax unit pricing, so GST still adds on top of
+  // it. A plain typed Amount is the receipt's total actually paid — once GST
+  // is added, that typed figure is treated as GST-inclusive and the base is
+  // backed out of it, rather than GST being added on top and inflating it.
+  const enteredAmount = showQtyRateFields ? projectTotal : parseINR(amount)
+  const baseAmount = addGst && !showQtyRateFields ? enteredAmount / (1 + gstPct / 100) : enteredAmount
+  const gstAmount = addGst ? (showQtyRateFields ? (baseAmount * gstPct) / 100 : enteredAmount - baseAmount) : 0
+  const displayAmount = showQtyRateFields ? baseAmount + gstAmount : enteredAmount
 
   // Major Head / Sub-Head (Chart of Accounts) — feeds the manual dropdown
   // pair below, which shows on the Project section (Employee & Labour,
@@ -796,6 +801,11 @@ export function ExpenseForm({
                   <CalculatorIcon />
                 </Button>
               </div>
+              {addGst && (
+                <div className="note" style={{ margin: '4px 0 0' }}>
+                  Excl. GST: {fmt(baseAmount)} · GST ({gstPct}%): {fmt(gstAmount)}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -833,7 +843,16 @@ export function ExpenseForm({
               />
             </div>
             <div className="note" style={{ marginTop: 8 }}>
-              {fmt(baseAmount)} + {gstPctDraft || 0}% GST = {fmt(baseAmount + (baseAmount * (Number(gstPctDraft) || 0)) / 100)}
+              {showQtyRateFields
+                ? (() => {
+                    const pct = Number(gstPctDraft) || 0
+                    return `${fmt(enteredAmount)} + ${pct}% GST = ${fmt(enteredAmount + (enteredAmount * pct) / 100)}`
+                  })()
+                : (() => {
+                    const pct = Number(gstPctDraft) || 0
+                    const base = enteredAmount / (1 + pct / 100)
+                    return `${fmt(enteredAmount)} incl. ${pct}% GST = ${fmt(base)} excl. GST + ${fmt(enteredAmount - base)} GST`
+                  })()}
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
               <Button
