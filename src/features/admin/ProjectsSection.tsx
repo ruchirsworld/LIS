@@ -137,8 +137,8 @@ export function ProjectsSection() {
       return
     }
     const codeValue = code.trim().toUpperCase()
-    if (!/^[A-Z]{4}$/.test(codeValue)) {
-      setFormError('Project code must be exactly 4 letters.')
+    if (!/^[A-Z0-9]{4}$/.test(codeValue)) {
+      setFormError('Project code must be exactly 4 characters (letters or numbers).')
       return
     }
     setSubmitting(true)
@@ -186,14 +186,14 @@ export function ProjectsSection() {
           <input type="text" required value={name} onChange={(e) => setName(e.target.value)} />
         </div>
         <div className="field">
-          <label>Project code (4 letters)</label>
+          <label>Project code (4 characters)</label>
           <input
             type="text"
             required
             maxLength={4}
-            placeholder="e.g. UJIR"
+            placeholder="e.g. UJI7"
             value={code}
-            onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4))}
+            onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4))}
           />
         </div>
         <div className="field">
