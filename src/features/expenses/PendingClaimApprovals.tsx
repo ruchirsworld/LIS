@@ -77,7 +77,6 @@ export function PendingClaimApprovals() {
     list.push(e)
     supervisorByDate.set(e.date, list)
   }
-  const supervisorDates = [...supervisorByDate.keys()].sort((a, b) => b.localeCompare(a))
   const imprestBalance = supervisorId ? imprestBalances?.get(supervisorId) ?? 0 : 0
 
   const fieldByDate = new Map<string, PendingFieldExpense[]>()
@@ -86,7 +85,14 @@ export function PendingClaimApprovals() {
     list.push(exp)
     fieldByDate.set(exp.date, list)
   }
-  const fieldDates = [...fieldByDate.keys()].sort((a, b) => b.localeCompare(a))
+
+  // A Supervisor's Project claims and LIS_Fields' field-worker claims are
+  // both just "pending claims" from the reviewer's point of view — merged
+  // into one date-grouped list rather than two separate stacked sections.
+  // They still fund differently underneath (imprest float vs. reimbursable)
+  // and need different fields to approve, so each row renders per its own
+  // kind, sharing only the table shell and date grouping.
+  const claimDates = [...new Set([...supervisorByDate.keys(), ...fieldByDate.keys()])].sort((a, b) => b.localeCompare(a))
 
   async function handleApproveSupervisor(e: ExpenseRow) {
     setBusyKey(e.id)
@@ -230,12 +236,250 @@ export function PendingClaimApprovals() {
     }
   }
 
+  function renderSupervisorRow(e: ExpenseRow) {
+    if (editingSupervisorId === e.id) {
+      return (
+        <tr key={e.id}>
+          <td colSpan={2}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ minWidth: 180 }}>
+                <SearchableSelect
+                  items={activeProjects}
+                  value={supervisorDraft.projectId}
+                  onChange={(id) => setSupervisorDraft((d) => ({ ...d, projectId: id }))}
+                  getId={(p) => p.id}
+                  getLabel={(p) => p.name}
+                  placeholder="— Select project —"
+                />
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  aria-label="Amount"
+                  value={supervisorDraft.amount}
+                  onChange={(ev) => setSupervisorDraft((d) => ({ ...d, amount: ev.target.value }))}
+                  style={{ flex: 1, minWidth: 0 }}
+                />
+                <input
+                  type="date"
+                  aria-label="Date"
+                  value={supervisorDraft.date}
+                  onChange={(ev) => setSupervisorDraft((d) => ({ ...d, date: ev.target.value }))}
+                  style={{ flex: 1, minWidth: 0 }}
+                />
+              </div>
+              <input
+                type="text"
+                aria-label="Description"
+                placeholder="Description"
+                value={supervisorDraft.description}
+                onChange={(ev) => setSupervisorDraft((d) => ({ ...d, description: ev.target.value }))}
+              />
+            </div>
+          </td>
+          <td>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <Button type="button" disabled={busyKey === e.id} onClick={() => handleSaveSupervisor(e)}>
+                Save
+              </Button>
+              <Button type="button" variant="secondary" disabled={busyKey === e.id} onClick={() => setEditingSupervisorId(null)}>
+                Cancel
+              </Button>
+            </div>
+            {rowError[e.id] && (
+              <div className="note" style={{ color: 'var(--red)', marginTop: 4 }}>
+                {rowError[e.id]}
+              </div>
+            )}
+          </td>
+        </tr>
+      )
+    }
+    return (
+      <tr key={e.id}>
+        <td>
+          {categoryName(e.sub_head_id)}
+          <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--ink-soft)' }}>{projectName(e.project_id)}</div>
+        </td>
+        <td className="amt">{fmt(e.amount)}</td>
+        <td>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <Button
+              type="button"
+              className="icon-btn-sq"
+              disabled={busyKey === e.id}
+              onClick={() => handleApproveSupervisor(e)}
+              title="Approve"
+              aria-label="Approve"
+            >
+              ✓
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              className="icon-btn-sq"
+              disabled={busyKey === e.id}
+              onClick={() => handleRejectSupervisor(e)}
+              title="Reject"
+              aria-label="Reject"
+            >
+              ✕
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              className="icon-btn-sq"
+              disabled={busyKey === e.id}
+              onClick={() => startEditSupervisor(e)}
+              title="Edit"
+              aria-label="Edit"
+            >
+              ✎
+            </Button>
+          </div>
+          {rowError[e.id] && (
+            <div className="note" style={{ color: 'var(--red)', marginTop: 4 }}>
+              {rowError[e.id]}
+            </div>
+          )}
+        </td>
+      </tr>
+    )
+  }
+
+  function renderFieldRow(exp: PendingFieldExpense) {
+    // LIS_Fields' "site" and ERP2.0's "project" are the same place under
+    // two names — default the picker to whichever project matches the
+    // site name, if one does (falling back to a known name mapping for
+    // sites named differently between the two apps, e.g. "NH7 - GB").
+    const siteName = exp.sites?.name ?? ''
+    const mappedProjectName = FIELD_SITE_NAME_TO_PROJECT_NAME[siteName] ?? siteName
+    const matchedProjectId = activeProjects?.find((p) => p.name.trim().toLowerCase() === mappedProjectName.trim().toLowerCase())?.id
+    const projectValue = projectByRow[exp.id] ?? matchedProjectId ?? ''
+    const override = fieldOverrides[exp.id]
+    const effectiveAmount = override?.amount ?? exp.amount
+    const projectPicker = (
+      <SearchableSelect
+        items={activeProjects}
+        value={projectValue}
+        onChange={(id) => setProjectByRow((p) => ({ ...p, [exp.id]: id }))}
+        getId={(p) => p.id}
+        getLabel={(p) => p.name}
+        placeholder="— Select project —"
+        compact
+      />
+    )
+
+    if (editingFieldId === exp.id) {
+      return (
+        <tr key={exp.id}>
+          <td colSpan={2}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                aria-label="Amount"
+                value={fieldDraft.amount}
+                onChange={(ev) => setFieldDraft((d) => ({ ...d, amount: ev.target.value }))}
+              />
+              <input
+                type="text"
+                aria-label="Description"
+                placeholder="Description"
+                value={fieldDraft.description}
+                onChange={(ev) => setFieldDraft((d) => ({ ...d, description: ev.target.value }))}
+              />
+              <div style={{ minWidth: 180 }}>{projectPicker}</div>
+            </div>
+          </td>
+          <td>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <Button type="button" onClick={() => handleSaveField(exp)}>
+                Save
+              </Button>
+              <Button type="button" variant="secondary" onClick={() => setEditingFieldId(null)}>
+                Cancel
+              </Button>
+            </div>
+            {rowError[exp.id] && (
+              <div className="note" style={{ color: 'var(--red)', marginTop: 4 }}>
+                {rowError[exp.id]}
+              </div>
+            )}
+          </td>
+        </tr>
+      )
+    }
+
+    return (
+      <tr key={exp.id}>
+        <td>
+          {exp.category}
+          <span className="note" style={{ margin: '0 0 0 6px', fontSize: 10 }}>
+            (Field)
+          </span>
+          <div style={{ marginTop: 2, maxWidth: 160 }}>{projectPicker}</div>
+          {siteName && !matchedProjectId && (
+            <div className="note" style={{ margin: '4px 0 0' }}>
+              LIS_Fields site: {siteName}
+            </div>
+          )}
+        </td>
+        <td className="amt">{fmt(effectiveAmount)}</td>
+        <td>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <Button
+              type="button"
+              className="icon-btn-sq"
+              disabled={busyKey === exp.id}
+              onClick={() => handleApproveField(exp)}
+              title="Approve"
+              aria-label="Approve"
+            >
+              ✓
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              className="icon-btn-sq"
+              disabled={busyKey === exp.id}
+              onClick={() => handleRejectField(exp)}
+              title="Reject"
+              aria-label="Reject"
+            >
+              ✕
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              className="icon-btn-sq"
+              disabled={busyKey === exp.id}
+              onClick={() => startEditField(exp)}
+              title="Edit"
+              aria-label="Edit"
+            >
+              ✎
+            </Button>
+          </div>
+          {rowError[exp.id] && (
+            <div className="note" style={{ color: 'var(--red)', marginTop: 4 }}>
+              {rowError[exp.id]}
+            </div>
+          )}
+        </td>
+      </tr>
+    )
+  }
+
   return (
     <details className="toggle-section" open>
       <summary>Pending expense approvals</summary>
       <div style={{ marginTop: 16 }}>
-        <h3 style={{ fontSize: 13, marginBottom: 10 }}>Supervisor claims</h3>
-        <div className="field" style={{ maxWidth: 280, marginBottom: 12 }}>
+        <h3 style={{ fontSize: 13, marginBottom: 10 }}>Claims</h3>
+        <div className="field" style={{ maxWidth: 280, marginBottom: 4 }}>
           <label>Supervisor</label>
           <SearchableSelect
             items={supervisors}
@@ -246,186 +490,35 @@ export function PendingClaimApprovals() {
             placeholder="— Select supervisor —"
           />
         </div>
+        <div className="note" style={{ marginBottom: 12 }}>
+          Field-worker claims from LIS_Fields (marked "Field") show regardless of the Supervisor picked above — pick a
+          Supervisor to also include their own Project claims here.
+        </div>
 
-        {!supervisorId ? (
-          <div className="note">Pick a supervisor to see their pending claims.</div>
-        ) : supervisorDates.length === 0 ? (
-          <div className="note">Nothing waiting on approval for this supervisor.</div>
-        ) : (
-          supervisorDates.map((date, i) => {
-            const rows = supervisorByDate.get(date)!
-            const dayTotal = rows.reduce((s, e) => s + Number(e.amount || 0), 0)
-            return (
-              <details key={date} className="toggle-section" style={{ marginBottom: 10 }} open={i === 0}>
-                <summary>
-                  {fmtDate(date)} —{' '}
-                  <span style={dayTotal > imprestBalance ? { color: 'var(--red)', fontWeight: 700 } : undefined}>{fmt(dayTotal)}</span>
-                </summary>
-                <div className="note" style={{ margin: '8px 0 0' }}>
-                  Site Imprest balance: <strong style={{ color: 'var(--blue)' }}>{fmt(imprestBalance)}</strong>
-                </div>
-                <div className="table-scroll" style={{ marginTop: 10 }}>
-                  <table className="data">
-                    <thead>
-                      <tr>
-                        <th>Category</th>
-                        <th style={{ textAlign: 'right' }}>Amount</th>
-                        <th></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rows.map((e) =>
-                        editingSupervisorId === e.id ? (
-                          <tr key={e.id}>
-                            <td colSpan={2}>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                <div style={{ minWidth: 180 }}>
-                                  <SearchableSelect
-                                    items={activeProjects}
-                                    value={supervisorDraft.projectId}
-                                    onChange={(id) => setSupervisorDraft((d) => ({ ...d, projectId: id }))}
-                                    getId={(p) => p.id}
-                                    getLabel={(p) => p.name}
-                                    placeholder="— Select project —"
-                                  />
-                                </div>
-                                <div style={{ display: 'flex', gap: 6 }}>
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    aria-label="Amount"
-                                    value={supervisorDraft.amount}
-                                    onChange={(ev) => setSupervisorDraft((d) => ({ ...d, amount: ev.target.value }))}
-                                    style={{ flex: 1, minWidth: 0 }}
-                                  />
-                                  <input
-                                    type="date"
-                                    aria-label="Date"
-                                    value={supervisorDraft.date}
-                                    onChange={(ev) => setSupervisorDraft((d) => ({ ...d, date: ev.target.value }))}
-                                    style={{ flex: 1, minWidth: 0 }}
-                                  />
-                                </div>
-                                <input
-                                  type="text"
-                                  aria-label="Description"
-                                  placeholder="Description"
-                                  value={supervisorDraft.description}
-                                  onChange={(ev) => setSupervisorDraft((d) => ({ ...d, description: ev.target.value }))}
-                                />
-                              </div>
-                            </td>
-                            <td>
-                              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                                <Button type="button" disabled={busyKey === e.id} onClick={() => handleSaveSupervisor(e)}>
-                                  Save
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="secondary"
-                                  disabled={busyKey === e.id}
-                                  onClick={() => setEditingSupervisorId(null)}
-                                >
-                                  Cancel
-                                </Button>
-                              </div>
-                              {rowError[e.id] && (
-                                <div className="note" style={{ color: 'var(--red)', marginTop: 4 }}>
-                                  {rowError[e.id]}
-                                </div>
-                              )}
-                            </td>
-                          </tr>
-                        ) : (
-                          <tr key={e.id}>
-                            <td>
-                              {categoryName(e.sub_head_id)}
-                              <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--ink-soft)' }}>{projectName(e.project_id)}</div>
-                            </td>
-                            <td className="amt">{fmt(e.amount)}</td>
-                            <td>
-                              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                                <Button
-                                  type="button"
-                                  className="icon-btn-sq"
-                                  disabled={busyKey === e.id}
-                                  onClick={() => handleApproveSupervisor(e)}
-                                  title="Approve"
-                                  aria-label="Approve"
-                                >
-                                  ✓
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="secondary"
-                                  className="icon-btn-sq"
-                                  disabled={busyKey === e.id}
-                                  onClick={() => handleRejectSupervisor(e)}
-                                  title="Reject"
-                                  aria-label="Reject"
-                                >
-                                  ✕
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="secondary"
-                                  className="icon-btn-sq"
-                                  disabled={busyKey === e.id}
-                                  onClick={() => startEditSupervisor(e)}
-                                  title="Edit"
-                                  aria-label="Edit"
-                                >
-                                  ✎
-                                </Button>
-                              </div>
-                              {rowError[e.id] && (
-                                <div className="note" style={{ color: 'var(--red)', marginTop: 4 }}>
-                                  {rowError[e.id]}
-                                </div>
-                              )}
-                            </td>
-                          </tr>
-                        )
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-                {rows.some((e) => e.description) && (
-                  <details className="toggle-section" style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
-                    <summary>Comments</summary>
-                    <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>
-                      {rows
-                        .filter((e) => e.description)
-                        .map((e) => (
-                          <li key={e.id} style={{ marginBottom: 4 }}>
-                            <strong>{projectName(e.project_id)}</strong> ({fmt(e.amount)}) — {e.description}
-                          </li>
-                        ))}
-                    </ul>
-                  </details>
-                )}
-              </details>
-            )
-          })
-        )}
-
-        <h3 style={{ fontSize: 13, marginTop: 24, marginBottom: 10 }}>Field expenses</h3>
-        {fieldLoading && <div className="note">Loading…</div>}
         {fieldError && (
           <div className="note" style={{ color: 'var(--red)' }}>
             {getErrorMessage(fieldError, 'Could not load field expenses.')}
           </div>
         )}
-        {!fieldLoading && fieldDates.length === 0 && <div className="note">Nothing waiting on approval.</div>}
-        {fieldDates.map((date) => {
-          const rows = fieldByDate.get(date)!
-          const dayTotal = rows.reduce((s, e) => s + Number(fieldOverrides[e.id]?.amount ?? e.amount ?? 0), 0)
+        {fieldLoading && <div className="note">Loading…</div>}
+        {!fieldLoading && claimDates.length === 0 && <div className="note">Nothing waiting on approval.</div>}
+        {claimDates.map((date, i) => {
+          const supervisorRows = supervisorByDate.get(date) ?? []
+          const fieldRows = fieldByDate.get(date) ?? []
+          const supervisorDayTotal = supervisorRows.reduce((s, e) => s + Number(e.amount || 0), 0)
+          const fieldDayTotal = fieldRows.reduce((s, e) => s + Number(fieldOverrides[e.id]?.amount ?? e.amount ?? 0), 0)
+          const exceedsImprest = supervisorId && supervisorDayTotal > imprestBalance
+          const allRows = [...supervisorRows, ...fieldRows]
           return (
-            <details key={date} className="toggle-section" style={{ marginBottom: 10 }}>
+            <details key={date} className="toggle-section" style={{ marginBottom: 10 }} open={i === 0}>
               <summary>
-                {fmtDate(date)} — {fmt(dayTotal)}
+                {fmtDate(date)} — {fmt(supervisorDayTotal + fieldDayTotal)}
               </summary>
+              {exceedsImprest && (
+                <div className="note" style={{ color: 'var(--red)', fontWeight: 700, marginTop: 4 }}>
+                  Exceeds this Supervisor's site imprest balance
+                </div>
+              )}
               <div className="table-scroll" style={{ marginTop: 10 }}>
                 <table className="data">
                   <thead>
@@ -436,142 +529,27 @@ export function PendingClaimApprovals() {
                     </tr>
                   </thead>
                   <tbody>
-                    {rows.map((exp) => {
-                      // LIS_Fields' "site" and ERP2.0's "project" are the same
-                      // place under two names — default the picker to
-                      // whichever project matches the site name, if one does
-                      // (falling back to a known name mapping for sites named
-                      // differently between the two apps, e.g. "NH7 - GB").
-                      const siteName = exp.sites?.name ?? ''
-                      const mappedProjectName = FIELD_SITE_NAME_TO_PROJECT_NAME[siteName] ?? siteName
-                      const matchedProjectId = activeProjects?.find(
-                        (p) => p.name.trim().toLowerCase() === mappedProjectName.trim().toLowerCase()
-                      )?.id
-                      const projectValue = projectByRow[exp.id] ?? matchedProjectId ?? ''
-                      const override = fieldOverrides[exp.id]
-                      const effectiveAmount = override?.amount ?? exp.amount
-                      const projectPicker = (
-                        <SearchableSelect
-                          items={activeProjects}
-                          value={projectValue}
-                          onChange={(id) => setProjectByRow((p) => ({ ...p, [exp.id]: id }))}
-                          getId={(p) => p.id}
-                          getLabel={(p) => p.name}
-                          placeholder="— Select project —"
-                          compact
-                        />
-                      )
-
-                      if (editingFieldId === exp.id) {
-                        return (
-                          <tr key={exp.id}>
-                            <td colSpan={2}>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  aria-label="Amount"
-                                  value={fieldDraft.amount}
-                                  onChange={(ev) => setFieldDraft((d) => ({ ...d, amount: ev.target.value }))}
-                                />
-                                <input
-                                  type="text"
-                                  aria-label="Description"
-                                  placeholder="Description"
-                                  value={fieldDraft.description}
-                                  onChange={(ev) => setFieldDraft((d) => ({ ...d, description: ev.target.value }))}
-                                />
-                                <div style={{ minWidth: 180 }}>{projectPicker}</div>
-                              </div>
-                            </td>
-                            <td>
-                              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                                <Button type="button" onClick={() => handleSaveField(exp)}>
-                                  Save
-                                </Button>
-                                <Button type="button" variant="secondary" onClick={() => setEditingFieldId(null)}>
-                                  Cancel
-                                </Button>
-                              </div>
-                              {rowError[exp.id] && (
-                                <div className="note" style={{ color: 'var(--red)', marginTop: 4 }}>
-                                  {rowError[exp.id]}
-                                </div>
-                              )}
-                            </td>
-                          </tr>
-                        )
-                      }
-
-                      return (
-                        <tr key={exp.id}>
-                          <td>
-                            {exp.category}
-                            <div style={{ marginTop: 2, maxWidth: 160 }}>{projectPicker}</div>
-                            {siteName && !matchedProjectId && (
-                              <div className="note" style={{ margin: '4px 0 0' }}>
-                                LIS_Fields site: {siteName}
-                              </div>
-                            )}
-                          </td>
-                          <td className="amt">{fmt(effectiveAmount)}</td>
-                        <td>
-                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                            <Button
-                              type="button"
-                              className="icon-btn-sq"
-                              disabled={busyKey === exp.id}
-                              onClick={() => handleApproveField(exp)}
-                              title="Approve"
-                              aria-label="Approve"
-                            >
-                              ✓
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="secondary"
-                              className="icon-btn-sq"
-                              disabled={busyKey === exp.id}
-                              onClick={() => handleRejectField(exp)}
-                              title="Reject"
-                              aria-label="Reject"
-                            >
-                              ✕
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="secondary"
-                              className="icon-btn-sq"
-                              disabled={busyKey === exp.id}
-                              onClick={() => startEditField(exp)}
-                              title="Edit"
-                              aria-label="Edit"
-                            >
-                              ✎
-                            </Button>
-                          </div>
-                          {rowError[exp.id] && (
-                            <div className="note" style={{ color: 'var(--red)', marginTop: 4 }}>
-                              {rowError[exp.id]}
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                      )
-                    })}
+                    {supervisorRows.map(renderSupervisorRow)}
+                    {fieldRows.map(renderFieldRow)}
                   </tbody>
                 </table>
               </div>
-              {rows.some((exp) => exp.description || exp.receipt_url) && (
+              {allRows.some((r) => ('sub_head_id' in r ? r.description : r.description || r.receipt_url)) && (
                 <details className="toggle-section" style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
                   <summary>Comments</summary>
                   <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>
-                    {rows
+                    {supervisorRows
+                      .filter((e) => e.description)
+                      .map((e) => (
+                        <li key={e.id} style={{ marginBottom: 4 }}>
+                          <strong>{projectName(e.project_id)}</strong> ({fmt(e.amount)}) — {e.description}
+                        </li>
+                      ))}
+                    {fieldRows
                       .filter((exp) => exp.description || exp.receipt_url)
                       .map((exp) => (
                         <li key={exp.id} style={{ marginBottom: 4 }}>
-                          <strong>{exp.category}</strong> ({fmt(exp.amount)}) — {exp.description || '—'}
+                          <strong>{exp.category} (Field)</strong> ({fmt(exp.amount)}) — {exp.description || '—'}
                           {exp.receipt_url && (
                             <>
                               {' · '}
