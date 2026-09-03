@@ -2,8 +2,9 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { AuthProvider, useAuth } from './lib/auth'
 import { LoginPage } from './features/auth/LoginPage'
 import { Shell } from './components/Shell'
+import { LocationGate } from './components/LocationGate'
 import { EXPENSE_COST_CENTERS, SUPERVISOR_EXPENSE_COST_CENTERS, type TabId, type ExpenseCostCenter } from './lib/nav'
-import { captureAndPing } from './lib/workStore'
+import { requestLocationPing, type LocationPingResult } from './lib/workStore'
 
 const DashboardPage = lazy(() => import('./features/dashboard/DashboardPage').then((m) => ({ default: m.DashboardPage })))
 const ExpensesPage = lazy(() => import('./features/expenses/ExpensesPage').then((m) => ({ default: m.ExpensesPage })))
@@ -30,15 +31,27 @@ function AppShellRouter() {
 
   const [tab, setTab] = useState<TabId>('dashboard')
   const [expensesCostCenter, setExpensesCostCenter] = useState<ExpenseCostCenter>(isSupervisor ? 'Project' : 'Admin')
+  const [locationPing, setLocationPing] = useState<LocationPingResult | 'unknown'>('unknown')
 
-  // One location ping per login, independent of the Start Work toggle — so a
-  // Supervisor's location is on record just from opening the app, not only
-  // when they remember to tap Start Work. AppShellRouter only mounts once
-  // per signed-in session (see AppInner below), so this fires once per login.
+  async function pingLocation() {
+    if (!profile) return
+    setLocationPing(await requestLocationPing(profile.id))
+  }
+
+  // A Supervisor can't use the app at all without granting location — this
+  // fires on every login (AppShellRouter mounts once per signed-in
+  // session, see AppInner below), and the render below blocks on anything
+  // but a successful ping. There's no "skip for now": a denied/unavailable
+  // result replaces the whole app with LocationGate until they grant it or
+  // sign out.
   useEffect(() => {
-    if (isSupervisor && profile) captureAndPing(profile.id)
+    if (isSupervisor) void pingLocation()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  if (isSupervisor && locationPing !== 'ok') {
+    return <LocationGate status={locationPing} onRetry={pingLocation} />
+  }
 
   return (
     <Shell active={tab} onChange={setTab}>
