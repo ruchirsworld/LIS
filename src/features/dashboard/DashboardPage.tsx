@@ -10,6 +10,8 @@ import { ReportPeriodFilter } from '../reports/ReportPeriodFilter'
 import { FinancialSummaryReport } from '../reports/FinancialSummaryReport'
 import { GstSummaryReport } from '../reports/GstSummaryReport'
 import { ExpenseSummary } from './ExpenseSummary'
+import { SupervisorDashboardPage } from './SupervisorDashboardPage'
+import { useAuth } from '../../lib/auth'
 import { reportPeriodToRange } from '../../lib/calc/reportPeriod'
 import type { DateRange, ReportPeriodType } from '../../lib/calc/reportPeriod'
 
@@ -24,6 +26,7 @@ const PERIOD_LABEL: Record<ReportPeriodType, string> = {
 }
 
 export function DashboardPage() {
+  const { profile } = useAuth()
   const [range, setRange] = useState<DateRange | null>(reportPeriodToRange('month'))
   const [periodType, setPeriodType] = useState<ReportPeriodType>('month')
   const { data, isLoading, error } = useDashboardKpis()
@@ -31,6 +34,10 @@ export function DashboardPage() {
   const { data: projects, isLoading: projectsLoading } = useProjects()
   const { data: invoices } = useInvoices(null)
   const { data: invoicePayments } = useInvoicePayments()
+
+  if (profile?.role === 'supervisor') {
+    return <SupervisorDashboardPage />
+  }
 
   const completedPaymentPendingCount =
     projects

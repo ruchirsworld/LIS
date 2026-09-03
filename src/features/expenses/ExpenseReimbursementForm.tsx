@@ -1,15 +1,16 @@
 import { useState } from 'react'
 import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
+import { SearchableSelect } from '../../components/SearchableSelect'
+import { useBankAccounts } from '../../lib/queries/masters'
 import { useCreateExpenseReimbursement, useUpdateExpenseReimbursement } from '../../lib/queries/expenses'
 import { fmtPlain, parseINR } from '../../lib/calc/format'
 import { getErrorMessage } from '../../lib/errors'
 import type { Database } from '../../types/database'
 
 type ExpenseReimbursement = Database['public']['Tables']['expense_reimbursements']['Row']
-type PaymentMode = 'UPI' | 'Cash' | 'Bank'
 
-const PAYMENT_MODES: PaymentMode[] = ['UPI', 'Cash', 'Bank']
+const CASH = 'cash'
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
@@ -30,12 +31,14 @@ export function ExpenseReimbursementForm({
 }) {
   const createReimbursement = useCreateExpenseReimbursement()
   const updateReimbursement = useUpdateExpenseReimbursement()
+  const { data: bankAccounts } = useBankAccounts()
+  const accountOptions = [{ id: CASH, name: 'Cash' }, ...(bankAccounts ?? [])]
   const [date, setDate] = useState(editingReimbursement?.date ?? todayStr())
   const [amount, setAmount] = useState(
     fmtPlain(editingReimbursement ? editingReimbursement.amount : due).replace(/,/g, ''),
   )
   const [reference, setReference] = useState(editingReimbursement?.reference ?? '')
-  const [paymentMode, setPaymentMode] = useState<PaymentMode>((editingReimbursement?.payment_mode as PaymentMode) ?? 'UPI')
+  const [accountId, setAccountId] = useState(editingReimbursement?.bank_account_id ?? CASH)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -44,11 +47,13 @@ export function ExpenseReimbursementForm({
     if (!date || amt <= 0) return
     setSaving(true)
     setError(null)
+    const bankAccountId = accountId === CASH ? null : accountId
+    const paymentMode = accountId === CASH ? 'Cash' : 'Bank'
     try {
       if (editingReimbursement) {
         await updateReimbursement.mutateAsync({
           id: editingReimbursement.id,
-          patch: { date, amount: amt, reference: reference.trim() || null, payment_mode: paymentMode },
+          patch: { date, amount: amt, reference: reference.trim() || null, payment_mode: paymentMode, bank_account_id: bankAccountId },
         })
       } else {
         await createReimbursement.mutateAsync({
@@ -57,6 +62,7 @@ export function ExpenseReimbursementForm({
           amount: amt,
           reference: reference.trim() || null,
           payment_mode: paymentMode,
+          bank_account_id: bankAccountId,
         })
       }
       onClose()
@@ -80,19 +86,15 @@ export function ExpenseReimbursementForm({
             <CurrencyInput value={amount} onValueChange={setAmount} />
           </div>
           <div className="field">
-            <label>Mode of payment</label>
-            <div className="pill-tabs">
-              {PAYMENT_MODES.map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  className={paymentMode === m ? 'pill active' : 'pill'}
-                  onClick={() => setPaymentMode(m)}
-                >
-                  {m}
-                </button>
-              ))}
-            </div>
+            <label>Account</label>
+            <SearchableSelect
+              items={accountOptions}
+              value={accountId}
+              onChange={setAccountId}
+              getId={(a) => a.id}
+              getLabel={(a) => a.name}
+              placeholder="— Select account —"
+            />
           </div>
           <div className="field">
             <label>Reference</label>

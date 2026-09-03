@@ -36,9 +36,14 @@ export function SearchableSelect<T>({
   }, [value])
 
   const q = query.trim().toLowerCase()
-  const filtered = q
+  const matched = q
     ? list.filter((item) => (getSearchValue ? getSearchValue(item) : getLabel(item)).toLowerCase().includes(q))
     : list
+  // Float the currently selected item to the top so it's visible without
+  // scrolling when reopening a list to change an existing pick.
+  const filtered = value
+    ? [...matched].sort((a, b) => (getId(a) === value ? -1 : getId(b) === value ? 1 : 0))
+    : matched
 
   function selectItem(item: T) {
     onChange(getId(item))
@@ -74,6 +79,11 @@ export function SearchableSelect<T>({
         value={query}
         placeholder={placeholder}
         onFocus={() => {
+          // Clear the leftover selected-label text so opening the list shows
+          // every option, not just ones matching what's already selected —
+          // otherwise picking "Cash" then reopening only shows items whose
+          // name happens to contain "cash".
+          setQuery('')
           setOpen(true)
           setHighlight(0)
         }}

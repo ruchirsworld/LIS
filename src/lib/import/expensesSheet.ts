@@ -1,32 +1,47 @@
-// Column layout for the standalone Expenses import file — kept separate
-// from sheets.ts (the combined Projects/Invoices/Vendor Bills/Loans
-// workbook) since Expenses now has its own file. Mirrors the live "Add
-// transaction" form exactly: cost center instead of category, Project only
-// applies when the cost center is "Projects" (Client comes from the
-// project, same as the live form — there's no separate Client column).
+// Column layout for the one common bulk-add-expenses sheet, covering all
+// three cost centers (Admin, Trips, Project) in a single file — replaces
+// the old Trips-only importer. Description + Sub Head mirror the app's own
+// pickers: for Admin/Trips it's the two-tap Description group → option
+// quick-tap; for Project it's Major head → Sub-head. The Sub Head dropdown
+// in the file is dependent on both Cost Center and Description in the same
+// row.
 
-export const SHEET_EXPENSES = 'Expenses'
+export const SHEET_EXPENSES = 'Entries'
 
 export const COLUMNS_EXPENSES = [
-  'Cost Center (e.g. NAN, DDN, Projects, T&M)',
-  'Project Name (required if Cost Center is Projects)',
-  'Tags (e.g. #Rent #Fuel)',
+  'Cost Center (Admin/Trips/Project)',
+  'Project (Project rows only)',
+  'Trip (Trips rows only)',
+  'Description',
+  'Sub Head (depends on Description)',
+  'Date (DD-MM-YYYY)',
   'Amount',
-  'Date (YYYY-MM-DD)',
+  'Account (Kotak/CBI/Cash/Reimburse)',
   'Remarks (optional)',
-  'Payment Mode (UPI/Cash/Bank)',
-  'Reimbursable (Yes/No)',
 ] as const
 
-export const EXAMPLE_ROW_EXPENSES = ['DDN', '', '#Fuel', '1500', '2025-04-05', '', 'Cash', 'No']
+export const EXAMPLE_ROW_EXPENSES = ['Admin', '', '', 'Office', 'Snacks', '05-04-2025', '500', 'Cash', '']
+
+// Project's Description dropdown is one of these Major heads (fixed order —
+// both the template's named-range positions and the importer's lookup rely
+// on this exact array, so it lives here once instead of being duplicated).
+export const PROJECT_MAJOR_HEADS = [
+  { name: 'Employee & Labour Costs', code: 10 },
+  { name: 'Equipment & Machinery', code: 30 },
+  { name: 'Site / Project Overheads', code: 60 },
+]
 
 export const EXPENSES_INSTRUCTIONS_LINES: string[] = [
   'Laavin Internal System — Expenses Import',
   '',
   '1. One sample row is included — delete it before adding your own rows, or the importer will try to import it too.',
-  '2. Cost Center must match one of the cost centers already set up in Admin (e.g. NAN, DDN, Projects, T&M) — it is not created automatically.',
-  '3. If Cost Center is "Projects", Project Name is required and must already exist in the system (create it first via Admin → Projects, or the Projects import file). The Client shown against the expense comes from the project automatically, same as in the app.',
-  '4. Tags and Amount and Date are always required.',
-  '5. Dates should be in YYYY-MM-DD format, e.g. 2025-04-01.',
-  '6. Save this file and upload it back on the Admin → Data import section when you’re done.',
+  '2. Cost Center must be Admin, Trips, or Project — pick it first, since it determines which other columns apply.',
+  '3. Project only applies to Project rows — pick an existing active project.',
+  '4. Trip only applies to Trips rows — pick an existing trip ("Trip name — Traveler"). The trip\'s own project (if any) is used automatically; the Project column is ignored for Trips rows.',
+  '5. Pick a Description next — the options depend on the Cost Center. For Admin/Trips this is the same Description group as the app\'s quick-tap picker (e.g. Transport, Office); the Sub Head dropdown then only offers the options under it. Some Admin groups (e.g. Misc) have no Sub Head of their own — leave Sub Head blank for those.',
+  '6. For Project rows, Description is a Major head (Employee & Labour Costs / Equipment & Machinery / Site / Project Overheads) and Sub Head is required — pick the actual sub-head under it.',
+  '7. Account must be one of: Kotak, CBI, Cash, or Reimburse. Kotak/CBI must already exist as bank accounts.',
+  '8. Cost Center, Description, Amount, Date, and Account are always required.',
+  '9. Dates should be in DD-MM-YYYY format, e.g. 01-04-2025.',
+  '10. Save this file and upload it back on the Expenses page when you’re done.',
 ]

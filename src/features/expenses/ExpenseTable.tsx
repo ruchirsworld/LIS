@@ -19,14 +19,14 @@ import {
   useDeleteExpenseReimbursement,
   useApproveExpenseReimbursement,
 } from '../../lib/queries/expenses'
-import { useProjects, useClients, useVendors, useCostCenters } from '../../lib/queries/masters'
+import { useProjects, useClients, useVendors, useCostCenters, useExpenseSubHeads } from '../../lib/queries/masters'
 import { useProfiles } from '../../lib/queries/admin'
 import { useAuth } from '../../lib/auth'
 import { fmt, fmtDate } from '../../lib/calc/format'
 import { expenseReimbursed, expenseDue } from '../../lib/calc/expenses'
 import type { DateRange } from '../../lib/calc/period'
 import { ReceiptLink } from '../../components/ReceiptLink'
-import { clientLabel } from '../../lib/labels'
+import { clientLabel, clientFullName } from '../../lib/labels'
 import { ExpenseReimbursementForm } from './ExpenseReimbursementForm'
 import { ExpenseForm } from './ExpenseForm'
 import type { Database } from '../../types/database'
@@ -35,17 +35,36 @@ type ExpenseReimbursement = Database['public']['Tables']['expense_reimbursements
 
 const COL_SPAN = 7
 
-export function ExpenseTable() {
+function CalendarIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="17" rx="2" />
+      <path d="M3 9h18M8 2v4M16 2v4" />
+    </svg>
+  )
+}
+
+export function ExpenseTable({
+  costCenterFilter,
+  title = 'Expense records',
+}: {
+  /** Only show expenses with this exact cost_center — e.g. "Project" on the
+   * Project section. Omit to show everything, as on the Admin section. */
+  costCenterFilter?: string
+  title?: string
+} = {}) {
   const { profile } = useAuth()
   const [range, setRange] = useState<DateRange | null>(null)
-  const [idSearch, setIdSearch] = useState('')
+  const [showPeriodFilter, setShowPeriodFilter] = useState(false)
   const [userFilter, setUserFilter] = useState('')
-  const { data: expenses, isLoading } = useExpenses(range)
+  const { data: rawExpenses, isLoading } = useExpenses(range)
+  const expenses = costCenterFilter ? rawExpenses?.filter((e) => e.cost_center === costCenterFilter) : rawExpenses
   const { data: projects } = useProjects()
   const { data: clients } = useClients()
   const { data: vendors } = useVendors()
   const { data: profiles } = useProfiles()
   const { data: costCenters } = useCostCenters()
+  const { data: subHeads } = useExpenseSubHeads()
   const { data: reimbursements } = useExpenseReimbursements()
   const deleteExpense = useDeleteExpense()
   const bulkUpdateExpenses = useBulkUpdateExpenses()
@@ -124,9 +143,18 @@ export function ExpenseTable() {
     const client = project ? clients?.find((c) => c.id === project.client_id) : null
     return project ? `${project.name} — ${clientLabel(client)}` : ''
   }
+  const projLabelForExportOf = (e: NonNullable<typeof expenses>[number]) => {
+    const project = projects?.find((p) => p.id === e.project_id)
+    const client = project ? clients?.find((c) => c.id === project.client_id) : null
+    return project ? `${project.name} — ${clientFullName(client)}` : ''
+  }
   const vendorNameOf = (e: NonNullable<typeof expenses>[number]) => {
     const vendor = e.vendor_id ? vendors?.find((v) => v.id === e.vendor_id) : null
     return vendor?.name ?? ''
+  }
+  const subHeadNameOf = (e: NonNullable<typeof expenses>[number]) => {
+    const subHead = e.sub_head_id ? subHeads?.find((s) => s.id === e.sub_head_id) : null
+    return subHead?.name ?? ''
   }
   const userNameOf = (e: NonNullable<typeof expenses>[number]) => {
     const profile = e.created_by ? profiles?.find((p) => p.id === e.created_by) : null
@@ -139,10 +167,7 @@ export function ExpenseTable() {
   const reimbursedOf = (e: NonNullable<typeof expenses>[number]) => expenseReimbursed(reimbursementsOf(e))
   const dueOf = (e: NonNullable<typeof expenses>[number]) => (e.reimbursable ? expenseDue(e.amount, reimbursementsOf(e)) : 0)
 
-  const idFiltered = idSearch.trim()
-    ? expenses?.filter((e) => e.display_id?.toLowerCase().includes(idSearch.trim().toLowerCase()))
-    : expenses
-  const userFiltered = userFilter ? idFiltered?.filter((e) => e.created_by === userFilter) : idFiltered
+  const userFiltered = userFilter ? expenses?.filter((e) => e.created_by === userFilter) : expenses
   const { sorted: sortedExpenses, sortKey, direction, toggleSort } = useSort(
     userFiltered,
     {
@@ -169,17 +194,17 @@ export function ExpenseTable() {
 
   const exportSections: ExportSection[] = [
     {
-      title: 'Expense records',
-      columns: ['ID', 'Date', 'Vendor', 'Description', 'Remarks', 'Project / client', 'Cost center', 'Purpose', 'Amount', 'Reimbursable', 'Reimbursed', 'Due', 'Recorded by'],
+      title,
+      columns: ['ID', 'Date', 'Vendor', 'Description', 'Remarks', 'Project / client', 'Cost center', 'Sub-head', 'Amount', 'Reimbursable', 'Reimbursed', 'Due', 'Recorded by'],
       rows: (sortedExpenses ?? []).map((e) => [
         e.display_id ?? '',
         fmtDate(e.date),
         vendorNameOf(e),
         e.description,
         e.remarks ?? '',
-        projLabelOf(e),
+        projLabelForExportOf(e),
         e.cost_center ?? '',
-        e.purpose ?? '',
+        subHeadNameOf(e),
         e.amount,
         e.reimbursable ? 'Yes' : 'No',
         e.reimbursable ? reimbursedOf(e) : '—',
@@ -191,39 +216,38 @@ export function ExpenseTable() {
 
   return (
     <details className="toggle-section" open>
-      <summary>Expense records</summary>
+      <summary>{title}</summary>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 12, marginTop: 16 }}>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-          <PeriodFilter onChange={setRange} allowCustom style={{ marginBottom: 0 }} />
-          <div className="field" style={{ maxWidth: 160, marginBottom: 0 }}>
-            <label>Search ID</label>
-            <input
-              type="text"
-              placeholder="e.g. Exp/23"
-              value={idSearch}
-              onChange={(e) => setIdSearch(e.target.value)}
-            />
-          </div>
-          <div className="field" style={{ maxWidth: 220, marginBottom: 0 }}>
-            <label>By user</label>
-            <SearchableSelect
-              items={profiles}
-              value={userFilter}
-              onChange={setUserFilter}
-              getId={(p) => p.id}
-              getLabel={(p) => p.name}
-              placeholder="— All users —"
-            />
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <ReportExportButtons
-            title="Expense records"
-            sections={exportSections}
-            range={range}
-            style={{ marginTop: 0 }}
+      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginTop: 16 }}>
+        <button
+          type="button"
+          className={range ? 'icon-btn active' : 'icon-btn'}
+          onClick={() => setShowPeriodFilter((v) => !v)}
+          title="Filter by date"
+          aria-label="Filter by date"
+        >
+          <CalendarIcon />
+        </button>
+        <div className="field" style={{ maxWidth: 130, marginBottom: 0 }}>
+          <label>By user</label>
+          <SearchableSelect
+            items={profiles}
+            value={userFilter}
+            onChange={setUserFilter}
+            getId={(p) => p.id}
+            getLabel={(p) => p.name}
+            placeholder="— All users —"
           />
+        </div>
+        <ReportExportButtons
+          title={title}
+          sections={exportSections}
+          range={range}
+          iconOnly
+          style={{ marginTop: 0, marginLeft: 'auto', alignSelf: 'center' }}
+        />
+        <div style={{ display: showPeriodFilter ? 'block' : 'none', width: '100%' }}>
+          <PeriodFilter onChange={setRange} allowCustom style={{ marginBottom: 0 }} />
         </div>
       </div>
 
@@ -289,11 +313,7 @@ export function ExpenseTable() {
             {!isLoading && (!sortedExpenses || sortedExpenses.length === 0) && (
               <tr>
                 <td colSpan={COL_SPAN} className="empty-row">
-                  {idSearch.trim()
-                    ? `No expenses match "${idSearch.trim()}"`
-                    : userFilter
-                      ? 'No expenses for this user in this period'
-                      : 'No expenses in this period'}
+                  {userFilter ? 'No expenses for this user in this period' : 'No expenses in this period'}
                 </td>
               </tr>
             )}
@@ -328,9 +348,9 @@ export function ExpenseTable() {
                     <td>{e.description}</td>
                     <td>
                       {e.cost_center ?? '—'}
-                      {e.cost_center === 'Projects' && (projectNameOf(e) || e.purpose) && (
+                      {(projectNameOf(e) || subHeadNameOf(e)) && (
                         <div style={{ fontSize: 11, color: 'var(--ink-soft)', marginTop: 2 }}>
-                          {[projectNameOf(e), e.purpose].filter(Boolean).join(' · ')}
+                          {[projectNameOf(e), subHeadNameOf(e)].filter(Boolean).join(' · ')}
                         </div>
                       )}
                     </td>

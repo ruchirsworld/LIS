@@ -1,7 +1,7 @@
 import { useExpenses } from '../../lib/queries/expenses'
 import { useProjects, useClients, useVendors } from '../../lib/queries/masters'
 import { fmt, fmtDate } from '../../lib/calc/format'
-import { clientLabel } from '../../lib/labels'
+import { clientLabel, clientFullName } from '../../lib/labels'
 import type { DateRange } from '../../lib/calc/reportPeriod'
 import { ReportExportButtons } from './ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
@@ -24,6 +24,11 @@ export function ExpenseBreakdownReport({ range }: { range: DateRange | null }) {
     const client = project ? clients?.find((c) => c.id === project.client_id) : null
     return project ? `${project.name} — ${clientLabel(client)}` : ''
   }
+  const projLabelForExportOf = (e: NonNullable<typeof expenses>[number]) => {
+    const project = projects?.find((p) => p.id === e.project_id)
+    const client = project ? clients?.find((c) => c.id === project.client_id) : null
+    return project ? `${project.name} — ${clientFullName(client)}` : ''
+  }
   const vendorNameOf = (e: NonNullable<typeof expenses>[number]) => {
     const vendor = e.vendor_id ? vendors?.find((v) => v.id === e.vendor_id) : null
     return vendor?.name ?? ''
@@ -44,7 +49,7 @@ export function ExpenseBreakdownReport({ range }: { range: DateRange | null }) {
         e.description,
         e.amount,
         vendorNameOf(e),
-        projLabelOf(e),
+        projLabelForExportOf(e),
         e.cost_center ?? '',
         e.reimbursable ? 'Yes' : 'No',
       ]),
@@ -52,8 +57,7 @@ export function ExpenseBreakdownReport({ range }: { range: DateRange | null }) {
   ]
 
   return (
-    <details className="toggle-section" open>
-      <summary>Expense breakdown</summary>
+    <div className="report-panel">
       <ReportExportButtons title="Expense breakdown" sections={sections} range={range} />
       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 16 }}>
         <div style={{ flex: '1 1 260px' }}>
@@ -128,6 +132,6 @@ export function ExpenseBreakdownReport({ range }: { range: DateRange | null }) {
           </tbody>
         </table>
       </div>
-    </details>
+    </div>
   )
 }

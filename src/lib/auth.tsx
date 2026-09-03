@@ -5,7 +5,7 @@ import { supabase } from './supabase'
 export interface Profile {
   id: string
   name: string
-  role: 'admin' | 'cxo'
+  role: 'admin' | 'cxo' | 'supervisor'
   phone: string | null
 }
 

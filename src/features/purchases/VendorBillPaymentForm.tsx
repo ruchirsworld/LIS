@@ -1,15 +1,16 @@
 import { useState } from 'react'
 import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
+import { SearchableSelect } from '../../components/SearchableSelect'
+import { useBankAccounts } from '../../lib/queries/masters'
 import { useCreateVendorBillPayment, useUpdateVendorBillPayment } from '../../lib/queries/purchases'
 import { fmtPlain, parseINR } from '../../lib/calc/format'
 import { getErrorMessage } from '../../lib/errors'
 import type { Database } from '../../types/database'
 
 type VendorBillPayment = Database['public']['Tables']['vendor_bill_payments']['Row']
-type PaymentMode = 'UPI' | 'NEFT' | 'Cash'
 
-const PAYMENT_MODES: PaymentMode[] = ['UPI', 'NEFT', 'Cash']
+const CASH = 'cash'
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
@@ -30,25 +31,33 @@ export function VendorBillPaymentForm({
 }) {
   const createPayment = useCreateVendorBillPayment()
   const updatePayment = useUpdateVendorBillPayment()
+  const { data: bankAccounts } = useBankAccounts()
+  const accountOptions = [{ id: CASH, name: 'Cash' }, ...(bankAccounts ?? [])]
   const [date, setDate] = useState(editingPayment?.date ?? todayStr())
   const [amount, setAmount] = useState(
     fmtPlain(editingPayment ? editingPayment.amount : due).replace(/,/g, ''),
   )
   const [reference, setReference] = useState(editingPayment?.reference ?? '')
-  const [paymentMode, setPaymentMode] = useState<PaymentMode>((editingPayment?.payment_mode as PaymentMode) ?? 'UPI')
+  const [accountId, setAccountId] = useState(editingPayment?.bank_account_id ?? CASH)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   async function save() {
     const amt = parseINR(amount)
     if (!date || amt <= 0) return
+    if (!accountId) {
+      setError('Pick an account.')
+      return
+    }
     setSaving(true)
     setError(null)
+    const bankAccountId = accountId === CASH ? null : accountId
+    const paymentMode = accountId === CASH ? 'Cash' : 'Bank'
     try {
       if (editingPayment) {
         await updatePayment.mutateAsync({
           id: editingPayment.id,
-          patch: { date, amount: amt, reference: reference.trim() || null, payment_mode: paymentMode },
+          patch: { date, amount: amt, reference: reference.trim() || null, payment_mode: paymentMode, bank_account_id: bankAccountId },
         })
       } else {
         await createPayment.mutateAsync({
@@ -57,6 +66,7 @@ export function VendorBillPaymentForm({
           amount: amt,
           reference: reference.trim() || null,
           payment_mode: paymentMode,
+          bank_account_id: bankAccountId,
         })
       }
       onClose()
@@ -80,19 +90,15 @@ export function VendorBillPaymentForm({
             <CurrencyInput value={amount} onValueChange={setAmount} />
           </div>
           <div className="field">
-            <label>Mode of payment</label>
-            <div className="pill-tabs">
-              {PAYMENT_MODES.map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  className={paymentMode === m ? 'pill active' : 'pill'}
-                  onClick={() => setPaymentMode(m)}
-                >
-                  {m}
-                </button>
-              ))}
-            </div>
+            <label>Account</label>
+            <SearchableSelect
+              items={accountOptions}
+              value={accountId}
+              onChange={setAccountId}
+              getId={(a) => a.id}
+              getLabel={(a) => a.name}
+              placeholder="— Select account —"
+            />
           </div>
           <div className="field">
             <label>Reference</label>

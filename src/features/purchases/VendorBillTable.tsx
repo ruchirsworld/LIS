@@ -10,13 +10,13 @@ import { usePagination } from '../../lib/usePagination'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
 import { useVendorBills, useVendorBillPayments, useDeleteVendorBill } from '../../lib/queries/purchases'
-import { useVendors, useProjects, useClients } from '../../lib/queries/masters'
+import { useVendors, useProjects, useClients, useExpenseSubHeads } from '../../lib/queries/masters'
 import { fmt, fmtDate } from '../../lib/calc/format'
 import { billGstAmt, billTotal, billPaid, billDue, billDueRaw } from '../../lib/calc/vendorBills'
 import type { DateRange } from '../../lib/calc/period'
 import { VendorBillPaymentForm } from './VendorBillPaymentForm'
 import { ReceiptLink } from '../../components/ReceiptLink'
-import { clientLabel } from '../../lib/labels'
+import { clientLabel, clientFullName } from '../../lib/labels'
 import type { Database } from '../../types/database'
 
 type VendorBill = Database['public']['Tables']['vendor_bills']['Row']
@@ -29,6 +29,7 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
   const { data: vendors } = useVendors()
   const { data: projects } = useProjects()
   const { data: clients } = useClients()
+  const { data: subHeads } = useExpenseSubHeads()
   const deleteBill = useDeleteVendorBill()
   const [payFormId, setPayFormId] = useState<string | null>(null)
   const [editingPayment, setEditingPayment] = useState<VendorBillPayment | null>(null)
@@ -58,9 +59,14 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
   const visibleBills = vendorFilter ? categoryFiltered?.filter((b) => b.vendor_id === vendorFilter) : categoryFiltered
 
   const vendorNameOf = (b: NonNullable<typeof bills>[number]) => vendors?.find((v) => v.id === b.vendor_id)?.name ?? ''
+  const subHeadNameOf = (b: NonNullable<typeof bills>[number]) => subHeads?.find((s) => s.id === b.sub_head_id)?.name ?? ''
   const clientNameOf = (b: NonNullable<typeof bills>[number]) => {
     const client = b.client_id ? clients?.find((c) => c.id === b.client_id) : null
     return clientLabel(client)
+  }
+  const clientFullNameOf = (b: NonNullable<typeof bills>[number]) => {
+    const client = b.client_id ? clients?.find((c) => c.id === b.client_id) : null
+    return clientFullName(client)
   }
   const projectNameOf = (b: NonNullable<typeof bills>[number]) => {
     const project = b.project_id ? projects?.find((p) => p.id === b.project_id) : null
@@ -94,13 +100,14 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
   const exportSections: ExportSection[] = [
     {
       title: 'Bill records',
-      columns: ['Ref ID', 'Vendor', 'Description', 'Remarks', 'Client', 'Project', 'Date', 'Qty', 'Rate', 'Other cost', 'Amount', 'GST', 'Total', 'Paid', 'Due'],
+      columns: ['Ref ID', 'Vendor', 'Description', 'Sub-head', 'Remarks', 'Client', 'Project', 'Date', 'Qty', 'Rate', 'Other cost', 'Amount', 'GST', 'Total', 'Paid', 'Due'],
       rows: (sortedBills ?? []).map((b) => [
         b.display_id ?? '',
         vendorNameOf(b),
         b.description ?? '',
+        subHeadNameOf(b),
         b.remarks ?? '',
-        clientNameOf(b),
+        clientFullNameOf(b),
         projectNameOf(b),
         b.date ? fmtDate(b.date) : '',
         b.qty ?? '',
@@ -163,6 +170,7 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
               <SortableTh label="Ref ID" sortKey="id" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Vendor" sortKey="vendor" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Description" sortKey="description" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <th>Sub-head</th>
               <th>Remarks</th>
               <SortableTh label="Client" sortKey="client" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Project" sortKey="project" activeKey={sortKey} direction={direction} onSort={toggleSort} />
@@ -183,14 +191,14 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={18} className="empty-row">
+                <td colSpan={19} className="empty-row">
                   Loading…
                 </td>
               </tr>
             )}
             {!isLoading && (!sortedBills || sortedBills.length === 0) && (
               <tr>
-                <td colSpan={18} className="empty-row">
+                <td colSpan={19} className="empty-row">
                   No vendor bills in this period
                 </td>
               </tr>
@@ -213,6 +221,7 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
                     <td>{b.display_id ?? '—'}</td>
                     <td>{vendor ? vendor.name : '—'}</td>
                     <td>{b.description ?? '—'}</td>
+                    <td>{subHeadNameOf(b) || '—'}</td>
                     <td>{b.remarks ?? '—'}</td>
                     <td>{clientLabel(client)}</td>
                     <td>{project ? project.name : '—'}</td>
@@ -270,7 +279,7 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
                       billId={b.id}
                       due={due}
                       editingPayment={editingPayment}
-                      colSpan={18}
+                      colSpan={19}
                       onClose={closePayForm}
                     />
                   )}

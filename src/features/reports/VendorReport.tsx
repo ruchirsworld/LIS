@@ -41,8 +41,7 @@ export function VendorReport({ range }: { range: DateRange | null }) {
   ]
 
   return (
-    <details className="toggle-section" open>
-      <summary>Vendor report</summary>
+    <div className="report-panel">
       <ReportExportButtons title="Vendor report" sections={sections} range={range} />
       <div className="table-scroll" style={{ marginTop: 16 }}>
         <table className="data">
@@ -73,6 +72,6 @@ export function VendorReport({ range }: { range: DateRange | null }) {
           </tbody>
         </table>
       </div>
-    </details>
+    </div>
   )
 }

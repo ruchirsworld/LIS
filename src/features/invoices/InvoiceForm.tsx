@@ -73,6 +73,12 @@ export function InvoiceForm({
     if (id && proj?.client_id !== id) setProjectId('')
   }
 
+  function handleProjectChange(id: string) {
+    setProjectId(id)
+    const proj = projects?.find((p) => p.id === id)
+    if (proj) setClientId(proj.client_id)
+  }
+
   function handleStatusChange(next: 'draft' | 'sent') {
     setStatus(next)
     if (next === 'sent' && !invoiceDate) setInvoiceDate(todayStr())
@@ -140,7 +146,7 @@ export function InvoiceForm({
             <SearchableSelect
               items={visibleProjects}
               value={projectId}
-              onChange={setProjectId}
+              onChange={handleProjectChange}
               getId={(p) => p.id}
               getLabel={(p) => p.name}
               placeholder="— No specific project —"

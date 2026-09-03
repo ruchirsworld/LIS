@@ -8,14 +8,16 @@ import { ReportExportButtons } from './ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
 
 export function CapitalReport({ range }: { range: DateRange | null }) {
-  const { data: profiles } = useProfiles()
+  const { data: allProfiles } = useProfiles()
+  // Partners are Admin and CXO only.
+  const profiles = (allProfiles ?? []).filter((p) => p.role === 'admin' || p.role === 'cxo')
   const { data: tx } = useCapitalTx(null)
 
   const from = range?.from ?? null
   const to = range?.to ?? null
   const periodTx = (tx ?? []).filter((t) => inRange(t.date, from, to))
 
-  const rows = (profiles ?? []).map((p) => {
+  const rows = profiles.map((p) => {
     const period = partnerNet(p.id, periodTx)
     const toDate = partnerNet(p.id, tx ?? [])
     return { id: p.id, name: p.name, injected: period.injected, withdrawn: period.withdrawn, net: toDate.net }
@@ -30,8 +32,7 @@ export function CapitalReport({ range }: { range: DateRange | null }) {
   ]
 
   return (
-    <details className="toggle-section" open>
-      <summary>Capital report</summary>
+    <div className="report-panel">
       <ReportExportButtons title="Capital report" sections={sections} range={range} />
       <div className="table-scroll" style={{ marginTop: 16 }}>
         <table className="data">
@@ -62,6 +63,6 @@ export function CapitalReport({ range }: { range: DateRange | null }) {
           </tbody>
         </table>
       </div>
-    </details>
+    </div>
   )
 }

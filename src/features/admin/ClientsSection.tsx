@@ -46,6 +46,7 @@ export function ClientsSection() {
   const updateClient = useUpdateClient()
   const deleteClient = useDeleteClient()
 
+  const [formOpen, setFormOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [addressLine1, setAddressLine1] = useState('')
@@ -71,6 +72,7 @@ export function ClientsSection() {
   }
 
   function startEdit(c: NonNullable<typeof clients>[number]) {
+    setFormOpen(true)
     setEditingId(c.id)
     setName(c.name)
     setAddressLine1(c.address_line1 ?? '')
@@ -118,6 +120,14 @@ export function ClientsSection() {
   return (
     <details className="toggle-section">
       <summary>Clients</summary>
+
+      <details
+        className="toggle-section"
+        style={{ marginTop: 16 }}
+        open={formOpen}
+        onToggle={(e) => setFormOpen(e.currentTarget.open)}
+      >
+        <summary>{editingId ? 'Edit client' : 'Add new client'}</summary>
 
       <form className="form-grid" onSubmit={handleSubmit} style={{ marginTop: 16 }}>
         <div className="field full">
@@ -179,6 +189,10 @@ export function ClientsSection() {
           {formError}
         </div>
       )}
+      </details>
+
+      <details className="toggle-section" style={{ marginTop: 12 }} open>
+        <summary>Client list</summary>
 
       <ReportExportButtons title="Clients" sections={exportSections} range={null} />
 
@@ -238,6 +252,7 @@ export function ClientsSection() {
         </table>
       </TableScroll>
       <Pagination page={page} totalPages={totalPages} totalCount={totalCount} onChange={setPage} />
+      </details>
     </details>
   )
 }

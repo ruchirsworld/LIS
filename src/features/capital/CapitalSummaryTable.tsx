@@ -4,7 +4,9 @@ import { fmt } from '../../lib/calc/format'
 import { partnerNet } from '../../lib/calc/capital'
 
 export function CapitalSummaryTable() {
-  const { data: profiles } = useProfiles()
+  const { data: allProfiles } = useProfiles()
+  // Partners are Admin and CXO only.
+  const profiles = (allProfiles ?? []).filter((p) => p.role === 'admin' || p.role === 'cxo')
   const { data: tx } = useCapitalTx(null)
 
   return (

@@ -9,11 +9,11 @@ import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
-import { useClients, useProjects, useCostCenters } from '../../lib/queries/masters'
+import { useClients, useProjects } from '../../lib/queries/masters'
 import { useCreateProject, useUpdateProject, useDeleteProject } from '../../lib/queries/admin'
 import { fmt, fmtDate, parseINR } from '../../lib/calc/format'
 import { getErrorMessage } from '../../lib/errors'
-import { clientLabel } from '../../lib/labels'
+import { clientLabel, clientFullName } from '../../lib/labels'
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
@@ -22,16 +22,16 @@ function todayStr() {
 export function ProjectsSection() {
   const { data: clients } = useClients()
   const { data: projects, isLoading } = useProjects()
-  const { data: costCenters } = useCostCenters()
   const createProject = useCreateProject()
   const updateProject = useUpdateProject()
   const deleteProject = useDeleteProject()
 
+  const [formOpen, setFormOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [name, setName] = useState('')
+  const [code, setCode] = useState('')
   const [clientId, setClientId] = useState('')
   const [status, setStatus] = useState<'active' | 'completed'>('active')
-  const [costCenter, setCostCenter] = useState('')
   const [budget, setBudget] = useState('0')
   const [valueExGst, setValueExGst] = useState('0')
   const [startDate, setStartDate] = useState(todayStr())
@@ -42,13 +42,14 @@ export function ProjectsSection() {
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const clientNameOf = (p: NonNullable<typeof projects>[number]) => clientLabel(clients?.find((c) => c.id === p.client_id))
+  const clientFullNameOf = (p: NonNullable<typeof projects>[number]) => clientFullName(clients?.find((c) => c.id === p.client_id))
 
   const { sorted: sortedProjects, sortKey, direction, toggleSort } = useSort(projects, {
     id: (p) => p.display_id,
+    code: (p) => p.code,
     name: (p) => p.name,
     client: (p) => clientNameOf(p),
     location: (p) => p.project_location,
-    costCenter: (p) => p.cost_center,
     budget: (p) => p.budget,
     value: (p) => p.value_ex_gst,
     startDate: (p) => p.start_date,
@@ -60,13 +61,13 @@ export function ProjectsSection() {
   const exportSections: ExportSection[] = [
     {
       title: 'Projects',
-      columns: ['ID', 'Project', 'Client', 'Project location', 'Cost center', 'Budget', 'Total value', 'Start date', 'End date', 'Status'],
+      columns: ['ID', 'Code', 'Project', 'Client', 'Project location', 'Budget', 'Total value', 'Start date', 'End date', 'Status'],
       rows: (sortedProjects ?? []).map((p) => [
         p.display_id ?? '',
+        p.code ?? '',
         p.name,
-        clientNameOf(p),
+        clientFullNameOf(p),
         p.project_location ?? '',
-        p.cost_center ?? '',
         p.budget ?? '',
         p.value_ex_gst ?? '',
         p.start_date ? fmtDate(p.start_date) : '',
@@ -82,19 +83,12 @@ export function ProjectsSection() {
     setProjectLocation(client?.city || '')
   }, [sameAsClient, clientId, clients])
 
-  useEffect(() => {
-    if (!costCenter && costCenters && costCenters.length > 0) {
-      const projectsCostCenter = costCenters.find((cc) => cc.name.trim().toLowerCase() === 'projects')
-      setCostCenter((projectsCostCenter ?? costCenters[0]).name)
-    }
-  }, [costCenters, costCenter])
-
   function resetForm() {
     setEditingId(null)
     setName('')
+    setCode('')
     setClientId('')
     setStatus('active')
-    setCostCenter(costCenters?.[0]?.name ?? '')
     setBudget('0')
     setValueExGst('0')
     setSameAsClient(true)
@@ -103,11 +97,12 @@ export function ProjectsSection() {
   }
 
   function startEdit(p: NonNullable<typeof projects>[number]) {
+    setFormOpen(true)
     setEditingId(p.id)
     setName(p.name)
+    setCode(p.code ?? '')
     setClientId(p.client_id)
     setStatus(p.status as 'active' | 'completed')
-    setCostCenter(p.cost_center ?? '')
     setBudget(p.budget != null ? String(p.budget) : '0')
     setValueExGst(p.value_ex_gst != null ? String(p.value_ex_gst) : '0')
     setSameAsClient(p.same_as_client_address)
@@ -141,13 +136,19 @@ export function ProjectsSection() {
       setFormError('Pick a client.')
       return
     }
+    const codeValue = code.trim().toUpperCase()
+    if (!/^[A-Z]{4}$/.test(codeValue)) {
+      setFormError('Project code must be exactly 4 letters.')
+      return
+    }
     setSubmitting(true)
     try {
       const patch = {
         name: name.trim(),
+        code: codeValue,
         client_id: clientId,
         status,
-        cost_center: costCenter || null,
+        cost_center: 'Project',
         budget: parseINR(budget) || null,
         value_ex_gst: parseINR(valueExGst) || null,
         project_location: projectLocation.trim() || null,
@@ -171,10 +172,29 @@ export function ProjectsSection() {
     <details className="toggle-section">
       <summary>Projects</summary>
 
+      <details
+        className="toggle-section"
+        style={{ marginTop: 16 }}
+        open={formOpen}
+        onToggle={(e) => setFormOpen(e.currentTarget.open)}
+      >
+        <summary>{editingId ? 'Edit project' : 'Add new project'}</summary>
+
       <form className="form-grid" onSubmit={handleSubmit} style={{ marginTop: 16 }}>
         <div className="field">
           <label>Project name</label>
           <input type="text" required value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>Project code (4 letters)</label>
+          <input
+            type="text"
+            required
+            maxLength={4}
+            placeholder="e.g. UJIR"
+            value={code}
+            onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4))}
+          />
         </div>
         <div className="field">
           <label>Client</label>
@@ -195,18 +215,6 @@ export function ProjectsSection() {
             <option value="completed">Completed</option>
           </select>
         </div>
-        <div className="field">
-          <label>Cost center</label>
-          <SearchableSelect
-            items={costCenters}
-            value={costCenter}
-            onChange={setCostCenter}
-            getId={(cc) => cc.name}
-            getLabel={(cc) => cc.name}
-            placeholder="— Select —"
-          />
-        </div>
-
         <div className="field">
           <label>Budget (₹)</label>
           <CurrencyInput value={budget} onValueChange={setBudget} />
@@ -257,6 +265,10 @@ export function ProjectsSection() {
           {formError}
         </div>
       )}
+      </details>
+
+      <details className="toggle-section" style={{ marginTop: 12 }} open>
+        <summary>Project list</summary>
 
       {deleteError && (
         <div className="note" style={{ color: 'var(--red)' }}>
@@ -271,10 +283,10 @@ export function ProjectsSection() {
           <thead>
             <tr>
               <SortableTh label="ID" sortKey="id" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Code" sortKey="code" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Project" sortKey="name" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Client" sortKey="client" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Project location" sortKey="location" activeKey={sortKey} direction={direction} onSort={toggleSort} />
-              <SortableTh label="Cost center" sortKey="costCenter" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Budget" sortKey="budget" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
               <SortableTh label="Total value" sortKey="value" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
               <SortableTh label="Start date" sortKey="startDate" activeKey={sortKey} direction={direction} onSort={toggleSort} />
@@ -303,10 +315,10 @@ export function ProjectsSection() {
               return (
                 <tr key={p.id}>
                   <td>{p.display_id ?? '—'}</td>
+                  <td>{p.code ?? '—'}</td>
                   <td>{p.name}</td>
                   <td>{clientLabel(client)}</td>
                   <td>{p.project_location ?? '—'}</td>
-                  <td>{p.cost_center ?? '—'}</td>
                   <td className="amt">{p.budget ? fmt(p.budget) : '—'}</td>
                   <td className="amt">{p.value_ex_gst ? fmt(p.value_ex_gst) : '—'}</td>
                   <td>{p.start_date ? fmtDate(p.start_date) : '—'}</td>
@@ -327,6 +339,7 @@ export function ProjectsSection() {
         </table>
       </TableScroll>
       <Pagination page={page} totalPages={totalPages} totalCount={totalCount} onChange={setPage} />
+      </details>
     </details>
   )
 }

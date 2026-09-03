@@ -1,12 +1,16 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
+import { SearchableSelect } from '../../components/SearchableSelect'
+import { useBankAccounts } from '../../lib/queries/masters'
 import { useCreateLoan, useUpdateLoan } from '../../lib/queries/loans'
 import { parseINR } from '../../lib/calc/format'
 import { getErrorMessage } from '../../lib/errors'
 import type { Database } from '../../types/database'
 
 type Loan = Database['public']['Tables']['loans']['Row']
+
+const CASH = 'cash'
 
 export function LoanForm({
   editingLoan,
@@ -17,6 +21,8 @@ export function LoanForm({
 }) {
   const createLoan = useCreateLoan()
   const updateLoan = useUpdateLoan()
+  const { data: bankAccounts } = useBankAccounts()
+  const accountOptions = [{ id: CASH, name: 'Cash' }, ...(bankAccounts ?? [])]
 
   const [loanType, setLoanType] = useState<'private' | 'bank'>('private')
   const [lender, setLender] = useState('')
@@ -24,6 +30,7 @@ export function LoanForm({
   const [roiPct, setRoiPct] = useState('')
   const [dateTaken, setDateTaken] = useState('')
   const [notes, setNotes] = useState('')
+  const [accountId, setAccountId] = useState(CASH)
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -35,6 +42,7 @@ export function LoanForm({
     setRoiPct(String(editingLoan.roi_pct))
     setDateTaken(editingLoan.date_taken ?? '')
     setNotes(editingLoan.notes ?? '')
+    setAccountId(editingLoan.bank_account_id ?? CASH)
     setFormError(null)
   }, [editingLoan])
 
@@ -45,6 +53,7 @@ export function LoanForm({
     setRoiPct('')
     setDateTaken('')
     setNotes('')
+    setAccountId(CASH)
   }
 
   function handleCancel() {
@@ -68,6 +77,8 @@ export function LoanForm({
         roi_pct: Number(roiPct) || 0,
         date_taken: dateTaken || null,
         notes: notes.trim() || null,
+        payment_mode: accountId === CASH ? 'Cash' : 'Bank',
+        bank_account_id: accountId === CASH ? null : accountId,
       }
       if (editingLoan) {
         await updateLoan.mutateAsync({ id: editingLoan.id, patch })
@@ -136,11 +147,22 @@ export function LoanForm({
           </div>
         </div>
 
-        {/* Row 3: Date taken */}
+        {/* Row 3: Date taken + Account received into */}
         <div className="field-row ln-row3">
           <div className="field ln-date-taken">
             <label>Date taken</label>
             <input type="date" value={dateTaken} onChange={(e) => setDateTaken(e.target.value)} />
+          </div>
+          <div className="field">
+            <label>Account</label>
+            <SearchableSelect
+              items={accountOptions}
+              value={accountId}
+              onChange={setAccountId}
+              getId={(a) => a.id}
+              getLabel={(a) => a.name}
+              placeholder="— Select account —"
+            />
           </div>
         </div>
 

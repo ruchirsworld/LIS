@@ -3,7 +3,7 @@ import { useInvoices, useInvoicePayments } from '../../lib/queries/invoices'
 import { netPayable, totalPaid, dueAmount } from '../../lib/calc/invoices'
 import { inRange } from '../../lib/calc/period'
 import { fmt } from '../../lib/calc/format'
-import { clientLabel } from '../../lib/labels'
+import { clientLabel, clientFullName } from '../../lib/labels'
 import type { DateRange } from '../../lib/calc/reportPeriod'
 import { ReportExportButtons } from './ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
@@ -30,20 +30,19 @@ export function ClientReport({ range }: { range: DateRange | null }) {
       return s + dueAmount(i, invPayments)
     }, 0)
 
-    return { id: c.id, name: clientLabel(c), invoicedThisPeriod, receivedThisPeriod, dueToDate }
+    return { id: c.id, name: clientLabel(c), fullName: clientFullName(c), invoicedThisPeriod, receivedThisPeriod, dueToDate }
   })
 
   const sections: ExportSection[] = [
     {
       title: 'Client report',
       columns: ['Client', 'Invoiced (period)', 'Received (period)', 'Due (to date)'],
-      rows: rows.map((r) => [r.name, r.invoicedThisPeriod, r.receivedThisPeriod, r.dueToDate]),
+      rows: rows.map((r) => [r.fullName, r.invoicedThisPeriod, r.receivedThisPeriod, r.dueToDate]),
     },
   ]
 
   return (
-    <details className="toggle-section" open>
-      <summary>Client report</summary>
+    <div className="report-panel">
       <ReportExportButtons title="Client report" sections={sections} range={range} />
       <div className="table-scroll" style={{ marginTop: 16 }}>
         <table className="data">
@@ -74,6 +73,6 @@ export function ClientReport({ range }: { range: DateRange | null }) {
           </tbody>
         </table>
       </div>
-    </details>
+    </div>
   )
 }

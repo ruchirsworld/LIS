@@ -10,7 +10,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       devOptions: { enabled: true },
       manifest: {
-        name: 'Laavin Internal System (LIS 1.64)',
+        name: 'LIS',
         short_name: 'LIS',
         description: 'Internal billing, clients, projects, vendors & expenses — Laavin InfraScapes',
         theme_color: '#2f6b40',
@@ -28,6 +28,33 @@ export default defineConfig({
         // Runtime data (Supabase REST/Storage calls) should never be served from
         // the service worker cache — only the built app shell (JS/CSS/HTML) is.
         globPatterns: ['**/*.{js,css,html,png,svg,ico}'],
+        // Excel/PDF export & import (exceljs, xlsx, jspdf + its html2canvas/
+        // dompurify/font deps) are lazy-loaded and together add up to ~2MB —
+        // most staff never touch them. Don't force every visitor to download
+        // that upfront; let the browser fetch them normally on first actual
+        // use, then cache them via runtimeCaching below for next time.
+        globIgnores: [
+          '**/exceljs*.js',
+          '**/xlsx-*.js',
+          '**/jspdf*.js',
+          '**/html2canvas-*.js',
+          '**/notoSansLedgerFont-*.js',
+          '**/purify.es-*.js',
+          '**/index.es-*.js',
+        ],
+        runtimeCaching: [
+          {
+            // Content-hashed filenames — safe to cache aggressively and
+            // indefinitely; a new build ships a new filename, not new bytes
+            // under the old one.
+            urlPattern: ({ url, sameOrigin }) => sameOrigin && url.pathname.startsWith('/assets/') && url.pathname.endsWith('.js'),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'lazy-chunks',
+              expiration: { maxEntries: 40, maxAgeSeconds: 60 * 24 * 60 * 60 },
+            },
+          },
+        ],
       },
     }),
   ],

@@ -21,14 +21,13 @@ export function GstSummaryReport({ range }: { range: DateRange | null }) {
   ]
 
   return (
-    <details className="toggle-section" open>
-      <summary>GST summary</summary>
+    <div className="report-panel">
       <ReportExportButtons title="GST summary" sections={sections} range={range} />
       <div className="dash-grid" style={{ marginTop: 16 }}>
         {metrics.map(([label, value]) => (
           <KpiCard key={label} label={label} value={fmt(value)} />
         ))}
       </div>
-    </details>
+    </div>
   )
 }

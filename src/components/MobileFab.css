@@ -1,16 +1,19 @@
-.mobile-fab {
+.mobile-fab-wrap {
   display: none;
 }
 
 @media (max-width: 640px) {
-  .mobile-fab {
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  .mobile-fab-wrap {
+    display: block;
     position: fixed;
     right: 16px;
     bottom: calc(100px + env(safe-area-inset-bottom));
     z-index: 46;
+  }
+  .mobile-fab {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     width: 52px;
     height: 52px;
     border-radius: 50%;

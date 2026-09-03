@@ -8,6 +8,7 @@ import { usePagination } from '../../lib/usePagination'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
 import { useLoans, useLoanPayments, useDeleteLoan } from '../../lib/queries/loans'
+import { LoanPaymentForm } from './LoanPaymentForm'
 import { fmt, fmtDate } from '../../lib/calc/format'
 import {
   loanPrincipalPaid,
@@ -29,6 +30,7 @@ export function LoanTable({ onEdit }: { onEdit: (loan: Loan) => void }) {
   const { data: loans, isLoading } = useLoans(range)
   const { data: payments } = useLoanPayments()
   const deleteLoan = useDeleteLoan()
+  const [payFormId, setPayFormId] = useState<string | null>(null)
 
   const paymentsOf = (l: NonNullable<typeof loans>[number]) => payments?.filter((p) => p.loan_id === l.id) ?? []
 
@@ -145,6 +147,11 @@ export function LoanTable({ onEdit }: { onEdit: (loan: Loan) => void }) {
                     <td className="amt">{outstanding > 0 ? interestDueMonths : '—'}</td>
                     <td className="amt">{outstanding > 0 ? fmt(interestDue) : '—'}</td>
                     <td>
+                      {outstanding > 0 && (
+                        <button type="button" className="pay-btn" onClick={() => setPayFormId(l.id)}>
+                          Record payment
+                        </button>
+                      )}
                       <button type="button" className="pay-btn" onClick={() => onEdit(l)}>
                         Edit
                       </button>
@@ -164,6 +171,9 @@ export function LoanTable({ onEdit }: { onEdit: (loan: Loan) => void }) {
                       )}
                     </td>
                   </tr>
+                  {payFormId === l.id && (
+                    <LoanPaymentForm loanId={l.id} colSpan={13} onClose={() => setPayFormId(null)} />
+                  )}
                 </Fragment>
               )
             })}

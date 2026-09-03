@@ -54,8 +54,8 @@ Deno.serve(async (req) => {
     if (!phone || !pin || !name || !role) {
       return json({ error: "phone, pin, name, and role are required" }, 400);
     }
-    if (!["admin", "cxo"].includes(role)) {
-      return json({ error: "role must be admin or cxo" }, 400);
+    if (!["admin", "cxo", "supervisor"].includes(role)) {
+      return json({ error: "role must be admin, cxo, or supervisor" }, 400);
     }
     const digits = String(phone).replace(/\D/g, "");
     if (digits.length < 10) return json({ error: "Enter a valid phone number." }, 400);

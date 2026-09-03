@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui'
 import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
@@ -7,11 +7,20 @@ import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
-import { useProfiles, useCreateUser, useUpdateProfile, useDeleteUser, type Profile } from '../../lib/queries/admin'
+import {
+  useProfiles,
+  useCreateUser,
+  useUpdateProfile,
+  useDeleteUser,
+  useSupervisorProjects,
+  useSetSupervisorProjects,
+  type Profile,
+} from '../../lib/queries/admin'
+import { useProjects } from '../../lib/queries/masters'
 import { getErrorMessage } from '../../lib/errors'
 import { useAuth } from '../../lib/auth'
 
-const ROLE_LABEL: Record<string, string> = { admin: 'Admin', cxo: 'CXO' }
+const ROLE_LABEL: Record<string, string> = { admin: 'Admin', cxo: 'CXO', supervisor: 'Supervisor' }
 
 export function UsersSection() {
   const { profile: myProfile } = useAuth()
@@ -19,6 +28,8 @@ export function UsersSection() {
   const createUser = useCreateUser()
   const updateProfile = useUpdateProfile()
   const deleteUser = useDeleteUser()
+  const { data: activeProjects } = useProjects()
+  const setSupervisorProjects = useSetSupervisorProjects()
 
   const { sorted: sortedProfiles, sortKey, direction, toggleSort } = useSort(profiles, {
     name: (p) => p.name,
@@ -39,9 +50,21 @@ export function UsersSection() {
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [pin, setPin] = useState('')
-  const [role, setRole] = useState<'cxo' | 'admin'>('cxo')
+  const [role, setRole] = useState<'cxo' | 'admin' | 'supervisor'>('cxo')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+  const [assignedProjectIds, setAssignedProjectIds] = useState<string[]>([])
+
+  const { data: currentAssignments } = useSupervisorProjects(editingId)
+  useEffect(() => {
+    setAssignedProjectIds((currentAssignments ?? []).map((a) => a.project_id))
+  }, [currentAssignments])
+
+  const projectOptions = (activeProjects ?? []).filter((p) => p.status === 'active')
+
+  function toggleAssignedProject(projectId: string) {
+    setAssignedProjectIds((ids) => (ids.includes(projectId) ? ids.filter((id) => id !== projectId) : [...ids, projectId]))
+  }
 
   function resetForm() {
     setEditingId(null)
@@ -49,6 +72,7 @@ export function UsersSection() {
     setPhone('')
     setPin('')
     setRole('cxo')
+    setAssignedProjectIds([])
   }
 
   function startEdit(p: Profile) {
@@ -70,6 +94,10 @@ export function UsersSection() {
       setSubmitting(true)
       try {
         await updateProfile.mutateAsync({ id: editingId, name: name.trim(), role })
+        await setSupervisorProjects.mutateAsync({
+          profileId: editingId,
+          projectIds: role === 'supervisor' ? assignedProjectIds : [],
+        })
         resetForm()
       } catch (err) {
         setFormError(getErrorMessage(err, 'Could not save user.'))
@@ -147,8 +175,34 @@ export function UsersSection() {
           <select value={role} onChange={(e) => setRole(e.target.value as typeof role)}>
             <option value="cxo">CXO</option>
             <option value="admin">Admin</option>
+            <option value="supervisor">Supervisor</option>
           </select>
         </div>
+
+        {editingId && role === 'supervisor' && (
+          <div className="field full">
+            <label>Assigned projects</label>
+            <div
+              className="note"
+              style={{ margin: '0 0 8px' }}
+            >
+              Which project(s) this supervisor is responsible for — can be more than one.
+            </div>
+            {projectOptions.length === 0 && <div className="note">No active projects yet.</div>}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+              {projectOptions.map((p) => (
+                <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 400 }}>
+                  <input
+                    type="checkbox"
+                    checked={assignedProjectIds.includes(p.id)}
+                    onChange={() => toggleAssignedProject(p.id)}
+                  />
+                  {p.name}
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="field full" style={{ display: 'flex', gap: 8 }}>
           <Button type="submit" disabled={submitting}>

@@ -37,6 +37,17 @@ export function useVendors() {
   })
 }
 
+export function useStaff() {
+  return useQuery({
+    queryKey: ['staff'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('staff').select('*').order('name')
+      if (error) throw error
+      return data
+    },
+  })
+}
+
 export function useCostCenters() {
   return useQuery({
     queryKey: ['cost_centers'],
@@ -48,22 +59,15 @@ export function useCostCenters() {
   })
 }
 
-export function useExpenseCategories() {
+/** Chart of Accounts: the Major Head / Sub-Head taxonomy shared by Payments
+ * (expenses) and Procurements (vendor_bills) — replaces expense_purposes
+ * (which only ever applied to the Projects cost center) as the categorization
+ * dimension for both modules. */
+export function useExpenseSubHeads() {
   return useQuery({
-    queryKey: ['expense_categories'],
+    queryKey: ['expense_sub_heads'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('expense_categories').select('*').order('name')
-      if (error) throw error
-      return data
-    },
-  })
-}
-
-export function useExpensePurposes() {
-  return useQuery({
-    queryKey: ['expense_purposes'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('expense_purposes').select('*').order('sort_order')
+      const { data, error } = await supabase.from('expense_sub_heads').select('*').order('sort_order')
       if (error) throw error
       return data
     },

@@ -34,3 +34,27 @@ export function useReportSummary(range: DateRange | null) {
     },
   })
 }
+
+export interface TrialBalanceRow {
+  code: string | null
+  name: string | null
+  account_type: string | null
+  normal_balance: string | null
+  total_debit: number | null
+  total_credit: number | null
+  balance: number | null
+}
+
+/** Every GL account's total debit/credit and net balance, as of now — not
+ * date-ranged, since a trial balance is a running snapshot of the ledger,
+ * not a period report. */
+export function useTrialBalance() {
+  return useQuery({
+    queryKey: ['trial_balance'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('v_trial_balance').select('*').order('code')
+      if (error) throw error
+      return data as TrialBalanceRow[]
+    },
+  })
+}

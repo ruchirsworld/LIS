@@ -27,6 +27,11 @@ details.toggle-section summary {
 details.toggle-section summary::-webkit-details-marker {
   display: none;
 }
+/* Expenses forms (Add/Edit transaction) — tighter summary bar than the
+   app-wide default, to match the compact form below it. */
+details.toggle-section.exp-compact-section summary {
+  padding: 6px 16px;
+}
 details.toggle-section summary::after {
   content: '+';
   font-size: 18px;
@@ -58,6 +63,13 @@ details.toggle-section .note:last-child {
   padding: 10px 16px;
   border-radius: 8px;
   margin-bottom: 18px;
+}
+
+/* Pages whose header carries a cost-center/section switcher (Expenses, HR)
+   sit directly above their content — tighter than the app default. */
+.expenses-page .module-header,
+.hr-page .module-header {
+  margin-bottom: 8px;
 }
 
 .btn {
@@ -245,6 +257,37 @@ button:focus-visible {
 .form-grid > .optional-row {
   min-width: 0;
 }
+
+/* Compact variant — the Expenses forms (Admin/Trips/Project add-transaction
+   form, Start trip) pack a lot of rows into one screen, so they run smaller
+   and tighter than the app's default form-grid sizing. */
+.form-grid.exp-compact {
+  gap: 8px 10px;
+  padding: 8px 12px;
+}
+.form-grid.exp-compact .field-row,
+.form-grid.exp-compact .optional-row {
+  gap: 8px;
+}
+.form-grid.exp-compact .field label {
+  font-size: 10px;
+}
+.form-grid.exp-compact .field input,
+.form-grid.exp-compact .field select {
+  font-size: 12.5px;
+  padding: 5px 8px;
+}
+.form-grid.exp-compact .pill-tabs .pill {
+  font-size: 11px;
+  padding: 1px 10px;
+}
+.form-grid.exp-compact .btn {
+  font-size: 12.5px;
+  padding: 6px 14px;
+}
+.form-grid.exp-compact .note {
+  font-size: 11px;
+}
 .form-grid .field.full {
   grid-column: 1 / -1;
 }
@@ -273,12 +316,12 @@ button:focus-visible {
   width: 140px;
 }
 
-/* Add-transaction Row 4 — Amount/Calculator are a fixed 44px tall (bigger
+/* Add-transaction Row 4 — Amount/Calculator are a fixed 36px tall (bigger
    font for currency prominence); sync Date to the same height so the row
    doesn't look uneven at the bottom. (Loan's row4 uses plain-height
    Interest/Principal inputs, so it doesn't need this.) */
 .form-grid .exp-row4 .field-narrow input[type='date'] {
-  height: 44px;
+  height: 36px;
   box-sizing: border-box;
 }
 
@@ -320,6 +363,10 @@ button:focus-visible {
 }
 .icon-btn.ok {
   color: var(--green);
+}
+.icon-btn.active {
+  color: var(--accent);
+  background: var(--accent-soft);
 }
 .icon-btn.error {
   color: var(--red);
@@ -517,6 +564,63 @@ button:focus-visible {
   .form-grid .exp-row4 .calc-btn {
     flex: 0 0 40px;
     width: 40px;
+  }
+
+  /* Payments (expenses) — sized against a real 393pt-wide phone, not an
+     arbitrary fixed width: the page (.wrap, 14px) plus this card's own
+     padding (16px) already eat 60px off each side, leaving ~333px of real
+     content width. Two-field rows stack full-width instead of squeezing to
+     135px each, since labels like "Site / Project Overheads" don't fit that
+     narrow — and pill rows wrap onto a second line at a real touch size
+     (min 44pt tall, per Apple/Google guidance) instead of shrinking text
+     down to fit one row, which the app-wide default below still does. */
+  .form-grid .exp-taxonomy-row,
+  .form-grid .exp-footer-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .form-grid .exp-taxonomy-row > .field,
+  .form-grid .exp-footer-row > .field {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+  .form-grid .exp-project-row {
+    gap: 8px;
+  }
+  .form-grid .exp-quick-category .pill-tabs,
+  .form-grid .exp-taxonomy-row .pill-tabs {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .form-grid .exp-quick-category .pill-tabs .pill,
+  .form-grid .exp-taxonomy-row .pill-tabs .pill {
+    min-height: 44px;
+    padding: 10px 14px;
+    font-size: 10px;
+  }
+  /* Accounts stay on one row even at 4 options — shrink to fit instead of
+     wrapping, since switching accounts is a single quick glance/tap. */
+  .form-grid .exp-account .pill-tabs {
+    flex-wrap: nowrap;
+    gap: 4px;
+  }
+  .form-grid .exp-account .pill-tabs .pill {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 44px;
+    padding: 6px 4px;
+    font-size: 10px;
+    line-height: 1.15;
+    white-space: normal;
+    text-align: center;
+  }
+  .form-grid .exp-qty-row {
+    gap: 8px;
+  }
+  .form-grid .exp-qty-row > .field {
+    flex: 1 1 0%;
+    min-width: 0;
   }
 
   /* Row 3 (Type/Tags): fixed 135 / gap 10 / 135 split, per exact spec. */
@@ -718,6 +822,21 @@ button:focus-visible {
   justify-content: center;
 }
 
+/* Fixed square icon button (Approve/Reject/Edit, etc.) — distinct from the
+   flexible-padding .icon-btn above (logout/camera/GPS/PDF-export), which
+   this used to collide with under the same class name. */
+.icon-btn-sq {
+  width: 30px;
+  height: 30px;
+  padding: 0 !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
 .table-scroll {
   overflow-x: auto;
   overflow-y: auto;
@@ -846,6 +965,7 @@ table.data.table-compact td {
   display: inline-block;
 }
 .row-menu-btn {
+  position: relative;
   background: none;
   border: 1px solid var(--line);
   color: var(--ink-soft);
@@ -856,6 +976,23 @@ table.data.table-compact td {
   align-items: center;
   justify-content: center;
   cursor: pointer;
+}
+.row-menu-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--red);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
 }
 .row-menu-btn:hover {
   border-color: var(--accent);
@@ -983,6 +1120,57 @@ table.data.table-compact td {
 .pill-tabs .pill:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* Expenses page's cost-center switcher (Admin / Trips / Project) — sits on
+   the dark ModuleHeader, so the active choice gets a solid, high-contrast
+   pill rather than the subtle accent-soft highlight .pill-tabs uses on a
+   plain paper background. */
+.cc-switch {
+  display: flex;
+  gap: 6px;
+  flex-wrap: nowrap;
+  flex-shrink: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.cc-switch::-webkit-scrollbar {
+  display: none;
+}
+.cc-switch-btn {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s, transform 0.1s;
+}
+.cc-switch-btn:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+.cc-switch-btn.active {
+  background: #fff;
+  color: var(--accent);
+  border-color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
+  transform: translateY(-1px);
+}
+
+@media (max-width: 640px) {
+  .cc-switch {
+    gap: 4px;
+  }
+  .cc-switch-btn {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 5px 10px;
+  }
 }
 
 .row-selected td {
@@ -1151,4 +1339,68 @@ table.data.table-compact td {
     font-size: 16px;
     padding: 10px;
   }
+}
+
+/* Supervisor Dashboard's team calendar — a month grid with a small dot per
+   attendance exception, colored by type. */
+.team-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+.team-calendar-weekday {
+  text-align: center;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+  padding-bottom: 4px;
+}
+.team-calendar-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  aspect-ratio: 1 / 1;
+  min-height: 40px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: var(--paper-2);
+  font-family: inherit;
+  cursor: default;
+  padding: 4px 2px;
+}
+.team-calendar-cell:disabled {
+  cursor: default;
+}
+.team-calendar-cell:not(:disabled) {
+  cursor: pointer;
+}
+.team-calendar-cell:not(:disabled):hover {
+  border-color: var(--accent);
+}
+.team-calendar-cell.empty {
+  background: none;
+}
+.team-calendar-cell.today {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.team-calendar-daynum {
+  font-size: 12px;
+  color: var(--ink);
+}
+.team-calendar-dots {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.team-calendar-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }

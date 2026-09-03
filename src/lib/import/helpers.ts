@@ -13,11 +13,26 @@ export function num(v: unknown): number | null {
   return Number.isFinite(n) ? n : null
 }
 
+// Every import template asks for DD-MM-YYYY, so that's parsed explicitly
+// rather than falling through to the native Date constructor — which reads
+// an ambiguous "05-08-2026" as MM-DD-YYYY (US-locale) and would silently
+// swap day and month. A real Excel date cell (cellDates: true) or an
+// already-ISO string still short-circuits above/below this, unaffected.
 export function toDateStr(v: unknown): string | null {
   if (v instanceof Date && !isNaN(v.getTime())) return v.toISOString().slice(0, 10)
   const s = str(v)
   if (!s) return null
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
+  const ddmmyyyy = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/)
+  if (ddmmyyyy) {
+    const [, ddStr, mmStr, yyyyStr] = ddmmyyyy
+    const dd = Number(ddStr)
+    const mm = Number(mmStr)
+    const yyyy = Number(yyyyStr)
+    const d = new Date(Date.UTC(yyyy, mm - 1, dd))
+    if (isNaN(d.getTime()) || d.getUTCDate() !== dd || d.getUTCMonth() !== mm - 1) return null
+    return d.toISOString().slice(0, 10)
+  }
   const d = new Date(s)
   return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10)
 }

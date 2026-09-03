@@ -4,6 +4,8 @@
 // FY-aligned quarters (Apr-Jun, Jul-Sep, Oct-Dec, Jan-Mar), not calendar
 // ones. Reusing the same type names across both would be confusing.
 
+import { fmtDate } from './format'
+
 export type ReportPeriodType = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all' | 'custom'
 
 export interface DateRange {
@@ -78,7 +80,7 @@ export function reportPeriodToRange(type: ReportPeriodType, opts: { from?: strin
 /** Human-readable label for a range, used on exported PDF/Excel reports. */
 export function formatRangeLabel(range: DateRange | null): string {
   if (!range || (!range.from && !range.to)) return 'All time'
-  if (range.from && range.to) return `${range.from} to ${range.to}`
-  if (range.from) return `From ${range.from}`
-  return `Up to ${range.to}`
+  if (range.from && range.to) return `${fmtDate(range.from)} to ${fmtDate(range.to)}`
+  if (range.from) return `From ${fmtDate(range.from)}`
+  return `Up to ${fmtDate(range.to)}`
 }

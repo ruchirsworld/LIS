@@ -1,15 +1,62 @@
 import { ModuleHeader } from '../../components/ui'
-import { ExpenseForm } from './ExpenseForm'
-import { ExpenseTable } from './ExpenseTable'
-import { ReimbursementRecordsTable } from './ReimbursementRecordsTable'
+import { EXPENSE_COST_CENTERS, type ExpenseCostCenter } from '../../lib/nav'
+import { useAuth } from '../../lib/auth'
+import { AdminExpensesSection } from './AdminExpensesSection'
+import { ProjectExpensesSection } from './ProjectExpensesSection'
+import { TripsSection } from '../trips/TripsSection'
+import { ImportFileBlock } from '../admin/DataImportSection'
+import { downloadExpensesImportTemplate } from '../../lib/import/expensesTemplate'
+import { parseExpensesImport, commitExpensesImport } from '../../lib/import/runExpensesImport'
 
-export function ExpensesPage() {
+export function ExpensesPage({
+  costCenter,
+  onCostCenterChange,
+  costCenters = EXPENSE_COST_CENTERS,
+}: {
+  costCenter: ExpenseCostCenter
+  onCostCenterChange: (cc: ExpenseCostCenter) => void
+  /** Which cost centers this user is allowed to switch between — e.g. a
+   * Supervisor only ever sees "Project", not Admin Expenses or Trips. */
+  costCenters?: readonly ExpenseCostCenter[]
+}) {
+  const { profile } = useAuth()
+  const canImport = profile?.role === 'admin' || profile?.role === 'cxo'
+
   return (
-    <div>
-      <ModuleHeader>Payments</ModuleHeader>
-      <ExpenseForm editingExpense={null} onDoneEditing={() => {}} />
-      <ExpenseTable />
-      <ReimbursementRecordsTable />
+    <div className="expenses-page">
+      <ModuleHeader>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'nowrap' }}>
+          <span style={{ fontSize: 13, flexShrink: 0 }}>Expenses</span>
+          {costCenters.length > 1 && (
+            <div className="cc-switch">
+              {costCenters.map((cc) => (
+                <button
+                  key={cc}
+                  type="button"
+                  className={costCenter === cc ? 'cc-switch-btn active' : 'cc-switch-btn'}
+                  onClick={() => onCostCenterChange(cc)}
+                >
+                  {cc}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </ModuleHeader>
+
+      {costCenter === 'Admin' && <AdminExpensesSection />}
+      {costCenter === 'Trips' && <TripsSection />}
+      {costCenter === 'Project' && <ProjectExpensesSection />}
+
+      {canImport && (
+        <ImportFileBlock
+          label="Bulk-add expenses from Excel (Admin, Trips, or Project)"
+          onDownload={downloadExpensesImportTemplate}
+          onParse={parseExpensesImport}
+          onCommit={commitExpensesImport}
+          invalidateKeys={['expenses']}
+        />
+      )}
     </div>
   )
 }

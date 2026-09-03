@@ -43,8 +43,7 @@ export function CashBankReport({ range }: { range: DateRange | null }) {
   ]
 
   return (
-    <details className="toggle-section" open>
-      <summary>Cash & bank report</summary>
+    <div className="report-panel">
       <ReportExportButtons title="Cash & bank report" sections={sections} range={range} />
       <div className="table-scroll" style={{ marginTop: 16 }}>
         <table className="data">
@@ -68,6 +67,6 @@ export function CashBankReport({ range }: { range: DateRange | null }) {
           </tbody>
         </table>
       </div>
-    </details>
+    </div>
   )
 }

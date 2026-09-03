@@ -1,10 +1,10 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
 import { ReceiptUploadButton } from '../../components/ReceiptUploadButton'
 import { SearchableSelect } from '../../components/SearchableSelect'
 import { useAuth } from '../../lib/auth'
-import { useClients, useProjects, useVendors } from '../../lib/queries/masters'
+import { useClients, useProjects, useVendors, useExpenseSubHeads } from '../../lib/queries/masters'
 import { useCreateVendorBill, useUpdateVendorBill, useCreateVendorBillPayment } from '../../lib/queries/purchases'
 import { fmt, fmtDate, parseINR } from '../../lib/calc/format'
 import { billTotal } from '../../lib/calc/vendorBills'
@@ -61,6 +61,7 @@ export function VendorBillForm({
   const { data: vendors } = useVendors()
   const { data: clients } = useClients()
   const { data: projects } = useProjects()
+  const { data: subHeads } = useExpenseSubHeads()
   const createVendorBill = useCreateVendorBill()
   const updateVendorBill = useUpdateVendorBill()
   const createVendorBillPayment = useCreateVendorBillPayment()
@@ -68,6 +69,7 @@ export function VendorBillForm({
   const [vendorId, setVendorId] = useState('')
   const { categories: vendorCategories, category: vendorCategory, setCategory: setVendorCategory, filteredVendors } =
     useVendorCategoryFilter(vendors, () => setVendorId(''))
+  const [subHeadId, setSubHeadId] = useState('')
   const [description, setDescription] = useState('')
   const [remarks, setRemarks] = useState('')
   const [clientId, setClientId] = useState('')
@@ -96,9 +98,31 @@ export function VendorBillForm({
   const selectedVendor = vendors?.find((v) => v.id === vendorId)
   const isSupervisor = selectedVendor?.category === 'Supervisor'
 
+  // Procurement always posts to Materials & Consumables — there's nothing to
+  // pick, so Major head isn't a form field here — just these sub-heads, in
+  // this order (plant stock gets its own sub-head, split out from the
+  // general Project Materials catch-all — see the bill-description
+  // placeholder below).
+  const PROCUREMENT_SUB_HEAD_CODES = ['20.1', '20.7', '20.6', '20.4']
+  const subHeadOptions = PROCUREMENT_SUB_HEAD_CODES.map((code) => (subHeads ?? []).find((s) => s.code === code)).filter(
+    (s): s is NonNullable<typeof s> => !!s
+  )
+  const defaultSubHead = subHeadOptions.find((s) => s.code === '20.1') ?? null
+
+  // Apply the Project Materials default once, the first time sub-heads load
+  // for a fresh (non-editing) form — never again after that, so a
+  // Supervisor freely browsing other sub-heads doesn't get snapped back.
+  const defaultApplied = useRef(false)
+  useEffect(() => {
+    if (editingBill || defaultApplied.current || !defaultSubHead) return
+    defaultApplied.current = true
+    setSubHeadId(defaultSubHead.id)
+  }, [defaultSubHead, editingBill])
+
   useEffect(() => {
     if (!editingBill) return
     setVendorId(editingBill.vendor_id)
+    setSubHeadId(editingBill.sub_head_id ?? '')
     setDescription(editingBill.description ?? '')
     setRemarks(editingBill.remarks ?? '')
     setClientId(editingBill.client_id ?? '')
@@ -116,6 +140,7 @@ export function VendorBillForm({
   function resetForm() {
     setVendorId('')
     setVendorCategory(null)
+    setSubHeadId(defaultSubHead?.id ?? '')
     setDescription('')
     setRemarks('')
     setClientId('')
@@ -195,6 +220,10 @@ export function VendorBillForm({
       setFormError('Pick a vendor.')
       return
     }
+    if (!subHeadId) {
+      setFormError('Pick a sub-head.')
+      return
+    }
     if (!date) {
       setFormError('Pick a bill date.')
       return
@@ -211,6 +240,7 @@ export function VendorBillForm({
     try {
       const basePatch = {
         vendor_id: vendorId,
+        sub_head_id: subHeadId,
         description: description.trim(),
         remarks: remarks.trim() || null,
         client_id: clientId || null,
@@ -283,6 +313,21 @@ export function VendorBillForm({
         <div className="field full">
           <label>Vendor</label>
           <VendorCombobox vendors={filteredVendors} value={vendorId} onChange={setVendorId} allowCreate={canAddVendor} />
+        </div>
+
+        {/* Row 3b: Sub-head — what this bill is actually for. Major head is
+            always Materials & Consumables for Procurement, so it isn't a
+            field here. */}
+        <div className="field full">
+          <label>Sub-head</label>
+          <SearchableSelect
+            items={subHeadOptions}
+            value={subHeadId}
+            onChange={setSubHeadId}
+            getId={(s) => s.id}
+            getLabel={(s) => s.name}
+            placeholder="— Select sub-head —"
+          />
         </div>
 
         {/* Row 4: Date + Bill description (mandatory) */}

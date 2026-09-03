@@ -18,7 +18,9 @@ export function FinancialSummaryReport({ range }: { range: DateRange | null }) {
   const { data: invoices } = useInvoices(range)
   const { data: loans } = useLoans(null)
   const { data: loanPayments } = useLoanPayments()
-  const { data: profiles } = useProfiles()
+  const { data: allProfiles } = useProfiles()
+  // Partners are Admin and CXO only.
+  const profiles = (allProfiles ?? []).filter((p) => p.role === 'admin' || p.role === 'cxo')
   const { data: capitalTx } = useCapitalTx(null)
 
   // Draft invoices raised in this period still need sending.
@@ -62,8 +64,7 @@ export function FinancialSummaryReport({ range }: { range: DateRange | null }) {
   ]
 
   return (
-    <details className="toggle-section" open>
-      <summary>Financial summary</summary>
+    <div className="report-panel">
       <ReportExportButtons title="Financial summary" sections={sections} range={range} />
       <div className="dash-grid" style={{ marginTop: 16 }}>
         {metrics.map(([label, value]) => (
@@ -73,6 +74,6 @@ export function FinancialSummaryReport({ range }: { range: DateRange | null }) {
           <KpiCard key={p.id} label={`${p.name} (withdrawn − injected)`} value={fmt(p.net)} />
         ))}
       </div>
-    </details>
+    </div>
   )
 }

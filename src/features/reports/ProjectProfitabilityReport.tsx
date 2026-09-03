@@ -6,7 +6,7 @@ import { netPayable, totalPaid } from '../../lib/calc/invoices'
 import { billTotal } from '../../lib/calc/vendorBills'
 import { inRange } from '../../lib/calc/period'
 import { fmt } from '../../lib/calc/format'
-import { clientLabel } from '../../lib/labels'
+import { clientLabel, clientFullName } from '../../lib/labels'
 import type { DateRange } from '../../lib/calc/reportPeriod'
 import { ReportExportButtons } from './ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
@@ -40,20 +40,29 @@ export function ProjectProfitabilityReport({ range }: { range: DateRange | null 
 
     const profit = invoiced - expenseTotal - billTotalSum
 
-    return { id: p.id, name: p.name, client: clientLabel(client), invoiced, received, expenseTotal, billTotalSum, profit }
+    return {
+      id: p.id,
+      name: p.name,
+      client: clientLabel(client),
+      clientFullName: clientFullName(client),
+      invoiced,
+      received,
+      expenseTotal,
+      billTotalSum,
+      profit,
+    }
   })
 
   const sections: ExportSection[] = [
     {
       title: 'Project profitability',
       columns: ['Project', 'Client', 'Invoiced', 'Received', 'Expenses', 'Vendor bills', 'Profit'],
-      rows: rows.map((r) => [r.name, r.client, r.invoiced, r.received, r.expenseTotal, r.billTotalSum, r.profit]),
+      rows: rows.map((r) => [r.name, r.clientFullName, r.invoiced, r.received, r.expenseTotal, r.billTotalSum, r.profit]),
     },
   ]
 
   return (
-    <details className="toggle-section" open>
-      <summary>Project profitability</summary>
+    <div className="report-panel">
       <ReportExportButtons title="Project profitability" sections={sections} range={range} />
       <div className="table-scroll" style={{ marginTop: 16 }}>
         <table className="data">
@@ -90,6 +99,6 @@ export function ProjectProfitabilityReport({ range }: { range: DateRange | null 
           </tbody>
         </table>
       </div>
-    </details>
+    </div>
   )
 }

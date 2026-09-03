@@ -3,8 +3,11 @@ import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
 import { SearchableSelect } from '../../components/SearchableSelect'
 import { useProfiles } from '../../lib/queries/admin'
+import { useBankAccounts } from '../../lib/queries/masters'
 import { useCreateCapitalTx } from '../../lib/queries/capital'
 import { parseINR } from '../../lib/calc/format'
+
+const CASH = 'cash'
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
@@ -12,6 +15,11 @@ function todayStr() {
 
 export function CapitalForm() {
   const { data: profiles } = useProfiles()
+  // Partners are Admin and CXO only — a Supervisor is just an employee and
+  // has no stake (or say) in capital.
+  const partners = (profiles ?? []).filter((p) => p.role === 'admin' || p.role === 'cxo')
+  const { data: bankAccounts } = useBankAccounts()
+  const accountOptions = [{ id: CASH, name: 'Cash' }, ...(bankAccounts ?? [])]
   const createCapitalTx = useCreateCapitalTx()
 
   const [partnerId, setPartnerId] = useState('')
@@ -19,6 +27,7 @@ export function CapitalForm() {
   const [amount, setAmount] = useState('0')
   const [date, setDate] = useState(todayStr())
   const [notes, setNotes] = useState('')
+  const [accountId, setAccountId] = useState(CASH)
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -29,6 +38,10 @@ export function CapitalForm() {
       setFormError('Pick a partner.')
       return
     }
+    if (!accountId) {
+      setFormError('Pick an account.')
+      return
+    }
     setSubmitting(true)
     try {
       await createCapitalTx.mutateAsync({
@@ -37,12 +50,15 @@ export function CapitalForm() {
         amount: parseINR(amount),
         date,
         notes: notes.trim() || null,
+        payment_mode: accountId === CASH ? 'Cash' : 'Bank',
+        bank_account_id: accountId === CASH ? null : accountId,
       })
       setPartnerId('')
       setType('injection')
       setAmount('0')
       setDate(todayStr())
       setNotes('')
+      setAccountId(CASH)
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Could not add entry.')
     } finally {
@@ -58,7 +74,7 @@ export function CapitalForm() {
         <div className="field">
           <label>Partner</label>
           <SearchableSelect
-            items={profiles}
+            items={partners}
             value={partnerId}
             onChange={setPartnerId}
             getId={(p) => p.id}
@@ -81,6 +97,17 @@ export function CapitalForm() {
         <div className="field">
           <label>Date</label>
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>Account</label>
+          <SearchableSelect
+            items={accountOptions}
+            value={accountId}
+            onChange={setAccountId}
+            getId={(a) => a.id}
+            getLabel={(a) => a.name}
+            placeholder="— Select account —"
+          />
         </div>
 
         <div className="field full">

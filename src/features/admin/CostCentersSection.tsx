@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type KeyboardEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import {
   DndContext,
   closestCenter,
@@ -16,7 +16,6 @@ import {
   useRenameCostCenter,
   useDeleteCostCenter,
   useReorderCostCenters,
-  useUpdateCostCenterTags,
 } from '../../lib/queries/admin'
 import type { Database } from '../../types/database'
 
@@ -31,10 +30,6 @@ function SortableCard({
   onSaveRename,
   onCancelRename,
   onDelete,
-  tagDraft,
-  onTagDraftChange,
-  onAddTag,
-  onRemoveTag,
 }: {
   item: CostCenterRow
   editing: boolean
@@ -44,24 +39,12 @@ function SortableCard({
   onSaveRename: () => void
   onCancelRename: () => void
   onDelete: () => void
-  tagDraft: string
-  onTagDraftChange: (v: string) => void
-  onAddTag: () => void
-  onRemoveTag: (tag: string) => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id })
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
-  }
-  const tags = item.tags ?? []
-
-  function handleTagKeyDown(e: KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      onAddTag()
-    }
   }
 
   return (
@@ -100,57 +83,6 @@ function SortableCard({
           </div>
         </div>
       )}
-
-      <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-        {tags.length === 0 && <span className="note" style={{ margin: 0 }}>No tags yet</span>}
-        {tags.map((tag) => (
-          <span
-            key={tag}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              background: 'var(--accent-soft)',
-              color: 'var(--accent)',
-              borderRadius: 12,
-              padding: '2px 4px 2px 9px',
-              fontSize: 11,
-            }}
-          >
-            #{tag}
-            <button
-              type="button"
-              onClick={() => onRemoveTag(tag)}
-              aria-label={`Remove tag ${tag}`}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                color: 'inherit',
-                padding: '0 4px',
-                fontSize: 13,
-                lineHeight: 1,
-              }}
-            >
-              ×
-            </button>
-          </span>
-        ))}
-      </div>
-
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
-        <input
-          type="text"
-          placeholder="Add a tag, press Enter"
-          value={tagDraft}
-          onChange={(e) => onTagDraftChange(e.target.value)}
-          onKeyDown={handleTagKeyDown}
-          style={{ flex: 1 }}
-        />
-        <button type="button" className="pay-btn" onClick={onAddTag}>
-          Add tag
-        </button>
-      </div>
     </div>
   )
 }
@@ -161,14 +93,12 @@ export function CostCentersSection() {
   const renameCostCenter = useRenameCostCenter()
   const deleteCostCenter = useDeleteCostCenter()
   const reorderCostCenters = useReorderCostCenters()
-  const updateTags = useUpdateCostCenterTags()
 
   const [name, setName] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
-  const [tagDraft, setTagDraft] = useState<Record<string, string>>({})
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
@@ -195,20 +125,6 @@ export function CostCentersSection() {
     await renameCostCenter.mutateAsync({ id: editingId, name: editingName.trim() })
     setEditingId(null)
     setEditingName('')
-  }
-
-  async function addTag(costCenterId: string, currentTags: string[]) {
-    const draft = (tagDraft[costCenterId] ?? '').trim()
-    if (!draft || currentTags.includes(draft)) {
-      setTagDraft((d) => ({ ...d, [costCenterId]: '' }))
-      return
-    }
-    await updateTags.mutateAsync({ id: costCenterId, tags: [...currentTags, draft] })
-    setTagDraft((d) => ({ ...d, [costCenterId]: '' }))
-  }
-
-  async function removeTag(costCenterId: string, currentTags: string[], tag: string) {
-    await updateTags.mutateAsync({ id: costCenterId, tags: currentTags.filter((t) => t !== tag) })
   }
 
   function handleDragEnd(event: DragEndEvent) {
@@ -269,10 +185,6 @@ export function CostCentersSection() {
               onSaveRename={saveRename}
               onCancelRename={() => setEditingId(null)}
               onDelete={() => deleteCostCenter.mutate(c.id)}
-              tagDraft={tagDraft[c.id] ?? ''}
-              onTagDraftChange={(v) => setTagDraft((d) => ({ ...d, [c.id]: v }))}
-              onAddTag={() => addTag(c.id, c.tags ?? [])}
-              onRemoveTag={(tag) => removeTag(c.id, c.tags ?? [], tag)}
             />
           ))}
         </SortableContext>

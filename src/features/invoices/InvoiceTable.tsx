@@ -14,15 +14,107 @@ import { fmt, fmtDate } from '../../lib/calc/format'
 import { gstAmt, tdsAmt, netPayable, totalPaid, dueAmount, effectiveDueDate, effectiveStatus } from '../../lib/calc/invoices'
 import type { DateRange } from '../../lib/calc/period'
 import { InvoicePaymentForm } from './InvoicePaymentForm'
-import { clientLabel } from '../../lib/labels'
+import { clientLabel, clientFullName, clientGstLine } from '../../lib/labels'
 import type { Database } from '../../types/database'
 
 type Invoice = Database['public']['Tables']['invoices']['Row']
+type InvoicePayment = Database['public']['Tables']['invoice_payments']['Row']
+type Client = Database['public']['Tables']['clients']['Row']
+
+/** Formats a running balance the way a Tally-style ledger does: the figure plus Dr/Cr side. */
+function fmtBalance(balance: number): string {
+  return `${fmt(Math.abs(balance))} ${balance >= 0 ? 'Dr' : 'Cr'}`
+}
+
+/**
+ * Builds one ledger section per client — Tally-style: opening balance carried in from
+ * before the selected period, then a chronological Date/Particulars/Vch No./Debit/Credit/
+ * Balance trail (invoices debit the client, payments credit them), ending in a closing
+ * balance. This is what Excel/PDF export renders; the on-screen table stays a flat grid
+ * since it needs per-row action buttons (edit/pay/remove) a ledger layout has no room for.
+ */
+function buildLedgerSections(
+  clients: Client[] | undefined,
+  allInvoices: Invoice[] | undefined,
+  allPayments: InvoicePayment[] | undefined,
+  range: DateRange | null,
+  clientFilter: string
+): ExportSection[] {
+  type Entry = { date: string; particulars: string; vch: string; debit: number; credit: number }
+
+  const relevantClients = (clients ?? [])
+    .filter((c) => !clientFilter || c.id === clientFilter)
+    .sort((a, b) => clientLabel(a).localeCompare(clientLabel(b)))
+
+  const sections: ExportSection[] = []
+
+  for (const client of relevantClients) {
+    const clientInvoices = (allInvoices ?? []).filter((inv) => inv.client_id === client.id && inv.invoice_date)
+    const invoiceIds = new Set(clientInvoices.map((inv) => inv.id))
+    const clientPayments = (allPayments ?? []).filter((p) => invoiceIds.has(p.invoice_id))
+
+    if (clientInvoices.length === 0 && clientPayments.length === 0) continue
+
+    const before: Entry[] = []
+    const within: Entry[] = []
+
+    const bucket = (entry: Entry) => {
+      if (range?.from && entry.date < range.from) before.push(entry)
+      else if (!range?.to || entry.date <= range.to) within.push(entry)
+    }
+
+    for (const inv of clientInvoices) {
+      bucket({
+        date: inv.invoice_date as string,
+        particulars: `Invoice ${inv.invoice_number ?? inv.display_id ?? ''}`.trim(),
+        vch: inv.invoice_number ?? inv.display_id ?? '',
+        debit: netPayable(inv),
+        credit: 0,
+      })
+    }
+    for (const p of clientPayments) {
+      bucket({
+        date: p.date,
+        particulars: `Payment received${p.reference ? ' — ' + p.reference : ''}`,
+        vch: p.display_id ?? '',
+        debit: 0,
+        credit: Number(p.amount || 0),
+      })
+    }
+
+    within.sort((a, b) => a.date.localeCompare(b.date))
+    const openingBalance = before.reduce((bal, e) => bal + e.debit - e.credit, 0)
+
+    let running = openingBalance
+    const rows: (string | number)[][] = [['', 'Opening balance', '', '', '', fmtBalance(running)]]
+    for (const e of within) {
+      running += e.debit - e.credit
+      rows.push([
+        fmtDate(e.date),
+        e.particulars,
+        e.vch,
+        e.debit ? fmt(e.debit) : '',
+        e.credit ? fmt(e.credit) : '',
+        fmtBalance(running),
+      ])
+    }
+    rows.push(['', 'Closing balance', '', '', '', fmtBalance(running)])
+
+    sections.push({
+      title: clientFullName(client),
+      columns: ['Date', 'Particulars', 'Vch No.', 'Debit', 'Credit', 'Balance'],
+      rows,
+    })
+  }
+
+  return sections
+}
 
 export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void }) {
   const [range, setRange] = useState<DateRange | null>(null)
   const [clientFilter, setClientFilter] = useState('')
   const { data: invoices, isLoading } = useInvoices(range)
+  const { data: allInvoices } = useInvoices(null)
   const { data: payments } = useInvoicePayments()
   const { data: clients } = useClients()
   const { data: projects } = useProjects()
@@ -58,34 +150,19 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
   )
   const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedInvoices)
 
-  const exportSections: ExportSection[] = [
-    {
-      title: 'Invoice records',
-      columns: ['ID', 'Invoice no.', 'Client', 'Project', 'Invoice date', 'Due date', 'Amount', 'GST', 'TDS', 'Net payable', 'Paid', 'Due', 'Status'],
-      rows: (sortedInvoices ?? []).map((inv) => {
-        const invPayments = payments?.filter((p) => p.invoice_id === inv.id) ?? []
-        return [
-          inv.display_id ?? '',
-          inv.invoice_number ?? '',
-          clientNameOf(inv),
-          projectNameOf(inv),
-          inv.invoice_date ? fmtDate(inv.invoice_date) : '',
-          (() => { const d = effectiveDueDate(inv); return d ? fmtDate(d) : '' })(),
-          inv.amount,
-          gstAmt(inv),
-          tdsAmt(inv),
-          netPayable(inv),
-          totalPaid(invPayments),
-          dueAmount(inv, invPayments),
-          effectiveStatus(inv, invPayments),
-        ]
-      }),
-    },
-  ]
+  const exportSections = buildLedgerSections(clients, allInvoices, payments, range, clientFilter)
+  // When narrowed to one client, the export should say so up front — full
+  // name and GST in the document, client code in the downloaded filename —
+  // rather than leaving the header as the generic "Ledger" title with no
+  // per-section title (which only prints when there's more than one).
+  const filterClient = clientFilter ? clients?.find((c) => c.id === clientFilter) : undefined
+  const ledgerTitle = filterClient ? `${clientFullName(filterClient)} ledger` : 'Ledger'
+  const ledgerGst = filterClient ? clientGstLine(filterClient) : undefined
+  const ledgerFileNamePrefix = filterClient ? `${clientLabel(filterClient)}_Ledger` : 'Ledger'
 
   return (
     <details className="toggle-section" open>
-      <summary>Invoice records</summary>
+      <summary>Ledger</summary>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 12, marginTop: 16 }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
@@ -102,7 +179,14 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
             />
           </div>
         </div>
-        <ReportExportButtons title="Invoice records" sections={exportSections} range={range} style={{ marginTop: 0 }} />
+        <ReportExportButtons
+          title={ledgerTitle}
+          sections={exportSections}
+          range={range}
+          style={{ marginTop: 0 }}
+          headerNote={ledgerGst ?? undefined}
+          fileNamePrefix={ledgerFileNamePrefix}
+        />
       </div>
 
       <TableScroll>

@@ -8,13 +8,53 @@ type ExpenseUpdate = Database['public']['Tables']['expenses']['Update']
 type ExpenseReimbursementInsert = Database['public']['Tables']['expense_reimbursements']['Insert']
 type ExpenseReimbursementUpdate = Database['public']['Tables']['expense_reimbursements']['Update']
 
-export function useExpenses(range: DateRange | null) {
+export interface PendingFieldExpense {
+  id: string
+  date: string
+  category: string
+  amount: number
+  description: string | null
+  receipt_url: string | null
+  site_id: string
+  sites: { name: string } | null
+  profiles: { name: string } | null
+}
+
+/** Staff submit these from the LIS_Fields mobile app; nothing here becomes a
+ * real ERP2.0 expense until an admin picks the project and approves it —
+ * see field-expenses-bridge (the edge function this calls) for why a direct
+ * cross-project query from the browser wouldn't work. Shared by the
+ * approval panel and the Approvals nav badge, so both read the same cache. */
+export function usePendingFieldExpenses(enabled = true) {
   return useQuery({
-    queryKey: ['expenses', range],
+    queryKey: ['pending-field-expenses'],
+    enabled,
+    queryFn: async (): Promise<PendingFieldExpense[]> => {
+      const { data, error } = await supabase.functions.invoke('field-expenses-bridge', { body: { action: 'list' } })
+      if (error) throw error
+      return (data.expenses ?? []) as PendingFieldExpense[]
+    },
+  })
+}
+
+/** A Supervisor's own submission sits pending until an Admin/CXO reviews and
+ * approves it — until then it's a claim, not a settled record, so it must
+ * not show up in tables, reports, or dashboards built on this hook. Default
+ * to approved-only everywhere; pass 'all' or 'pending' only for the
+ * approval queue and a Supervisor's own "what's still awaiting review" view. */
+export function useExpenses(
+  range: DateRange | null,
+  status: 'approved' | 'pending' | 'rejected' | 'all' = 'approved',
+  enabled = true
+) {
+  return useQuery({
+    queryKey: ['expenses', range, status],
+    enabled,
     queryFn: async () => {
       let query = supabase.from('expenses').select('*').order('date', { ascending: false })
       if (range?.from) query = query.gte('date', range.from)
       if (range?.to) query = query.lte('date', range.to)
+      if (status !== 'all') query = query.eq('status', status)
       const { data, error } = await query
       if (error) throw error
       return data

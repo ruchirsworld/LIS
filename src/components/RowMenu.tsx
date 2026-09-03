@@ -18,8 +18,9 @@ function MenuIcon() {
 
 /** Small "⋮"-style dropdown for per-row info + actions — closes on outside click or Escape.
  * `info` renders read-only detail above the action buttons (e.g. fields trimmed from a
- * shortened table); omit it for a plain actions-only menu. */
-export function RowMenu({ items, info }: { items: RowMenuItem[]; info?: React.ReactNode }) {
+ * shortened table); omit it for a plain actions-only menu. `badge` overlays a count on the
+ * trigger button itself (e.g. pending approvals) so it's visible without opening the menu. */
+export function RowMenu({ items, info, badge }: { items: RowMenuItem[]; info?: React.ReactNode; badge?: number }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -43,6 +44,7 @@ export function RowMenu({ items, info }: { items: RowMenuItem[]; info?: React.Re
     <div className="row-menu" ref={ref}>
       <button type="button" className="row-menu-btn" onClick={() => setOpen((v) => !v)} aria-label="Row actions">
         <MenuIcon />
+        {!!badge && badge > 0 && <span className="row-menu-badge">{badge}</span>}
       </button>
       {open && (
         <div className="row-menu-dropdown">

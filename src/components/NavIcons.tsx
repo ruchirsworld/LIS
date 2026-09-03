@@ -33,6 +33,34 @@ function ExpensesIcon() {
   )
 }
 
+function ApprovalsIcon() {
+  return (
+    <svg {...svgProps}>
+      <path d="M9 11l3 3L22 4" />
+      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+    </svg>
+  )
+}
+
+function CalendarIcon() {
+  return (
+    <svg {...svgProps}>
+      <rect x="3" y="4" width="18" height="17" rx="2" />
+      <path d="M3 9h18M8 2v4M16 2v4" />
+    </svg>
+  )
+}
+
+function RecordsIcon() {
+  return (
+    <svg {...svgProps}>
+      <path d="M6 2h9l5 5v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Z" />
+      <path d="M14 2v5h5" />
+      <path d="M8 12h8M8 16h5" />
+    </svg>
+  )
+}
+
 function PurchasesIcon() {
   return (
     <svg {...svgProps}>
@@ -104,6 +132,17 @@ function ProjectsIcon() {
   )
 }
 
+function HrIcon() {
+  return (
+    <svg {...svgProps}>
+      <circle cx="9" cy="8" r="3.2" />
+      <path d="M3.5 20v-1.5A4.5 4.5 0 0 1 8 14h2a4.5 4.5 0 0 1 4.5 4.5V20" />
+      <path d="M16 4.2a3.2 3.2 0 0 1 0 6" />
+      <path d="M20.5 20v-1.5a4.4 4.4 0 0 0-3-4.2" />
+    </svg>
+  )
+}
+
 function ReportsIcon() {
   return (
     <svg {...svgProps}>
@@ -126,6 +165,9 @@ function AdminIcon() {
 const ICONS: Record<TabId, () => ReactElement> = {
   dashboard: DashboardIcon,
   expenses: ExpensesIcon,
+  approvals: ApprovalsIcon,
+  calendar: CalendarIcon,
+  records: RecordsIcon,
   purchases: PurchasesIcon,
   vendor: VendorIcon,
   invoices: InvoicesIcon,
@@ -133,6 +175,7 @@ const ICONS: Record<TabId, () => ReactElement> = {
   capital: CapitalIcon,
   transfers: TransfersIcon,
   projects: ProjectsIcon,
+  hr: HrIcon,
   reports: ReportsIcon,
   admin: AdminIcon,
 }

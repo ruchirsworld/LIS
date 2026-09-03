@@ -11,6 +11,8 @@ type VendorInsert = Database['public']['Tables']['vendors']['Insert']
 type VendorUpdate = Database['public']['Tables']['vendors']['Update']
 type BankAccountInsert = Database['public']['Tables']['bank_accounts']['Insert']
 type BankAccountUpdate = Database['public']['Tables']['bank_accounts']['Update']
+type StaffInsert = Database['public']['Tables']['staff']['Insert']
+type StaffUpdate = Database['public']['Tables']['staff']['Update']
 
 // --- Clients ---
 
@@ -157,43 +159,6 @@ export function useReorderCostCenters() {
   })
 }
 
-// --- CoA: expense categories (admin-only write) + sub-categories
-// (create is open to all, ported in lib/queries/expenses.ts; rename/delete are admin-only) ---
-
-export function useCreateExpenseCategory() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (name: string) => {
-      const { data, error } = await supabase.from('expense_categories').insert({ name }).select().single()
-      if (error) throw error
-      return data
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['expense_categories'] }),
-  })
-}
-
-export function useRenameExpenseCategory() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async ({ id, name }: { id: string; name: string }) => {
-      const { error } = await supabase.from('expense_categories').update({ name }).eq('id', id)
-      if (error) throw error
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['expense_categories'] }),
-  })
-}
-
-export function useDeleteExpenseCategory() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from('expense_categories').delete().eq('id', id)
-      if (error) throw error
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['expense_categories'] }),
-  })
-}
-
 export function useUpdateCostCenterTags() {
   const qc = useQueryClient()
   return useMutation({
@@ -205,62 +170,64 @@ export function useUpdateCostCenterTags() {
   })
 }
 
-// --- Expense purposes (Projects cost center's "for what use" breakdown,
-// each with its own tag list — same shape as cost center tags) ---
+// --- Expense sub-heads (Chart of Accounts: Major Head is a fixed set of 10,
+// Sub-Head is addable within a head — code is "<major_head_code>.<n>") ---
 
-export function useCreateExpensePurpose() {
+export function useCreateExpenseSubHead() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (name: string) => {
+    mutationFn: async ({ majorHeadCode, majorHead, name }: { majorHeadCode: number; majorHead: string; name: string }) => {
       const { data: existing, error: maxErr } = await supabase
-        .from('expense_purposes')
+        .from('expense_sub_heads')
         .select('sort_order')
+        .eq('major_head_code', majorHeadCode)
         .order('sort_order', { ascending: false })
         .limit(1)
       if (maxErr) throw maxErr
       const nextOrder = (existing?.[0]?.sort_order ?? 0) + 1
+      const code = `${majorHeadCode}.${nextOrder}`
       const { data, error } = await supabase
-        .from('expense_purposes')
-        .insert({ name, sort_order: nextOrder })
+        .from('expense_sub_heads')
+        .insert({ major_head_code: majorHeadCode, major_head: majorHead, code, name, sort_order: nextOrder })
         .select()
         .single()
       if (error) throw error
       return data
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['expense_purposes'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['expense_sub_heads'] }),
   })
 }
 
-export function useRenameExpensePurpose() {
+export function useRenameExpenseSubHead() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async ({ id, name }: { id: string; name: string }) => {
-      const { error } = await supabase.from('expense_purposes').update({ name }).eq('id', id)
+      const { error } = await supabase.from('expense_sub_heads').update({ name }).eq('id', id)
       if (error) throw error
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['expense_purposes'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['expense_sub_heads'] }),
   })
 }
 
-export function useDeleteExpensePurpose() {
+export function useDeleteExpenseSubHead() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('expense_purposes').delete().eq('id', id)
+      const { error } = await supabase.from('expense_sub_heads').delete().eq('id', id)
       if (error) throw error
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['expense_purposes'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['expense_sub_heads'] }),
   })
 }
 
-export function useUpdateExpensePurposeTags() {
+export function useUpdateExpenseSubHeadTags() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async ({ id, tags }: { id: string; tags: string[] }) => {
-      const { error } = await supabase.from('expense_purposes').update({ tags }).eq('id', id)
+      const { error } = await supabase.from('expense_sub_heads').update({ tags }).eq('id', id)
       if (error) throw error
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['expense_purposes'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['expense_sub_heads'] }),
   })
 }
 
@@ -327,6 +294,43 @@ export function useDeleteVendor() {
   })
 }
 
+// --- Staff (insert: admin/cxo; update/delete: admin only — enforced by RLS,
+// mirrored in the UI so Staff/CXO don't see controls that would just fail) ---
+
+export function useCreateStaff() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (staff: StaffInsert) => {
+      const { data, error } = await supabase.from('staff').insert(staff).select().single()
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['staff'] }),
+  })
+}
+
+export function useUpdateStaff() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, patch }: { id: string; patch: StaffUpdate }) => {
+      const { error } = await supabase.from('staff').update(patch).eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['staff'] }),
+  })
+}
+
+export function useDeleteStaff() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('staff').delete().eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['staff'] }),
+  })
+}
+
 // --- Bank accounts ---
 
 export function useCreateBankAccount() {
@@ -368,7 +372,7 @@ export function useDeleteBankAccount() {
 export interface Profile {
   id: string
   name: string
-  role: 'admin' | 'cxo'
+  role: 'admin' | 'cxo' | 'supervisor'
   phone: string | null
   created_at: string
 }
@@ -391,7 +395,7 @@ export function useCreateUser() {
       phone: string
       pin: string
       name: string
-      role: 'admin' | 'cxo'
+      role: 'admin' | 'cxo' | 'supervisor'
     }) => {
       const { data, error } = await supabase.functions.invoke('admin-create-user', { body: input })
       if (error) throw error
@@ -412,7 +416,7 @@ export function useUpdateProfile() {
     }: {
       id: string
       name: string
-      role: 'admin' | 'cxo'
+      role: 'admin' | 'cxo' | 'supervisor'
     }) => {
       const { error } = await supabase.from('profiles').update({ name, role }).eq('id', id)
       if (error) throw error
@@ -431,5 +435,48 @@ export function useDeleteUser() {
       return data
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['profiles'] }),
+  })
+}
+
+// --- Supervisor project assignments ---
+// A Supervisor can be responsible for more than one project at once (e.g.
+// covering two nearby sites) — this join table is separate from a field
+// worker's single default_project_id in `staff`.
+
+export interface SupervisorProjectRow {
+  id: string
+  profile_id: string
+  project_id: string
+}
+
+export function useSupervisorProjects(profileId: string | null) {
+  return useQuery({
+    queryKey: ['supervisor-projects', profileId],
+    queryFn: async () => {
+      if (!profileId) return []
+      const { data, error } = await supabase.from('supervisor_projects').select('*').eq('profile_id', profileId)
+      if (error) throw error
+      return data as SupervisorProjectRow[]
+    },
+    enabled: !!profileId,
+  })
+}
+
+export function useSetSupervisorProjects() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ profileId, projectIds }: { profileId: string; projectIds: string[] }) => {
+      const { error: delError } = await supabase.from('supervisor_projects').delete().eq('profile_id', profileId)
+      if (delError) throw delError
+      if (projectIds.length > 0) {
+        const { error: insError } = await supabase
+          .from('supervisor_projects')
+          .insert(projectIds.map((project_id) => ({ profile_id: profileId, project_id })))
+        if (insError) throw insError
+      }
+    },
+    onSuccess: (_data, { profileId }) => {
+      qc.invalidateQueries({ queryKey: ['supervisor-projects', profileId] })
+    },
   })
 }

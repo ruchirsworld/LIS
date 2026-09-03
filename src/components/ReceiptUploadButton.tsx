@@ -9,10 +9,10 @@ function CameraIcon() {
   )
 }
 
-/** Camera icon that opens an explicit "Take photo" / "Choose from gallery"
- * menu — two separate hidden file inputs (one with capture=environment,
- * one without) so the choice is deterministic across mobile browsers rather
- * than relying on a single input's native chooser. */
+/** Opens an explicit "Take photo" / "Choose from gallery" menu — two
+ * separate hidden file inputs (one with capture=environment, one without)
+ * so the choice is deterministic across mobile browsers rather than relying
+ * on a single input's native chooser. */
 export function ReceiptUploadButton({
   idPrefix,
   hasFile,

@@ -4,7 +4,8 @@ import { CurrencyInput } from '../../components/CurrencyInput'
 import { InlineCalculator } from '../../components/InlineCalculator'
 import { SearchableSelect } from '../../components/SearchableSelect'
 import { ReceiptUploadButton } from '../../components/ReceiptUploadButton'
-import { useClients, useProjects, useCostCenters, useExpensePurposes, useExpenseUnits } from '../../lib/queries/masters'
+import { Modal } from '../../components/Modal'
+import { useClients, useProjects, useCostCenters, useExpenseSubHeads, useExpenseUnits, useBankAccounts } from '../../lib/queries/masters'
 import { useCreateExpense, useUpdateExpense } from '../../lib/queries/expenses'
 import { useCreateExpenseUnit } from '../../lib/queries/admin'
 import { useGeolocation } from '../../lib/useGeolocation'
@@ -13,13 +14,25 @@ import { uploadReceipt } from '../../lib/storage'
 import { fmt, parseINR } from '../../lib/calc/format'
 import { getErrorMessage } from '../../lib/errors'
 import { clientLabel } from '../../lib/labels'
+import { TRIP_QUICK_CATEGORIES } from '../../lib/tripQuickCategories'
+import { ADMIN_QUICK_CATEGORIES } from '../../lib/adminQuickCategories'
+import type { QuickCategory } from '../../lib/quickCategories'
 import type { Database } from '../../types/database'
 
 type ExpenseRow = Database['public']['Tables']['expenses']['Row']
-type Settlement = 'UPI' | 'Cash' | 'Bank' | 'Reimbursable'
 
-const SETTLEMENT_OPTIONS: Settlement[] = ['UPI', 'Cash', 'Bank', 'Reimbursable']
 const PROJECT_STORAGE_KEY = 'lis.expenses.lastProject'
+const GST_RATES = [0, 5, 12, 18, 28]
+const CASH = 'cash'
+// Not a real account — picking this means the employee paid out of pocket
+// and the firm owes it back, so no cash/bank actually moves yet.
+const REIMBURSE = 'reimburse'
+// Also not a real account — set automatically when a Supervisor's own
+// Project claim is approved (see handleApproveSupervisor in
+// PendingExpenseApprovals.tsx), never picked here. Shown read-only so
+// editing one of these doesn't misrepresent it as Cash and doesn't silently
+// clear paid_from_imprest on save.
+const IMPREST = 'imprest'
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
@@ -81,15 +94,56 @@ function CalculatorIcon() {
 export function ExpenseForm({
   editingExpense,
   onDoneEditing,
+  tripId,
+  tripDate,
+  fixedCostCenter,
+  fixedProjectId,
+  lockToProjects,
 }: {
   editingExpense: ExpenseRow | null
   onDoneEditing: () => void
+  /** When set (embedding this form inside a Trip sheet), every entry created
+   * here is tagged to that trip — same expense, same ledger posting, just
+   * with the extra trip dimension. */
+  tripId?: string
+  /** The date to log a trip entry under — picked from the date field next to
+   * End Trip in the Trips header, not from a field in this form. */
+  tripDate?: string
+  /** Cost center and project the trip was started with — entries logged
+   * under a trip inherit both instead of picking their own each time. */
+  fixedCostCenter?: string | null
+  fixedProjectId?: string | null
+  /** Used by the Project section — locks the cost center to "Project" (no
+   * picker, since it's the only option there) while still letting the user
+   * pick *which* project per entry, unlike a trip's fixed one. */
+  lockToProjects?: boolean
 }) {
   const { data: clients } = useClients()
   const { data: projects } = useProjects()
   const { data: costCenters } = useCostCenters()
-  const { data: purposes } = useExpensePurposes()
+  const { data: subHeads } = useExpenseSubHeads()
   const { data: units } = useExpenseUnits()
+  const { data: bankAccounts } = useBankAccounts()
+  // Bank accounts first (Kotak, then CBI, then anything else alphabetically),
+  // Cash and Reimbursement always last — matches the requested button order.
+  const BANK_ORDER = ['Kotak', 'CBI']
+  const sortedBankAccounts = [...(bankAccounts ?? [])].sort((a, b) => {
+    const ai = BANK_ORDER.indexOf(a.name)
+    const bi = BANK_ORDER.indexOf(b.name)
+    if (ai === -1 && bi === -1) return a.name.localeCompare(b.name)
+    if (ai === -1) return 1
+    if (bi === -1) return -1
+    return ai - bi
+  })
+  // Imprest is only ever shown, never offered, and only when the record
+  // being edited already has it — see the IMPREST constant above.
+  const accountOptions = [
+    ...sortedBankAccounts,
+    { id: CASH, name: 'Cash' },
+    { id: REIMBURSE, name: 'Reimburse' },
+    ...(editingExpense?.paid_from_imprest ? [{ id: IMPREST, name: 'Imprest (Site float)' }] : []),
+  ]
+  const defaultAccountId = accountOptions.find((a) => a.name === 'Kotak')?.id ?? CASH
   // No visible GPS UI — still silently captured on mount and submitted with the transaction.
   const { geo } = useGeolocation()
 
@@ -99,53 +153,134 @@ export function ExpenseForm({
 
   const [costCenterOverride, setCostCenterOverride] = useState<string | null>(null)
   const [projectId, setProjectId] = useState(() => loadStoredProject())
-  const [purpose, setPurpose] = useState('')
+  const [majorHeadFilter, setMajorHeadFilter] = useState<number | ''>('')
+  const [subHeadId, setSubHeadId] = useState('')
   const [amount, setAmount] = useState('0')
   const [qty, setQty] = useState('')
   const [unit, setUnit] = useState('Nos')
   const [rate, setRate] = useState('0')
   const [additionalAmount, setAdditionalAmount] = useState('0')
   const [showCalc, setShowCalc] = useState(false)
+  const [addGst, setAddGst] = useState(false)
+  const [gstPct, setGstPct] = useState(0)
+  const [showGstModal, setShowGstModal] = useState(false)
+  const [gstPctDraft, setGstPctDraft] = useState('18')
   const [description, setDescription] = useState('')
   const [date, setDate] = useState(todayStr())
+  // A trip entry's date comes from the Trips header's date picker instead of
+  // a field in this form.
+  const effectiveDate = tripId ? tripDate ?? todayStr() : date
   const [remarks, setRemarks] = useState('')
   const [receiptBlob, setReceiptBlob] = useState<Blob | null>(null)
   const [receiptStatus, setReceiptStatus] = useState('Take photo')
-  const [settlement, setSettlement] = useState<Settlement>('UPI')
+  // Which Description group's options row is open — a group with options
+  // has no sub-head of its own, so tapping it just reveals this instead of
+  // applying anything.
+  const [expandedQuickGroup, setExpandedQuickGroup] = useState<string | null>(null)
+  // Exactly which Description button was tapped — e.g. "Transport>Fuel" vs
+  // "Miscellaneous". Several buttons can resolve to the identical sub-head
+  // (Leisure, the standalone Miscellaneous, and Transport's own Miscellaneous
+  // option all post to 100.1), so matching by sub-head id alone would light
+  // up all of them at once. This key is what keeps exactly one highlighted.
+  const [selectedQuickKey, setSelectedQuickKey] = useState<string | null>(null)
+  // '' = no explicit pick yet — resolves to Kotak (or Cash, if that account
+  // isn't around) via defaultAccountId below, so the default stays correct
+  // even if bank accounts are renamed or reordered later.
+  const [accountId, setAccountId] = useState('')
+  const effectiveAccountId = accountId || defaultAccountId
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [lastCreatedId, setLastCreatedId] = useState<string | null>(null)
 
   const activeProjects = projects?.filter((p) => p.status === 'active')
-  const defaultCostCenter = projectId ? 'Projects' : (costCenters?.[0]?.name ?? '')
-  const costCenter = costCenterOverride ?? defaultCostCenter
-  const isProjectCostCenter = costCenter === 'Projects'
-  const selectedProject = projects?.find((p) => p.id === projectId)
+  const defaultCostCenter = costCenters?.[0]?.name ?? ''
+  // Cost center is now just a tag for which of the three flows an entry
+  // came from — Admin, Trips, or Project — not a business category picked
+  // per entry. A brand-new, non-trip, non-project entry is an Admin expense
+  // by definition. Editing an existing record re-derives this from what's
+  // actually stored, so it stays editable either way.
+  const isAdminEntry = !tripId && !lockToProjects && (editingExpense ? editingExpense.cost_center === 'Admin' : true)
+  // Under a trip, the cost center is always "Trips" — the trip's own
+  // (optional) project is tracked separately via hasProject below, not
+  // through this. The Project section locks its own cost center but still
+  // lets the project be picked per entry (below).
+  const costCenter = tripId ? fixedCostCenter ?? '' : lockToProjects ? 'Project' : isAdminEntry ? 'Admin' : costCenterOverride ?? defaultCostCenter
+  const isProjectCostCenter = costCenter === 'Project'
+  // Qty x Rate line-item billing only makes sense for standalone project
+  // costs — trip spends are always a straight amount.
+  const showQtyRateFields = isProjectCostCenter && !tripId
+  // Whether Description quick-tap is doing the sub-head picking instead of
+  // the raw Major Head / Sub-head accounting picker below.
+  const usesQuickTap = !!tripId || isAdminEntry
+  // Admin expenses get the same Description → Sub Head quick-tap as trips.
+  // Project costs use the accounting picker (Major head capsule buttons,
+  // Sub-head dropdown) instead — see the dedicated rows below. Editing an
+  // older record whose cost center isn't one of the three current tags
+  // keeps the plain dropdown pair too, since there's no quick-tap set for it.
+  const activeQuickCategories: QuickCategory[] = tripId
+    ? TRIP_QUICK_CATEGORIES
+    : isAdminEntry
+      ? ADMIN_QUICK_CATEGORIES
+      : []
+  const effectiveProjectId = tripId ? fixedProjectId ?? '' : projectId
+  const selectedProject = projects?.find((p) => p.id === effectiveProjectId)
   const selectedProjectClient = selectedProject ? clients?.find((c) => c.id === selectedProject.client_id) : null
+  // Whether this entry should carry a project_id at all — for a trip that's
+  // whether the trip itself has one (independent of cost center, which is
+  // always "Trips"); everywhere else it follows the Project cost center.
+  const hasProject = tripId ? !!effectiveProjectId : isProjectCostCenter
   const projectTotal = (Number(qty) || 0) * parseINR(rate) + parseINR(additionalAmount)
+  const baseAmount = showQtyRateFields ? projectTotal : parseINR(amount)
+  const gstAmount = addGst ? (baseAmount * gstPct) / 100 : 0
+  const displayAmount = baseAmount + gstAmount
 
-  // Tags are scoped per cost center (managed in Admin → Cost centers) — except
-  // under Projects, where Purpose (managed in Admin → Purposes) is the finer
-  // breakdown and supplies the quick-tag list instead.
-  const selectedCostCenter = costCenters?.find((cc) => cc.name === costCenter)
-  const selectedPurpose = purposes?.find((p) => p.name === purpose)
-  const tagSource = isProjectCostCenter ? selectedPurpose?.tags : selectedCostCenter?.tags
-  const topTags = (tagSource ?? []).map((t) => `#${t}`)
+  // Major Head / Sub-Head (Chart of Accounts) — feeds the manual dropdown
+  // pair below, which shows on the Project section (Employee & Labour,
+  // Equipment & Machinery, Site/Project Overheads) and when editing a legacy
+  // T&M expense — the latter needs every major head selectable, not just
+  // Project's own, so the filter only applies when actually on that page.
+  const PROJECT_MAJOR_HEAD_CODES = [10, 30, 60]
+  const majorHeads = Array.from(new Map((subHeads ?? []).map((s) => [s.major_head_code, s.major_head])).entries())
+    .filter(([code]) => (lockToProjects ? PROJECT_MAJOR_HEAD_CODES.includes(code) : true))
+    .sort((a, b) => a[0] - b[0])
+    .map(([code, name]) => ({ code, name }))
+  // Only feeds the manual Major Head / Sub-head pickers below, which trips
+  // don't use — Description covers sub-head selection there instead.
+  const subHeadOptions = majorHeadFilter === '' ? [] : (subHeads ?? []).filter((s) => s.major_head_code === majorHeadFilter)
+  const selectedSubHead = subHeads?.find((s) => s.id === subHeadId)
+  const topTags = (selectedSubHead?.tags ?? []).map((t) => `#${t}`)
+
+  // Hydrate the Major Head filter from the saved sub-head once sub-heads
+  // have loaded — covers both editing an existing expense and the async
+  // fetch racing the mount effect below.
+  useEffect(() => {
+    if (!subHeadId || !subHeads) return
+    const sh = subHeads.find((s) => s.id === subHeadId)
+    if (sh) setMajorHeadFilter(sh.major_head_code)
+  }, [subHeadId, subHeads])
 
   useEffect(() => {
     if (!editingExpense) return
     setCostCenterOverride(editingExpense.cost_center ?? null)
     setProjectId(editingExpense.project_id ?? '')
-    setPurpose(editingExpense.purpose ?? '')
+    setSubHeadId(editingExpense.sub_head_id ?? '')
     setAmount(String(editingExpense.amount))
     setQty(editingExpense.qty != null ? String(editingExpense.qty) : '')
     setUnit(editingExpense.unit ?? 'Nos')
     setRate(editingExpense.rate != null ? String(editingExpense.rate) : '0')
     setAdditionalAmount(editingExpense.additional_amount != null ? String(editingExpense.additional_amount) : '0')
+    setAddGst((editingExpense.gst_pct ?? 0) > 0)
+    setGstPct(editingExpense.gst_pct ?? 0)
     setDescription(editingExpense.description)
     setDate(editingExpense.date)
     setRemarks(editingExpense.remarks ?? '')
-    setSettlement(editingExpense.reimbursable ? 'Reimbursable' : (editingExpense.payment_mode as Settlement) ?? 'UPI')
+    setAccountId(
+      editingExpense.paid_from_imprest
+        ? IMPREST
+        : editingExpense.reimbursable
+          ? REIMBURSE
+          : editingExpense.bank_account_id ?? CASH
+    )
     setReceiptBlob(null)
     setReceiptStatus(editingExpense.receipt_path ? 'Photo attached' : 'Take photo')
     setShowCalc(false)
@@ -157,9 +292,65 @@ export function ExpenseForm({
     setCostCenterOverride(name)
   }
 
+  function applyQuickCategory(subHeadCode: string, label: string, key: string) {
+    const sh = subHeads?.find((s) => s.code === subHeadCode)
+    if (!sh) return
+    setMajorHeadFilter(sh.major_head_code)
+    setSubHeadId(sh.id)
+    setDescription(label)
+    // Row stays open after picking — the highlighted pill IS the
+    // confirmation that it was recorded; nothing forces it shut.
+    setSelectedQuickKey(key)
+  }
+
+  function handleQuickCategoryClick(c: QuickCategory) {
+    if (c.options) {
+      if (expandedQuickGroup === c.label) {
+        // Already open — just collapse it, keep whatever was picked.
+        setExpandedQuickGroup(null)
+      } else {
+        // Opening a different group means starting a fresh pick — only one
+        // Description selection stands at a time, so clear the old one.
+        setExpandedQuickGroup(c.label)
+        setSubHeadId('')
+        setMajorHeadFilter('')
+        setDescription('')
+        setSelectedQuickKey(null)
+      }
+    } else if (c.subHeadCode) {
+      // A plain pick is final — close out any group the user was browsing.
+      setExpandedQuickGroup(null)
+      applyQuickCategory(c.subHeadCode, c.label, c.label)
+    }
+  }
+
+  // A group with options highlights as soon as it's expanded — before its
+  // sub-head is even picked — or if one of its own options is the one
+  // selected. A plain group only highlights once it's the one selected.
+  // Matched by selectedQuickKey, not sub-head id, so buttons that happen to
+  // share a sub-head (see the note by its declaration) don't all light up.
+  function isQuickCategoryActive(c: QuickCategory) {
+    if (c.options) {
+      if (expandedQuickGroup === c.label) return true
+      return c.options.some((o) => selectedQuickKey === `${c.label}>${o.label}`)
+    }
+    return selectedQuickKey === c.label
+  }
+
   function handleProjectChange(id: string) {
     setProjectId(id)
     storeProject(id)
+  }
+
+  function handleSubHeadChange(id: string) {
+    setSubHeadId(id)
+    // On a trip, the sub-head choice itself says what the spend was for —
+    // no separate description to type. Manual entry (outside Quick category)
+    // still needs a description, so fall back to the sub-head's own name.
+    if (tripId) {
+      const sh = subHeads?.find((s) => s.id === id)
+      setDescription(sh?.name ?? '')
+    }
   }
 
   async function handleReceiptFile(file: File) {
@@ -179,21 +370,26 @@ export function ExpenseForm({
 
   function resetForm() {
     setCostCenterOverride(null)
-    setPurpose('')
+    setMajorHeadFilter('')
+    setSubHeadId('')
     setAmount('0')
     setQty('')
     setUnit('Nos')
     setRate('0')
     setAdditionalAmount('0')
+    setAddGst(false)
+    setGstPct(0)
     setDescription('')
     // projectId deliberately not reset — it stays the default for the rest
     // of the day (see loadStoredProject), across repeated entries.
-    setSettlement('UPI')
+    setAccountId('')
     setRemarks('')
     setReceiptBlob(null)
     setReceiptStatus('Take photo')
     setDate(todayStr())
     setShowCalc(false)
+    setExpandedQuickGroup(null)
+    setSelectedQuickKey(null)
   }
 
   function handleCancel() {
@@ -205,20 +401,23 @@ export function ExpenseForm({
     e.preventDefault()
     setFormError(null)
 
-    if (isProjectCostCenter && !projectId) {
+    if (isProjectCostCenter && !effectiveProjectId) {
       setFormError('Pick a project.')
       return
     }
-    if (isProjectCostCenter && (!qty || Number(qty) <= 0)) {
+    if (showQtyRateFields && (!qty || Number(qty) <= 0)) {
       setFormError('Enter a quantity.')
       return
     }
-    if (!description.trim()) {
-      setFormError('Tags are required.')
+    if (!subHeadId) {
+      setFormError(usesQuickTap ? 'Pick a description.' : 'Pick a major head and sub-head.')
       return
     }
-    const amt = isProjectCostCenter ? projectTotal : parseINR(amount)
-    if (amt <= 0) {
+    if (!description.trim()) {
+      setFormError('Description is required.')
+      return
+    }
+    if (baseAmount <= 0) {
       setFormError('Enter an amount.')
       return
     }
@@ -229,24 +428,36 @@ export function ExpenseForm({
       if (receiptBlob) {
         receiptPath = await uploadReceipt(receiptBlob)
       }
-      if (isProjectCostCenter && unit.trim() && !units?.some((u) => u.name === unit.trim())) {
+      if (showQtyRateFields && unit.trim() && !units?.some((u) => u.name === unit.trim())) {
         createUnit.mutate(unit.trim())
       }
       const patch = {
         description: description.trim(),
-        project_id: isProjectCostCenter ? projectId || null : null,
+        project_id: hasProject ? effectiveProjectId || null : null,
         cost_center: costCenter || null,
-        purpose: isProjectCostCenter ? purpose || null : null,
-        amount: amt,
-        qty: isProjectCostCenter ? Number(qty) || null : null,
-        unit: isProjectCostCenter ? unit.trim() || null : null,
-        rate: isProjectCostCenter ? parseINR(rate) || null : null,
-        additional_amount: isProjectCostCenter ? parseINR(additionalAmount) || 0 : null,
-        date,
-        reimbursable: settlement === 'Reimbursable',
+        sub_head_id: subHeadId || null,
+        amount: baseAmount,
+        gst_pct: addGst ? gstPct : 0,
+        qty: showQtyRateFields ? Number(qty) || null : null,
+        unit: showQtyRateFields ? unit.trim() || null : null,
+        rate: showQtyRateFields ? parseINR(rate) || null : null,
+        additional_amount: showQtyRateFields ? parseINR(additionalAmount) || 0 : null,
+        date: effectiveDate,
+        reimbursable: effectiveAccountId === REIMBURSE,
+        paid_from_imprest: effectiveAccountId === IMPREST,
         remarks: remarks.trim() || null,
         receipt_path: receiptPath,
-        payment_mode: settlement === 'Reimbursable' ? null : settlement,
+        payment_mode:
+          effectiveAccountId === REIMBURSE || effectiveAccountId === IMPREST
+            ? null
+            : effectiveAccountId === CASH
+              ? 'Cash'
+              : 'Bank',
+        bank_account_id:
+          effectiveAccountId === REIMBURSE || effectiveAccountId === CASH || effectiveAccountId === IMPREST
+            ? null
+            : effectiveAccountId,
+        trip_id: tripId ?? editingExpense?.trip_id ?? null,
       }
       if (editingExpense) {
         await updateExpense.mutateAsync({
@@ -267,30 +478,59 @@ export function ExpenseForm({
   }
 
   return (
-    <details className="toggle-section" open>
-      <summary>{editingExpense ? 'Edit transaction' : 'Add transaction'}</summary>
+    <details className="toggle-section exp-compact-section" open>
+      <summary style={{ fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <span>{editingExpense ? 'Edit transaction' : 'Add transaction'}</span>
+        <button
+          type="button"
+          className={addGst ? 'pill active' : 'pill'}
+          onClick={(e) => {
+            // Inside <summary>, a click's default action toggles the
+            // <details> open/closed — preventing it keeps this button from
+            // also collapsing the form every time it's tapped.
+            e.preventDefault()
+            e.stopPropagation()
+            setGstPctDraft(String(gstPct > 0 ? gstPct : 18))
+            setShowGstModal(true)
+          }}
+        >
+          {addGst ? `GST ${gstPct}% — ${fmt(gstAmount)}` : 'Add GST'}
+        </button>
+      </summary>
 
-      <form className="form-grid" onSubmit={handleSubmit} style={{ marginTop: 16 }}>
-        {/* Row 1: Cost center */}
-        <div className="field full">
-          <label>Cost center</label>
-          <div className="pill-tabs">
-            {(costCenters ?? []).map((cc) => (
-              <button
-                key={cc.id}
-                type="button"
-                className={costCenter === cc.name ? 'pill active' : 'pill'}
-                onClick={() => handleCostCenterChange(cc.name)}
-              >
-                {cc.name}
-              </button>
-            ))}
+      <form className="form-grid exp-compact" onSubmit={handleSubmit} style={{ marginTop: 8 }}>
+        {/* Row 1: Cost center — fixed by the trip when entering trip expenses,
+            so there's nothing to pick here (the page header already says
+            Trips). Date comes from the Trips header's date picker instead of
+            a field here; the trip's project, if any, is still noted below. */}
+        {tripId ? (
+          hasProject ? (
+            <div className="field full">
+              <div className="note" style={{ margin: 0, fontSize: 11 }}>({selectedProject?.name ?? '—'})</div>
+            </div>
+          ) : null
+        ) : isAdminEntry || lockToProjects ? null : (
+          <div className="field full">
+            <label>Cost center</label>
+            <div className="pill-tabs">
+              {(costCenters ?? []).map((cc) => (
+                <button
+                  key={cc.id}
+                  type="button"
+                  className={costCenter === cc.name ? 'pill active' : 'pill'}
+                  onClick={() => handleCostCenterChange(cc.name)}
+                >
+                  {cc.name}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Row 2: Project + Client, only when "Projects" is the cost center */}
-        {isProjectCostCenter && (
-          <div className="field-row">
+        {/* Row 2: Project + Client, only when "Projects" is the cost center
+            and not already fixed by a trip above */}
+        {isProjectCostCenter && !tripId && (
+          <div className="field-row exp-project-row">
             <div className="field">
               <label>Project</label>
               <SearchableSelect
@@ -309,38 +549,147 @@ export function ExpenseForm({
           </div>
         )}
 
-        {/* Row 2b: Purpose — Projects only, its tags feed future KPIs */}
-        {isProjectCostCenter && (
-          <div className="field full">
-            <label>Purpose</label>
+        {/* Quick categories — one tap sets Major Head, Sub-Head, and the
+            description, so logging on the go doesn't need the full Major
+            Head → Sub-Head picker underneath. A category with options has
+            no sub-head of its own — tapping it reveals those instead, and
+            the actual sub-head is set by tapping one of them. Trips get
+            their own set (Transport/Consumables/Other); NAN/DDN office
+            costs get the Admin set (Office/Marketing/Professional/Finance/
+            Misc) — Project and T&M costs still use the dropdown below. */}
+        {activeQuickCategories.length > 0 && (
+          <div className="field full exp-quick-category">
+            <label>Description</label>
             <div className="pill-tabs">
-              {(purposes ?? []).map((p) => (
+              {activeQuickCategories.map((c) => {
+                const active = isQuickCategoryActive(c)
+                return (
+                  <button
+                    key={c.label}
+                    type="button"
+                    className={active ? 'pill active' : 'pill'}
+                    onClick={() => handleQuickCategoryClick(c)}
+                  >
+                    {c.label}
+                  </button>
+                )
+              })}
+            </div>
+            {activeQuickCategories.map((c) => {
+              if (!c.options || expandedQuickGroup !== c.label) return null
+              return (
+                <div key={c.label} style={{ marginTop: 8 }}>
+                  <label style={{ fontSize: 12 }}>Sub-heads</label>
+                  <div className="pill-tabs" style={{ marginTop: 4 }}>
+                  {c.options.map((opt) => {
+                    const active = selectedQuickKey === `${c.label}>${opt.label}`
+                    return (
+                      <button
+                        key={opt.label}
+                        type="button"
+                        className={active ? 'pill active' : 'pill'}
+                        onClick={() => applyQuickCategory(opt.subHeadCode, opt.label, `${c.label}>${opt.label}`)}
+                      >
+                        {opt.label}
+                      </button>
+                    )
+                  })}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Project's own accounting picker — Major head as capsule buttons
+            (just the 3 heads Project spend can post to), Sub-head as a
+            dropdown scoped to whichever major head is picked. */}
+        {lockToProjects && (
+          <div className="field full">
+            <label>Major head</label>
+            <div className="pill-tabs">
+              {majorHeads.map((h) => (
                 <button
-                  key={p.id}
+                  key={h.code}
                   type="button"
-                  className={purpose === p.name ? 'pill active' : 'pill'}
-                  onClick={() => setPurpose(purpose === p.name ? '' : p.name)}
+                  className={majorHeadFilter === h.code ? 'pill active' : 'pill'}
+                  onClick={() => {
+                    setMajorHeadFilter(h.code)
+                    setSubHeadId('')
+                  }}
                 >
-                  {p.name}
+                  {h.name}
                 </button>
               ))}
             </div>
           </div>
         )}
+        {lockToProjects && (
+          <div className="field full">
+            <label>Sub-head</label>
+            <SearchableSelect
+              items={subHeadOptions}
+              value={subHeadId}
+              onChange={handleSubHeadChange}
+              getId={(s) => s.id}
+              getLabel={(s) => s.name}
+              placeholder={majorHeadFilter === '' ? '— Pick a major head first —' : '— Select sub-head —'}
+            />
+          </div>
+        )}
 
-        {/* Row 3: Tags */}
-        <div className="field full">
-          <label>Tags</label>
-          <input
-            type="text"
-            required
-            placeholder="Use #tags to make it searchable"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-        </div>
+        {/* Row 2b: Major Head / Sub-Head — Chart of Accounts. Hidden
+            whenever Description above is doing the job instead (trips and
+            NAN/DDN admin costs) — Major Head is still tracked underneath
+            via the hydration effect for the ledger join either way. Still
+            used for legacy T&M costs, which don't have a quick-tap set yet
+            (Project entries use their own picker above instead). */}
+        {!tripId && !isAdminEntry && !lockToProjects && (
+          <div className="field-row exp-taxonomy-row">
+            <div className="field">
+              <label>Major head</label>
+              <SearchableSelect
+                items={majorHeads}
+                value={majorHeadFilter === '' ? '' : String(majorHeadFilter)}
+                onChange={(v) => {
+                  setMajorHeadFilter(v === '' ? '' : Number(v))
+                  setSubHeadId('')
+                }}
+                getId={(h) => String(h.code)}
+                getLabel={(h) => h.name}
+                placeholder="— Select major head —"
+              />
+            </div>
+            <div className="field">
+              <label>Sub-head</label>
+              <SearchableSelect
+                items={subHeadOptions}
+                value={subHeadId}
+                onChange={handleSubHeadChange}
+                getId={(s) => s.id}
+                getLabel={(s) => s.name}
+                placeholder={majorHeadFilter === '' ? '— Pick a major head first —' : '— Select sub-head —'}
+              />
+            </div>
+          </div>
+        )}
 
-        {topTags.length > 0 && (
+        {/* Row 3: Description — not shown wherever the Description quick-tap
+            above already says what it was for. */}
+        {!usesQuickTap && (
+          <div className="field full">
+            <label>Description</label>
+            <input
+              type="text"
+              required
+              placeholder="What was this for?"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </div>
+        )}
+
+        {topTags.length > 0 && !usesQuickTap && (
           <div style={{ gridColumn: '1 / -1' }}>
             {topTags.map((t) => (
               <button
@@ -365,11 +714,13 @@ export function ExpenseForm({
           </div>
         )}
 
-        {/* Row 4: Date + Amount — or, under Projects, Qty x Unit x Rate then
-            Additional amount + Date, with the total shown by the submit button. */}
-        {isProjectCostCenter ? (
+        {/* Row 4: Date + Amount — or, for a standalone project cost, Qty x
+            Unit x Rate then Additional amount + Date, with the total shown
+            by the submit button. Trips always get the simple Date + Amount
+            row, even when booked to a project. */}
+        {showQtyRateFields ? (
           <>
-            <div className="field-row">
+            <div className="field-row exp-qty-row">
               <div className="field">
                 <label>Qty</label>
                 <input type="number" min="0" step="0.01" required value={qty} onChange={(e) => setQty(e.target.value)} />
@@ -401,10 +752,14 @@ export function ExpenseForm({
           </>
         ) : (
           <div className="field-row exp-row4">
-            <div className="field field-narrow">
-              <label>Date</label>
-              <input type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
-            </div>
+            {/* Date already sits up in the Cost center row on trips —
+                only show it here for non-trip entries. */}
+            {!tripId && (
+              <div className="field field-narrow">
+                <label>Date</label>
+                <input type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
+              </div>
+            )}
             <div className="field">
               <label>Amount (₹)</label>
               <div className="amount-row" style={{ display: 'flex', gap: 8, alignItems: 'center', minWidth: 0 }}>
@@ -415,10 +770,10 @@ export function ExpenseForm({
                   className="amount-input"
                   style={{
                     minWidth: 0,
-                    height: 44,
+                    height: 36,
                     boxSizing: 'border-box',
                     fontFamily: 'var(--font-mono)',
-                    fontSize: 21,
+                    fontSize: 16,
                     fontWeight: 500,
                     padding: '0 10px',
                   }}
@@ -428,7 +783,7 @@ export function ExpenseForm({
                   variant="secondary"
                   className="calc-btn"
                   style={{
-                    height: 44,
+                    height: 36,
                     padding: 0,
                     flexShrink: 0,
                     display: 'inline-flex',
@@ -444,13 +799,71 @@ export function ExpenseForm({
             </div>
           </div>
         )}
-        {showCalc && !isProjectCostCenter && (
+        {showCalc && !showQtyRateFields && (
           <InlineCalculator
             onResult={(value) => {
               setAmount(String(value))
               setShowCalc(false)
             }}
           />
+        )}
+
+        {showGstModal && (
+          <Modal title="GST rate" onClose={() => setShowGstModal(false)}>
+            <div className="pill-tabs">
+              {GST_RATES.map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  className={Number(gstPctDraft) === r ? 'pill active' : 'pill'}
+                  onClick={() => setGstPctDraft(String(r))}
+                >
+                  {r}%
+                </button>
+              ))}
+            </div>
+            <div className="field" style={{ marginTop: 12 }}>
+              <label>Custom rate (%)</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={gstPctDraft}
+                onChange={(e) => setGstPctDraft(e.target.value)}
+              />
+            </div>
+            <div className="note" style={{ marginTop: 8 }}>
+              {fmt(baseAmount)} + {gstPctDraft || 0}% GST = {fmt(baseAmount + (baseAmount * (Number(gstPctDraft) || 0)) / 100)}
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+              <Button
+                type="button"
+                onClick={() => {
+                  setAddGst(true)
+                  setGstPct(Number(gstPctDraft) || 0)
+                  setShowGstModal(false)
+                }}
+              >
+                Apply
+              </Button>
+              {addGst && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setAddGst(false)
+                    setGstPct(0)
+                    setShowGstModal(false)
+                  }}
+                >
+                  Remove GST
+                </Button>
+              )}
+              <Button type="button" variant="secondary" onClick={() => setShowGstModal(false)}>
+                Cancel
+              </Button>
+            </div>
+          </Modal>
         )}
 
         {/* Row 5: Remarks (optional) */}
@@ -473,38 +886,48 @@ export function ExpenseForm({
           </div>
         )}
         <div className="field-row exp-footer-row" style={{ alignItems: 'center' }}>
-          <div className="field" style={{ flex: '1 1 auto', minWidth: 0 }}>
-            <label>Payment mode</label>
-            <div className="pill-tabs">
-              {SETTLEMENT_OPTIONS.map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  className={settlement === m ? 'pill active' : 'pill'}
-                  onClick={() => setSettlement(m)}
-                >
-                  {m}
-                </button>
-              ))}
-            </div>
+          <div className="field exp-account" style={{ flex: '1 1 auto', minWidth: 0 }}>
+            <label>Account</label>
+            {/* Pills stay usable up to a handful of accounts; beyond that a
+                searchable dropdown scales better than a wall of buttons. */}
+            {accountOptions.length <= 5 ? (
+              <div className="pill-tabs">
+                {accountOptions.map((a) => (
+                  <button
+                    key={a.id}
+                    type="button"
+                    className={effectiveAccountId === a.id ? 'pill active' : 'pill'}
+                    onClick={() => setAccountId(a.id)}
+                  >
+                    {a.name}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <SearchableSelect
+                items={accountOptions}
+                value={effectiveAccountId}
+                onChange={setAccountId}
+                getId={(a) => a.id}
+                getLabel={(a) => a.name}
+                placeholder="— Select account —"
+              />
+            )}
           </div>
-          <div className="field" style={{ flex: '0 0 auto' }}>
-            <ReceiptUploadButton
-              idPrefix="e-receipt"
-              hasFile={!!receiptBlob}
-              status={receiptStatus}
-              onFile={handleReceiptFile}
-            />
-          </div>
-        </div>
-        <div className="field full" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {isProjectCostCenter && (
-            <div className="note" style={{ margin: 0, fontWeight: 600 }}>
-              Total: {fmt(projectTotal)}
+          {!tripId && (
+            <div className="field exp-receipt" style={{ flex: '0 0 auto' }}>
+              <ReceiptUploadButton
+                idPrefix="e-receipt"
+                hasFile={!!receiptBlob}
+                status={receiptStatus}
+                onFile={handleReceiptFile}
+              />
             </div>
           )}
+        </div>
+        <div className="field full" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <Button type="submit" disabled={submitting} style={{ flex: editingExpense ? undefined : '1 1 auto' }}>
-            {submitting ? 'Saving…' : editingExpense ? 'Save changes' : 'Add expense'}
+            {submitting ? 'Saving…' : editingExpense ? `Save — ${fmt(displayAmount)}` : `Add — ${fmt(displayAmount)}`}
           </Button>
           {editingExpense && (
             <Button type="button" variant="secondary" onClick={handleCancel}>

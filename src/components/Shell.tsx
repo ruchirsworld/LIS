@@ -3,15 +3,14 @@ import { useAuth } from '../lib/auth'
 import { Sidebar } from './Sidebar'
 import { MobileFooter } from './MobileFooter'
 import { MobileFab } from './MobileFab'
-import { type TabId } from '../lib/nav'
+import { usePendingApprovalsCount } from '../lib/queries/approvals'
+import type { TabId } from '../lib/nav'
 import laavinMark from '../assets/laavin-mark.png'
 import './Shell.css'
 
-const ROLE_LABEL: Record<string, string> = { admin: 'Admin', cxo: 'CXO' }
-
-function LogoutIcon() {
+function SignOutIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
       <polyline points="16 17 21 12 16 7" />
       <line x1="21" y1="12" x2="9" y2="12" />
@@ -29,6 +28,8 @@ export function Shell({
   children: ReactNode
 }) {
   const { signOut, profile } = useAuth()
+  const canApprove = profile?.role === 'admin' || profile?.role === 'cxo'
+  const pendingApprovalsCount = usePendingApprovalsCount(canApprove)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [headerHidden, setHeaderHidden] = useState(false)
   const lastScrollY = useRef(0)
@@ -53,11 +54,15 @@ export function Shell({
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
-  const designation = profile ? ROLE_LABEL[profile.role] : ''
-
   return (
     <div className="app-layout">
-      <Sidebar active={active} onChange={onChange} open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+      <Sidebar
+        active={active}
+        onChange={onChange}
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        approvalsBadge={pendingApprovalsCount}
+      />
 
       <div className="app-main">
         <div className="wrap">
@@ -68,13 +73,12 @@ export function Shell({
               </button>
               <div className="header-user">
                 <div className="header-user-name">{profile?.name ?? ''}</div>
-                {designation && <div className="header-user-designation">{designation}</div>}
               </div>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-              <button className="icon-btn danger" onClick={() => signOut()} title="Log out" aria-label="Log out">
-                <LogoutIcon />
+              <button type="button" className="icon-btn danger" onClick={() => signOut()} aria-label="Sign out" title="Sign out">
+                <SignOutIcon />
               </button>
             </div>
           </div>

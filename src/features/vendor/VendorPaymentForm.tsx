@@ -1,13 +1,13 @@
 import { useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
+import { SearchableSelect } from '../../components/SearchableSelect'
+import { useBankAccounts } from '../../lib/queries/masters'
 import { useVendorBills, useVendorBillPayments, useCreateVendorBillPayment } from '../../lib/queries/purchases'
 import { billDue } from '../../lib/calc/vendorBills'
 import { fmt, parseINR } from '../../lib/calc/format'
 
-type PaymentMode = 'UPI' | 'NEFT' | 'Cash'
-
-const PAYMENT_MODES: PaymentMode[] = ['UPI', 'NEFT', 'Cash']
+const CASH = 'cash'
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
@@ -20,10 +20,12 @@ export function VendorPaymentForm({ vendorId, onDone }: { vendorId: string; onDo
   const { data: bills } = useVendorBills(null)
   const { data: payments } = useVendorBillPayments()
   const createPayment = useCreateVendorBillPayment()
+  const { data: bankAccounts } = useBankAccounts()
+  const accountOptions = [{ id: CASH, name: 'Cash' }, ...(bankAccounts ?? [])]
 
   const [date, setDate] = useState(todayStr())
   const [amount, setAmount] = useState('0')
-  const [paymentMode, setPaymentMode] = useState<PaymentMode>('UPI')
+  const [accountId, setAccountId] = useState(CASH)
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -53,7 +55,8 @@ export function VendorPaymentForm({ vendorId, onDone }: { vendorId: string; onDo
         bill_id: target.bill.id,
         date,
         amount: amt,
-        payment_mode: paymentMode,
+        payment_mode: accountId === CASH ? 'Cash' : 'Bank',
+        bank_account_id: accountId === CASH ? null : accountId,
       })
       onDone()
     } catch (err) {
@@ -87,19 +90,15 @@ export function VendorPaymentForm({ vendorId, onDone }: { vendorId: string; onDo
       </div>
 
       <div className="field full">
-        <label>Mode of payment</label>
-        <div className="pill-tabs">
-          {PAYMENT_MODES.map((m) => (
-            <button
-              key={m}
-              type="button"
-              className={paymentMode === m ? 'pill active' : 'pill'}
-              onClick={() => setPaymentMode(m)}
-            >
-              {m}
-            </button>
-          ))}
-        </div>
+        <label>Account</label>
+        <SearchableSelect
+          items={accountOptions}
+          value={accountId}
+          onChange={setAccountId}
+          getId={(a) => a.id}
+          getLabel={(a) => a.name}
+          placeholder="— Select account —"
+        />
       </div>
 
       <div className="field full">

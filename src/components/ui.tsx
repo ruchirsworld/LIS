@@ -35,7 +35,7 @@ export function KpiCard({
     >
       <div className="dash-label">
         {label}
-        {onClick && <span className="dash-card-caret">{active ? '▾' : '▸'}</span>}
+        {onClick && <span className="dash-card-caret">{active ? '−' : '+'}</span>}
       </div>
       <div className="dash-value">{value}</div>
     </div>
