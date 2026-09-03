@@ -22,6 +22,21 @@ function json(body: unknown, status: number) {
   });
 }
 
+// LIS_Fields being paused surfaces here as a raw DNS/connection failure from
+// the underlying fetch, not a normal Postgrest error — recognizable by
+// message text rather than a status code, since it never reaches Postgrest
+// at all. Worth a calmer, specific message instead of the raw network error.
+const UNREACHABLE_PATTERN = /dns error|name or service not known|client error \(connect\)|failed to fetch/i;
+function fieldErrorResponse(error: { message?: string }) {
+  if (UNREACHABLE_PATTERN.test(error.message ?? "")) {
+    return json(
+      { error: "LIS_Fields is currently unavailable (its project is paused). Field expense claims can't be loaded until it's resumed." },
+      503
+    );
+  }
+  return json({ error: error.message }, 400);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -55,11 +70,13 @@ Deno.serve(async (req) => {
     const fieldUrl = Deno.env.get("LIS_FIELD_SUPABASE_URL");
     const fieldServiceKey = Deno.env.get("LIS_FIELD_SERVICE_ROLE_KEY");
     if (!fieldUrl || !fieldServiceKey) {
+      console.error("Missing LIS_FIELD_SUPABASE_URL / LIS_FIELD_SERVICE_ROLE_KEY");
       return json({ error: "LIS_FIELD_SUPABASE_URL / LIS_FIELD_SERVICE_ROLE_KEY not configured" }, 500);
     }
     const fieldClient = createClient(fieldUrl, fieldServiceKey);
 
     const { action, id } = await req.json();
+    console.log("field-expenses-bridge action:", action, id ?? "");
 
     if (action === "list") {
       const { data, error } = await fieldClient
@@ -67,7 +84,10 @@ Deno.serve(async (req) => {
         .select("id, date, category, amount, description, receipt_url, site_id, created_by, sites(name), profiles(name)")
         .eq("status", "pending")
         .order("date", { ascending: false });
-      if (error) return json({ error: error.message }, 400);
+      if (error) {
+        console.error("list query failed:", JSON.stringify(error));
+        return fieldErrorResponse(error);
+      }
       return json({ expenses: data }, 200);
     }
 
@@ -77,12 +97,16 @@ Deno.serve(async (req) => {
         .from("expenses")
         .update({ status: action === "approve" ? "approved" : "rejected" })
         .eq("id", id);
-      if (error) return json({ error: error.message }, 400);
+      if (error) {
+        console.error(`${action} update failed:`, JSON.stringify(error));
+        return fieldErrorResponse(error);
+      }
       return json({ ok: true }, 200);
     }
 
     return json({ error: "Unknown action" }, 400);
   } catch (e) {
+    console.error("field-expenses-bridge threw:", e instanceof Error ? e.stack ?? e.message : String(e));
     return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
   }
 });

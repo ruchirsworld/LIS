@@ -31,7 +31,16 @@ export function usePendingFieldExpenses(enabled = true) {
     enabled,
     queryFn: async (): Promise<PendingFieldExpense[]> => {
       const { data, error } = await supabase.functions.invoke('field-expenses-bridge', { body: { action: 'list' } })
-      if (error) throw error
+      if (error) {
+        // supabase-js's own FunctionsHttpError.message is just the generic
+        // "Edge Function returned a non-2xx status code" — the actual reason
+        // is in the JSON body it attaches as `context` (the raw Response).
+        if (error.name === 'FunctionsHttpError') {
+          const body = await error.context?.json?.().catch(() => null)
+          if (body?.error) throw new Error(body.error)
+        }
+        throw error
+      }
       return (data.expenses ?? []) as PendingFieldExpense[]
     },
   })
