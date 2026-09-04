@@ -2406,11 +2406,14 @@ export type Database = {
       v_dashboard_kpis: {
         Row: {
           active_projects: number | null;
+          cash_and_bank_balance: number | null;
           clients_count: number | null;
           expenses_this_month: number | null;
           loan_principal_outstanding: number | null;
           net_partner_capital: number | null;
           outstanding_from_clients: number | null;
+          overdue_invoices_amount: number | null;
+          overdue_invoices_count: number | null;
           owed_to_vendors: number | null;
         };
         Relationships: [];

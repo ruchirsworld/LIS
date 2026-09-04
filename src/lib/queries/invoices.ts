@@ -88,6 +88,25 @@ export function useCycleInvoiceStatus() {
   })
 }
 
+/** Invoices past their due date and still not fully paid — v_invoice_status
+ * does the "overdue" date math server-side (see its definition), so no
+ * client-side date comparison is needed here. Backs the Dashboard's "Needs
+ * attention" drill-down; the headline count/₹ come from v_dashboard_kpis. */
+export function useOverdueInvoices() {
+  return useQuery({
+    queryKey: ['v_invoice_status', 'overdue'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('v_invoice_status')
+        .select('*')
+        .eq('effective_status', 'overdue')
+        .order('effective_due_date')
+      if (error) throw error
+      return data
+    },
+  })
+}
+
 export function useInvoicePayments() {
   return useQuery({
     queryKey: ['invoice_payments'],
