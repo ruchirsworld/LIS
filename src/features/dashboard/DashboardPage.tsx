@@ -8,6 +8,7 @@ import { useInvoices, useInvoicePayments, useOverdueInvoices } from '../../lib/q
 import { useVendorBills } from '../../lib/queries/purchases'
 import { useExpenses } from '../../lib/queries/expenses'
 import { usePendingApprovalsCount } from '../../lib/queries/approvals'
+import { useSiteImprestBalances } from '../../lib/queries/ledger'
 import { useProfiles } from '../../lib/queries/admin'
 import { dueAmount, netPayable } from '../../lib/calc/invoices'
 import { projectExpenseTotal, projectVendorBillTotal } from '../../lib/calc/projects'
@@ -33,7 +34,7 @@ const PERIOD_LABEL: Record<ReportPeriodType, string> = {
 
 const SECTION_LABEL: CSSProperties = { fontSize: 12, fontWeight: 600, color: 'var(--ink-soft)', marginTop: 20, marginBottom: 8 }
 
-type ExpandedKpi = 'approvals' | 'draftInvoices' | 'overdueInvoices' | null
+type ExpandedKpi = 'approvals' | 'draftInvoices' | 'overdueInvoices' | 'imprest' | null
 
 export function DashboardPage() {
   const { profile } = useAuth()
@@ -51,6 +52,7 @@ export function DashboardPage() {
   const { data: allExpenses } = useExpenses(null)
   const { data: vendorBills } = useVendorBills(null)
   const { data: profiles } = useProfiles()
+  const { data: imprestBalances } = useSiteImprestBalances()
   const pendingApprovalsCount = usePendingApprovalsCount()
 
   if (profile?.role === 'supervisor') {
@@ -86,6 +88,12 @@ export function DashboardPage() {
   const clientName = (id: string | null) => clientFullName(clients?.find((c) => c.id === id))
   const supervisorName = (id: string | null) => (id ? profiles?.find((p) => p.id === id)?.name ?? '—' : '—')
   const projectName = (id: string | null) => (id ? projects?.find((p) => p.id === id)?.name ?? '—' : '—')
+
+  const imprestRows = [...(imprestBalances?.entries() ?? [])]
+    .map(([profileId, balance]) => ({ profileId, name: supervisorName(profileId), balance }))
+    .filter((r) => r.balance > 0.01)
+    .sort((a, b) => b.balance - a.balance)
+  const totalImprestOutstanding = imprestRows.reduce((s, r) => s + r.balance, 0)
 
   return (
     <div>
@@ -213,7 +221,39 @@ export function DashboardPage() {
         <KpiCard label="Outstanding from clients" value={isLoading ? '—' : fmt(data?.outstanding_from_clients)} />
         <KpiCard label="Owed to vendors" value={isLoading ? '—' : fmt(data?.owed_to_vendors)} />
         <KpiCard label="Loan principal outstanding" value={isLoading ? '—' : fmt(data?.loan_principal_outstanding)} />
+        <KpiCard
+          label="Site imprest outstanding"
+          value={fmt(totalImprestOutstanding)}
+          onClick={() => toggleKpi('imprest')}
+          active={expandedKpi === 'imprest'}
+        />
       </div>
+
+      {expandedKpi === 'imprest' &&
+        (imprestRows.length === 0 ? (
+          <div className="note" style={{ marginTop: 10 }}>
+            No supervisor is currently holding any site imprest float.
+          </div>
+        ) : (
+          <div className="table-scroll" style={{ marginTop: 10 }}>
+            <table className="data">
+              <thead>
+                <tr>
+                  <th>Supervisor</th>
+                  <th style={{ textAlign: 'right' }}>Float held</th>
+                </tr>
+              </thead>
+              <tbody>
+                {imprestRows.map((r) => (
+                  <tr key={r.profileId}>
+                    <td>{r.name}</td>
+                    <td className="amt">{fmt(r.balance)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ))}
 
       <div style={SECTION_LABEL}>This period ({PERIOD_LABEL[periodType]})</div>
       <div className="dash-grid">
