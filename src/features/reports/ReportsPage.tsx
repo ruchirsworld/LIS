@@ -3,6 +3,7 @@ import { ModuleHeader } from '../../components/ui'
 import { ReportPeriodFilter } from './ReportPeriodFilter'
 import { ExpenseBreakdownReport } from './ExpenseBreakdownReport'
 import { ClientReport } from './ClientReport'
+import { ReceiptsReport } from './ReceiptsReport'
 import { VendorReport } from './VendorReport'
 import { ProjectProfitabilityReport } from './ProjectProfitabilityReport'
 import { LoanReport } from './LoanReport'
@@ -84,6 +85,12 @@ const CATEGORIES: ReportCategory[] = [
         description: 'Every invoice and payment for one client, with a running balance.',
         Component: ClientLedgerReport,
         periodless: true,
+      },
+      {
+        id: 'receipts',
+        title: 'Receipts',
+        description: 'Every payment received from clients in the period, in one flat list.',
+        Component: ReceiptsReport,
       },
     ],
   },
