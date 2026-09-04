@@ -13,7 +13,7 @@ import { useClients, useProjects } from '../../lib/queries/masters'
 import { fmt, fmtDate } from '../../lib/calc/format'
 import { gstAmt, tdsAmt, netPayable, retentionAmt, totalPaid, dueAmount, effectiveDueDate, effectiveStatus } from '../../lib/calc/invoices'
 import type { DateRange } from '../../lib/calc/period'
-import { InvoicePaymentForm } from './InvoicePaymentForm'
+import { InvoicePaymentForm, EditInvoicePaymentFields } from './InvoicePaymentForm'
 import { clientLabel, clientFullName, clientGstLine } from '../../lib/labels'
 import type { Database } from '../../types/database'
 
@@ -121,6 +121,7 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
   const deleteInvoice = useDeleteInvoice()
   const cycleStatus = useCycleInvoiceStatus()
   const [payFormId, setPayFormId] = useState<string | null>(null)
+  const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null)
 
   const clientNameOf = (inv: Invoice) => clientLabel(clients?.find((c) => c.id === inv.client_id))
   const projectNameOf = (inv: Invoice) => (inv.project_id ? projects?.find((p) => p.id === inv.project_id)?.name : '') ?? ''
@@ -294,12 +295,19 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
                       </button>
                       {hasHistory && (
                         <div className="pay-history">
-                          {invPayments.map((p) => (
-                            <div key={p.id}>
-                              {p.display_id} — {fmtDate(p.date)} — {fmt(p.amount)}
-                              {p.reference ? ` · ${p.reference}` : ''}
-                            </div>
-                          ))}
+                          {invPayments.map((p) =>
+                            editingPaymentId === p.id ? (
+                              <EditInvoicePaymentFields key={p.id} payment={p} onClose={() => setEditingPaymentId(null)} />
+                            ) : (
+                              <div key={p.id}>
+                                {p.display_id} — {fmtDate(p.date)} — {fmt(p.amount)}
+                                {p.reference ? ` · ${p.reference}` : ''}{' '}
+                                <button type="button" className="btn link" onClick={() => setEditingPaymentId(p.id)}>
+                                  Edit
+                                </button>
+                              </div>
+                            )
+                          )}
                         </div>
                       )}
                     </td>

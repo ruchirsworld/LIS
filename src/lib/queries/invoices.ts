@@ -6,6 +6,7 @@ import type { Database } from '../../types/database'
 type InvoiceInsert = Database['public']['Tables']['invoices']['Insert']
 type InvoiceUpdate = Database['public']['Tables']['invoices']['Update']
 type InvoicePaymentInsert = Database['public']['Tables']['invoice_payments']['Insert']
+type InvoicePaymentUpdate = Database['public']['Tables']['invoice_payments']['Update']
 
 export function useInvoices(range: DateRange | null) {
   return useQuery({
@@ -123,6 +124,21 @@ export function useCreateInvoicePayment() {
   return useMutation({
     mutationFn: async (row: InvoicePaymentInsert) => {
       const { data, error } = await supabase.from('invoice_payments').insert(row).select().single()
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['invoice_payments'] })
+      qc.invalidateQueries({ queryKey: ['dashboard-kpis'] })
+    },
+  })
+}
+
+export function useUpdateInvoicePayment() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, patch }: { id: string; patch: InvoicePaymentUpdate }) => {
+      const { data, error } = await supabase.from('invoice_payments').update(patch).eq('id', id).select().single()
       if (error) throw error
       return data
     },
