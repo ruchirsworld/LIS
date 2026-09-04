@@ -33,6 +33,7 @@ export function InvoiceForm({
   const [amount, setAmount] = useState('0')
   const [gstPct, setGstPct] = useState('0')
   const [tdsPct, setTdsPct] = useState('0')
+  const [retentionPct, setRetentionPct] = useState('0')
   const [dueDays, setDueDays] = useState('')
   const [status, setStatus] = useState<'draft' | 'sent'>('draft')
   const [invoiceDate, setInvoiceDate] = useState('')
@@ -49,6 +50,7 @@ export function InvoiceForm({
     setAmount(String(editingInvoice.amount))
     setGstPct(String(editingInvoice.gst_pct ?? 0))
     setTdsPct(String(editingInvoice.tds_pct ?? 0))
+    setRetentionPct(String(editingInvoice.retention_pct ?? 0))
     setDueDays(editingInvoice.due_days != null ? String(editingInvoice.due_days) : '')
     setStatus(editingInvoice.status)
     setInvoiceDate(editingInvoice.invoice_date ?? '')
@@ -62,6 +64,7 @@ export function InvoiceForm({
     setAmount('0')
     setGstPct('0')
     setTdsPct('0')
+    setRetentionPct('0')
     setDueDays('')
     setStatus('draft')
     setInvoiceDate('')
@@ -105,6 +108,7 @@ export function InvoiceForm({
         amount: parseINR(amount),
         gst_pct: Number(gstPct) || 0,
         tds_pct: Number(tdsPct) || 0,
+        retention_pct: Number(retentionPct) || 0,
         due_days: dueDays ? Number(dueDays) : null,
         status,
         invoice_date: status === 'sent' ? invoiceDate || todayStr() : null,
@@ -197,6 +201,22 @@ export function InvoiceForm({
           <div className="field inv-tds">
             <label>TDS %</label>
             <input type="number" min="0" step="0.01" value={tdsPct} onChange={(e) => setTdsPct(e.target.value)} />
+          </div>
+        </div>
+
+        {/* Row 4b: Retention % — held back by the client for a period, not
+            counted as due/overdue until released. */}
+        <div className="field-row">
+          <div className="field field-narrow">
+            <label>Retention %</label>
+            <input
+              type="number"
+              min="0"
+              max="100"
+              step="0.01"
+              value={retentionPct}
+              onChange={(e) => setRetentionPct(e.target.value)}
+            />
           </div>
         </div>
 

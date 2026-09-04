@@ -11,7 +11,7 @@ import type { ExportSection } from '../../lib/export/report'
 import { useInvoices, useInvoicePayments, useDeleteInvoice, useCycleInvoiceStatus } from '../../lib/queries/invoices'
 import { useClients, useProjects } from '../../lib/queries/masters'
 import { fmt, fmtDate } from '../../lib/calc/format'
-import { gstAmt, tdsAmt, netPayable, totalPaid, dueAmount, effectiveDueDate, effectiveStatus } from '../../lib/calc/invoices'
+import { gstAmt, tdsAmt, netPayable, retentionAmt, totalPaid, dueAmount, effectiveDueDate, effectiveStatus } from '../../lib/calc/invoices'
 import type { DateRange } from '../../lib/calc/period'
 import { InvoicePaymentForm } from './InvoicePaymentForm'
 import { clientLabel, clientFullName, clientGstLine } from '../../lib/labels'
@@ -142,6 +142,7 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
       gst: (inv) => gstAmt(inv),
       tds: (inv) => tdsAmt(inv),
       netPayable: (inv) => netPayable(inv),
+      retention: (inv) => retentionAmt(inv),
       paid: (inv) => paidOf(inv),
       due: (inv) => dueOf(inv),
       status: (inv) => effectiveStatus(inv, payments?.filter((p) => p.invoice_id === inv.id) ?? []),
@@ -203,6 +204,7 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
               <SortableTh label="GST" sortKey="gst" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
               <SortableTh label="TDS" sortKey="tds" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
               <SortableTh label="Net payable" sortKey="netPayable" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+              <SortableTh label="Retention" sortKey="retention" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
               <SortableTh label="Paid" sortKey="paid" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
               <SortableTh label="Due" sortKey="due" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
               <SortableTh label="Status" sortKey="status" activeKey={sortKey} direction={direction} onSort={toggleSort} />
@@ -212,14 +214,14 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={14} className="empty-row">
+                <td colSpan={15} className="empty-row">
                   Loading…
                 </td>
               </tr>
             )}
             {!isLoading && (!sortedInvoices || sortedInvoices.length === 0) && (
               <tr>
-                <td colSpan={14} className="empty-row">
+                <td colSpan={15} className="empty-row">
                   No invoices in this period
                 </td>
               </tr>
@@ -252,6 +254,15 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
                       {fmt(tdsAmt(inv))} <span style={{ color: 'var(--ink-soft)', fontSize: 11 }}>({inv.tds_pct || 0}%)</span>
                     </td>
                     <td className="amt">{fmt(netPayable(inv))}</td>
+                    <td className="amt">
+                      {inv.retention_pct ? (
+                        <>
+                          {fmt(retentionAmt(inv))} <span style={{ color: 'var(--ink-soft)', fontSize: 11 }}>({inv.retention_pct}%)</span>
+                        </>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
                     <td className="amt">{fmt(paid)}</td>
                     <td className="amt">{fmt(due)}</td>
                     <td>

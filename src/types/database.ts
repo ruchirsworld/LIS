@@ -877,6 +877,7 @@ export type Database = {
           project_id: string | null;
           status: Database["public"]["Enums"]["invoice_status"];
           tds_pct: number;
+          retention_pct: number;
         };
         Insert: {
           amount: number;
@@ -893,6 +894,7 @@ export type Database = {
           project_id?: string | null;
           status?: Database["public"]["Enums"]["invoice_status"];
           tds_pct?: number;
+          retention_pct?: number;
         };
         Update: {
           amount?: number;
@@ -909,6 +911,7 @@ export type Database = {
           project_id?: string | null;
           status?: Database["public"]["Enums"]["invoice_status"];
           tds_pct?: number;
+          retention_pct?: number;
         };
         Relationships: [
           {
@@ -2438,6 +2441,8 @@ export type Database = {
           tds_amt: number | null;
           tds_pct: number | null;
           total_paid: number | null;
+          retention_pct: number | null;
+          retention_amount: number | null;
         };
         Insert: {
           amount?: number | null;
@@ -2458,6 +2463,8 @@ export type Database = {
           tds_amt?: never;
           tds_pct?: number | null;
           total_paid?: never;
+          retention_pct?: number | null;
+          retention_amount?: never;
         };
         Update: {
           amount?: number | null;
@@ -2478,6 +2485,8 @@ export type Database = {
           tds_amt?: never;
           tds_pct?: number | null;
           total_paid?: never;
+          retention_pct?: number | null;
+          retention_amount?: never;
         };
         Relationships: [
           {
@@ -2546,6 +2555,8 @@ export type Database = {
           tds_amt: number | null;
           tds_pct: number | null;
           total_paid: number | null;
+          retention_pct: number | null;
+          retention_amount: number | null;
         };
         Insert: {
           amount?: number | null;
@@ -2568,6 +2579,8 @@ export type Database = {
           tds_amt?: never;
           tds_pct?: number | null;
           total_paid?: never;
+          retention_pct?: number | null;
+          retention_amount?: never;
         };
         Update: {
           amount?: number | null;
@@ -2590,6 +2603,8 @@ export type Database = {
           tds_amt?: never;
           tds_pct?: number | null;
           total_paid?: never;
+          retention_pct?: number | null;
+          retention_amount?: never;
         };
         Relationships: [
           {

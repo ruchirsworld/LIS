@@ -7,6 +7,7 @@ export interface InvoiceRow {
   amount: number
   gst_pct: number | null
   tds_pct: number | null
+  retention_pct?: number | null
   due_date_manual: string | null
   due_days: number | null
   invoice_date: string | null
@@ -29,12 +30,19 @@ export function netPayable(inv: InvoiceRow): number {
   return Number(inv.amount || 0) + gstAmt(inv) - tdsAmt(inv)
 }
 
+// The % of net_payable a client contractually holds back for a period —
+// still owed, but not collectible (or overdue) until released. Doesn't
+// reduce GST liability, which is charged on the full invoice value.
+export function retentionAmt(inv: InvoiceRow): number {
+  return netPayable(inv) * Number(inv.retention_pct || 0) / 100
+}
+
 export function totalPaid(payments: InvoicePaymentRow[]): number {
   return payments.reduce((s, p) => s + Number(p.amount || 0), 0)
 }
 
 export function dueAmount(inv: InvoiceRow, payments: InvoicePaymentRow[]): number {
-  return Math.max(0, netPayable(inv) - totalPaid(payments))
+  return Math.max(0, netPayable(inv) - retentionAmt(inv) - totalPaid(payments))
 }
 
 function addDays(dateStr: string, days: number): string {
@@ -59,9 +67,11 @@ export function isPastDue(inv: InvoiceRow): boolean {
 export type EffectiveStatus = 'paid' | 'overdue' | 'draft' | 'sent'
 
 export function effectiveStatus(inv: InvoiceRow, payments: InvoicePaymentRow[]): EffectiveStatus {
-  const due = dueAmount(inv, payments)
   const net = netPayable(inv)
-  if (due <= 0.01 && net > 0) return 'paid'
-  if (isPastDue(inv)) return 'overdue'
+  const paid = totalPaid(payments)
+  // "Paid" means fully settled — including any retention eventually
+  // released — not just the currently-collectible (non-retained) portion.
+  if (net - paid <= 0.01 && net > 0) return 'paid'
+  if (isPastDue(inv) && dueAmount(inv, payments) > 0.01) return 'overdue'
   return inv.status
 }
