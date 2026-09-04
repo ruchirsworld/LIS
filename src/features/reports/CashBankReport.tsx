@@ -1,6 +1,5 @@
 import { useBankAccounts } from '../../lib/queries/masters'
-import { useTransfers } from '../../lib/queries/transfers'
-import { accountBalance, cashBalance } from '../../lib/calc/transfers'
+import { useCashAndBankLines } from '../../lib/queries/ledger'
 import { inRange } from '../../lib/calc/period'
 import { fmt } from '../../lib/calc/format'
 import type { DateRange } from '../../lib/calc/reportPeriod'
@@ -9,29 +8,44 @@ import type { ExportSection } from '../../lib/export/report'
 
 export function CashBankReport({ range }: { range: DateRange | null }) {
   const { data: accounts } = useBankAccounts()
-  const { data: transfers } = useTransfers(null)
+  const { data: lines } = useCashAndBankLines()
 
   const from = range?.from ?? null
   const to = range?.to ?? null
-  const all = transfers ?? []
-  const periodTransfers = all.filter((t) => inRange(t.date, from, to))
+  const all = lines ?? []
 
-  function movedIn(accountId: string | null, list: typeof all) {
-    return list.filter((t) => t.to_account_id === accountId).reduce((s, t) => s + Number(t.amount || 0), 0)
+  function linesFor(bankAccountId: string | null) {
+    return all.filter((l) => l.bank_account_id === bankAccountId)
   }
-  function movedOut(accountId: string | null, list: typeof all) {
-    return list.filter((t) => t.from_account_id === accountId).reduce((s, t) => s + Number(t.amount || 0), 0)
+  function movedIn(list: typeof all, periodOnly: boolean) {
+    return list
+      .filter((l) => !periodOnly || inRange(l.date, from, to))
+      .reduce((s, l) => s + l.debit, 0)
+  }
+  function movedOut(list: typeof all, periodOnly: boolean) {
+    return list
+      .filter((l) => !periodOnly || inRange(l.date, from, to))
+      .reduce((s, l) => s + l.credit, 0)
   }
 
   const rows = [
-    { id: 'cash', name: 'Cash', in: movedIn(null, periodTransfers), out: movedOut(null, periodTransfers), balance: cashBalance(all) },
-    ...(accounts ?? []).map((acc) => ({
-      id: acc.id,
-      name: acc.name,
-      in: movedIn(acc.id, periodTransfers),
-      out: movedOut(acc.id, periodTransfers),
-      balance: accountBalance(acc.id, acc.opening_balance ?? 0, all),
-    })),
+    {
+      id: 'cash',
+      name: 'Cash',
+      in: movedIn(linesFor(null), true),
+      out: movedOut(linesFor(null), true),
+      balance: movedIn(linesFor(null), false) - movedOut(linesFor(null), false),
+    },
+    ...(accounts ?? []).map((acc) => {
+      const accLines = linesFor(acc.id)
+      return {
+        id: acc.id,
+        name: acc.name,
+        in: movedIn(accLines, true),
+        out: movedOut(accLines, true),
+        balance: movedIn(accLines, false) - movedOut(accLines, false),
+      }
+    }),
   ]
 
   const sections: ExportSection[] = [
@@ -44,6 +58,10 @@ export function CashBankReport({ range }: { range: DateRange | null }) {
 
   return (
     <div className="report-panel">
+      <div className="note" style={{ marginTop: -4, marginBottom: 12 }}>
+        The real accounting position — every expense payment, invoice payment received, vendor bill payment, and
+        site imprest movement that touched Cash or a bank account, not just what's logged in Transfers.
+      </div>
       <ReportExportButtons title="Cash & bank report" sections={sections} range={range} />
       <div className="table-scroll" style={{ marginTop: 16 }}>
         <table className="data">

@@ -94,3 +94,55 @@ export function useSiteImprestBalances() {
     },
   })
 }
+
+export interface CashBankLine {
+  date: string
+  /** null = Cash in Hand (account 1010); a real id = that specific bank
+   * account (account 1020, shared by every bank — bank_account_id says
+   * which one, the same way profile_id distinguishes supervisors above). */
+  bank_account_id: string | null
+  debit: number
+  credit: number
+}
+
+/** Every journal line ever posted to Cash-in-Hand or Bank — the real
+ * accounting position, not just what's been logged via the Transfers tab
+ * (expenses paid, invoice payments received, site imprest advances/returns
+ * all post here directly too). Backs the Cash & Bank report; the Dashboard's
+ * "Cash & bank" KPI is this same total via v_dashboard_kpis instead. */
+export function useCashAndBankLines() {
+  return useQuery({
+    queryKey: ['ledger_lines', 'cash_and_bank'],
+    queryFn: async (): Promise<CashBankLine[]> => {
+      const { data: accounts, error: accountsError } = await supabase
+        .from('gl_accounts')
+        .select('id')
+        .in('code', ['1010', '1020'])
+      if (accountsError) throw accountsError
+      const accountIds = (accounts ?? []).map((a) => a.id)
+      if (accountIds.length === 0) return []
+
+      const { data: lines, error: linesError } = await supabase
+        .from('journal_lines')
+        .select('entry_id, bank_account_id, debit, credit')
+        .in('gl_account_id', accountIds)
+      if (linesError) throw linesError
+      if (!lines || lines.length === 0) return []
+
+      const entryIds = [...new Set(lines.map((l) => l.entry_id))]
+      const { data: entries, error: entriesError } = await supabase
+        .from('journal_entries')
+        .select('id, date')
+        .in('id', entryIds)
+      if (entriesError) throw entriesError
+      const dateById = new Map((entries ?? []).map((e) => [e.id, e.date]))
+
+      return lines.map((l) => ({
+        date: dateById.get(l.entry_id) ?? '',
+        bank_account_id: l.bank_account_id,
+        debit: Number(l.debit || 0),
+        credit: Number(l.credit || 0),
+      }))
+    },
+  })
+}
