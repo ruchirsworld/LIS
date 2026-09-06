@@ -6,6 +6,7 @@ import { useT } from '../../lib/i18n'
 import { useStaff, useProjects } from '../../lib/queries/masters'
 import { useProfiles } from '../../lib/queries/admin'
 import { useAllStaffAttendance, useAllStaffProjectAssignments } from '../../lib/queries/teamTracking'
+import { useHolidays } from '../../lib/queries/hr'
 import { TeamCalendarSection } from '../dashboard/TeamCalendarSection'
 import { SiteWorkCalendarSection } from './SiteWorkCalendarSection'
 
@@ -28,6 +29,7 @@ export function CalendarPage() {
   const { data: allAttendance } = useAllStaffAttendance()
   const { data: projects } = useProjects()
   const { data: allAssignments } = useAllStaffProjectAssignments()
+  const { data: holidays } = useHolidays()
 
   const [supervisorId, setSupervisorId] = useState('')
   const supervisors = (profiles ?? []).filter((p) => p.role === 'supervisor')
@@ -70,6 +72,7 @@ export function CalendarPage() {
           attendance={allAttendance ?? []}
           assignments={allAssignments ?? []}
           projects={projects ?? []}
+          holidays={holidays ?? []}
         />
       )}
     </div>

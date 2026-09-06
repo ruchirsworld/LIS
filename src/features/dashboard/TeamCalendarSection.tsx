@@ -43,6 +43,13 @@ interface TeamMember {
   id: string
   name: string
   default_project_id?: string | null
+  start_date: string
+  end_date?: string | null
+}
+
+interface HolidayEntry {
+  date: string
+  name: string
 }
 
 // A month-grid view of the whole team's leave/absent/half-day exceptions,
@@ -55,24 +62,31 @@ export function TeamCalendarSection({
   attendance,
   assignments = [],
   projects = [],
+  holidays = [],
 }: {
   team: TeamMember[]
   attendance: AttendanceEntry[]
   assignments?: ProjectAssignmentEntry[]
   projects?: ProjectRef[]
+  holidays?: HolidayEntry[]
 }) {
   const t = useT()
-  const [month, setMonth] = useState(() => todayStr().slice(0, 7))
+  const today = todayStr()
+  const [month, setMonth] = useState(() => today.slice(0, 7))
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
 
   const teamIds = new Set(team.map((member) => member.id))
   const byDate = new Map<string, AttendanceEntry[]>()
+  const exceptionByStaffDate = new Map<string, AttendanceEntry>()
   for (const a of attendance) {
     if (!teamIds.has(a.staff_id)) continue
     const list = byDate.get(a.date) ?? []
     list.push(a)
     byDate.set(a.date, list)
+    exceptionByStaffDate.set(`${a.staff_id}:${a.date}`, a)
   }
+  const holidayDates = new Set(holidays.map((h) => h.date))
+  const holidayNameByDate = new Map(holidays.map((h) => [h.date, h.name]))
 
   const assignmentByStaffDate = new Map<string, string>()
   for (const a of assignments) {
@@ -83,18 +97,33 @@ export function TeamCalendarSection({
   const projectCode = (id: string | null | undefined) => {
     if (!id) return null
     const p = projectById.get(id)
-    return p ? p.name ?? p.code ?? p.display_id : null
+    return p ? p.name ?? p.code ?? null : null
   }
-  // The site a staff member actually worked on a date — the day's override
-  // if one was set, else falling back to their own default project, same
-  // priority the Supervisor Dashboard's own picker uses.
-  function siteFor(staffId: string, date: string, defaultProjectId: string | null | undefined) {
-    return assignmentByStaffDate.get(`${staffId}:${date}`) ?? defaultProjectId ?? null
+  // The site a staff member actually worked on a date. Absent/Leave always
+  // wins first — even if a site was pre-set (e.g. carried over from the
+  // day before) it wasn't actually worked if they didn't show up. Short of
+  // that, an explicit day-specific assignment wins (covers comp-off on a
+  // Holiday, or a future date someone's deliberately planned ahead for).
+  // Otherwise only fall back to their default project if the day could
+  // actually have been worked: on the roster yet (not before they joined
+  // or after they left), not in the future, and not a Holiday they sat
+  // out. A half day still counts as worked — they were still at the site
+  // for part of it.
+  function siteFor(member: TeamMember, date: string) {
+    const exception = exceptionByStaffDate.get(`${member.id}:${date}`)
+    if (exception && (exception.day_type === 'absent' || exception.day_type === 'leave')) return null
+    const override = assignmentByStaffDate.get(`${member.id}:${date}`)
+    if (override) return override
+    if (date < member.start_date) return null
+    if (member.end_date && date > member.end_date) return null
+    if (date > today) return null
+    if (holidayDates.has(date)) return null
+    return member.default_project_id ?? null
   }
   function siteCodesForDate(date: string): string[] {
     const codes = new Set<string>()
     for (const member of team) {
-      const code = projectCode(siteFor(member.id, date, member.default_project_id))
+      const code = projectCode(siteFor(member, date))
       if (code) codes.add(code)
     }
     return [...codes]
@@ -115,8 +144,6 @@ export function TeamCalendarSection({
     const d = new Date(Date.UTC(year, monthNum - 1 + delta, 1))
     setMonth(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`)
   }
-
-  const today = todayStr()
 
   return (
     <div className="card" style={{ padding: 16, marginTop: 24 }}>
@@ -141,12 +168,17 @@ export function TeamCalendarSection({
           const dayNum = Number(date.slice(-2))
           const entries = byDate.get(date) ?? []
           const siteCodes = siteCodesForDate(date)
+          const holidayName = holidayNameByDate.get(date)
+          const classes = ['team-calendar-cell']
+          if (date === today) classes.push('today')
+          if (holidayName) classes.push('holiday')
           return (
             <button
               key={date}
               type="button"
-              className={date === today ? 'team-calendar-cell today' : 'team-calendar-cell'}
-              disabled={entries.length === 0 && siteCodes.length === 0}
+              className={classes.join(' ')}
+              title={holidayName}
+              disabled={entries.length === 0 && siteCodes.length === 0 && !holidayName}
               onClick={() => setSelectedDate(date)}
             >
               <span className="team-calendar-daynum">{dayNum}</span>
@@ -169,6 +201,18 @@ export function TeamCalendarSection({
 
       <div className="note" style={{ marginTop: 10, display: 'flex', gap: 14, flexWrap: 'wrap' }}>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+          <span
+            style={{
+              width: 10,
+              height: 10,
+              borderRadius: 3,
+              background: 'var(--amber-soft)',
+              border: '1px solid var(--amber)',
+            }}
+          />{' '}
+          {t('Holiday')}
+        </span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
           <span className="team-calendar-dot" style={{ background: 'var(--amber)' }} /> {t('Leave')}
         </span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
@@ -183,7 +227,10 @@ export function TeamCalendarSection({
         <div className="modal-backdrop" onClick={() => setSelectedDate(null)}>
           <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <strong>{fmtDate(selectedDate)}</strong>
+              <strong>
+                {fmtDate(selectedDate)}
+                {holidayNameByDate.get(selectedDate) && ` — ${holidayNameByDate.get(selectedDate)}`}
+              </strong>
               <button type="button" className="modal-close" onClick={() => setSelectedDate(null)}>
                 ×
               </button>
@@ -193,14 +240,14 @@ export function TeamCalendarSection({
                 const exceptionByStaff = new Map((byDate.get(selectedDate) ?? []).map((e) => [e.staff_id, e]))
                 return team.map((member) => {
                   const exception = exceptionByStaff.get(member.id)
-                  const siteId = siteFor(member.id, selectedDate, member.default_project_id)
+                  const siteId = siteFor(member, selectedDate)
                   const site = siteId ? projectById.get(siteId) : null
                   return (
                     <div key={member.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
                       <span>{member.name}</span>
                       <span style={{ textAlign: 'right' }}>
                         <span className="note" style={{ margin: 0 }}>
-                          {site ? `${site.code ?? site.display_id ?? ''} ${site.name}`.trim() : t('Site not set')}
+                          {site ? site.name : t('Site not set')}
                         </span>
                         {exception && (
                           <span className="note" style={{ margin: 0, display: 'block', color: DAY_TYPE_COLOR[exception.day_type] }}>

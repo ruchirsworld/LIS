@@ -132,7 +132,7 @@ export function ProjectsPage() {
             <details className="toggle-section" open>
               <summary>{selected.name}</summary>
               <div className="note" style={{ marginTop: 16, marginBottom: 12 }}>
-                {clientLabel(client)} · {selected.project_location ?? '—'} · {selected.code ?? selected.display_id ?? '—'} · Started{' '}
+                {clientLabel(client)} · {selected.project_location ?? '—'} · {selected.code ?? '—'} · Started{' '}
                 {selected.start_date ? fmtDate(selected.start_date) : '—'}
                 {selected.end_date ? ` · Completed ${fmtDate(selected.end_date)}` : ''}
               </div>

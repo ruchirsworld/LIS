@@ -1406,6 +1406,10 @@ table.data tr.group-header-row td {
   border-color: var(--accent);
   background: var(--accent-soft);
 }
+.team-calendar-cell.holiday {
+  border-color: var(--amber);
+  background: var(--amber-soft);
+}
 .team-calendar-daynum {
   font-size: 12px;
   color: var(--ink);

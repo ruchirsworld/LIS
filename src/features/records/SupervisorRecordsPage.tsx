@@ -2,12 +2,12 @@ import { useState } from 'react'
 import { ModuleHeader, KpiCard } from '../../components/ui'
 import { useAuth } from '../../lib/auth'
 import { useT } from '../../lib/i18n'
-import { useProjects } from '../../lib/queries/masters'
+import { useProjects, useStaff } from '../../lib/queries/masters'
 import { useExpenses, useExpenseReimbursements } from '../../lib/queries/expenses'
-import { useLedgerLines } from '../../lib/queries/ledger'
+import { useStaffImprestTransactions } from '../../lib/queries/hr'
 import { fmt, fmtDate } from '../../lib/calc/format'
 
-type ExpandedKpi = 'expenses' | 'payments' | 'pending' | null
+type ExpandedKpi = 'expenses' | 'payments' | 'pending' | 'advances' | null
 type QuickPeriod = 'week' | 'month' | 'custom'
 
 function todayStr() {
@@ -32,10 +32,11 @@ export function SupervisorRecordsPage() {
   const { profile } = useAuth()
   const t = useT()
   const { data: projects } = useProjects()
+  const { data: staff } = useStaff()
   const { data: allExpenses } = useExpenses(null)
   const { data: allPendingExpenses } = useExpenses(null, 'pending')
   const { data: allReimbursements } = useExpenseReimbursements()
-  const { data: imprestLines } = useLedgerLines('1060', 'profile_id', profile?.id ?? null)
+  const { data: allImprestTransactions } = useStaffImprestTransactions()
 
   const today = todayStr()
   const [period, setPeriod] = useState<QuickPeriod>('month')
@@ -52,6 +53,7 @@ export function SupervisorRecordsPage() {
   const datesInvalid = period === 'custom' && customFrom > customTo
 
   const projectName = (id: string | null) => (id ? projects?.find((p) => p.id === id)?.name ?? '—' : '—')
+  const staffName = (id: string | null) => (id ? staff?.find((s) => s.id === id)?.name ?? '—' : '—')
   const inRange = (date: string) => !datesInvalid && date >= range.from && date <= range.to
 
   const myExpenses = (allExpenses ?? []).filter((e) => e.created_by === profile?.id)
@@ -65,10 +67,17 @@ export function SupervisorRecordsPage() {
     .filter((e) => e.created_by === profile?.id && inRange(e.date))
     .sort((a, b) => b.date.localeCompare(a.date))
 
+  // Advances the Supervisor requested and an Admin approved, each tagged to
+  // one of their workers and recovered from that worker's own pay later —
+  // see HR → Imprest / the Salary tab.
+  const myAdvancesInRange = (allImprestTransactions ?? [])
+    .filter((t) => t.profile_id === profile?.id && t.kind === 'advance' && t.status === 'approved' && inRange(t.date))
+    .sort((a, b) => b.date.localeCompare(a.date))
+
   const totalExpenses = myExpensesInRange.reduce((sum, e) => sum + Number(e.amount || 0), 0)
   const totalReceived = myPaymentsInRange.reduce((sum, p) => sum + Number(p.amount || 0), 0)
   const totalPending = myPendingInRange.reduce((sum, e) => sum + Number(e.amount || 0), 0)
-  const imprestBalance = (imprestLines ?? []).reduce((sum, l) => sum + l.debit - l.credit, 0)
+  const totalAdvances = myAdvancesInRange.reduce((sum, a) => sum + Number(a.amount || 0), 0)
 
   const pendingByDate = new Map<string, typeof myPendingInRange>()
   for (const e of myPendingInRange) {
@@ -93,6 +102,15 @@ export function SupervisorRecordsPage() {
     paymentsByDate.set(p.date, list)
   }
   const paymentDates = [...paymentsByDate.keys()].sort((a, b) => b.localeCompare(a))
+
+  const advancesByWorker = new Map<string, typeof myAdvancesInRange>()
+  for (const a of myAdvancesInRange) {
+    const key = a.staff_id ?? ''
+    const list = advancesByWorker.get(key) ?? []
+    list.push(a)
+    advancesByWorker.set(key, list)
+  }
+  const advanceWorkerIds = [...advancesByWorker.keys()].sort((a, b) => staffName(a).localeCompare(staffName(b)))
 
   function toggle(kpi: ExpandedKpi) {
     setExpanded((cur) => (cur === kpi ? null : kpi))
@@ -138,24 +156,29 @@ export function SupervisorRecordsPage() {
 
       <div className="dash-grid">
         <KpiCard
-          label={t('Total expenses')}
+          label={t('Claims Approved')}
           value={fmt(totalExpenses)}
           onClick={() => toggle('expenses')}
           active={expanded === 'expenses'}
         />
         <KpiCard
-          label={t('Pending approval')}
+          label={t('Claims Pending')}
           value={fmt(totalPending)}
           onClick={() => toggle('pending')}
           active={expanded === 'pending'}
         />
         <KpiCard
-          label={t('Payments received')}
+          label={t('Payment Received')}
           value={fmt(totalReceived)}
           onClick={() => toggle('payments')}
           active={expanded === 'payments'}
         />
-        <KpiCard label={t('Site imprest float held')} value={fmt(imprestBalance)} />
+        <KpiCard
+          label={t('Advance received for workers')}
+          value={fmt(totalAdvances)}
+          onClick={() => toggle('advances')}
+          active={expanded === 'advances'}
+        />
       </div>
 
       {expanded === 'expenses' && (
@@ -257,6 +280,41 @@ export function SupervisorRecordsPage() {
             )
           })}
           {paymentDates.length === 0 && <div className="note">{t('No payments in this range.')}</div>}
+        </div>
+      )}
+
+      {expanded === 'advances' && (
+        <div style={{ marginTop: 16 }}>
+          {advanceWorkerIds.map((workerId, i) => {
+            const workerAdvances = advancesByWorker.get(workerId)!
+            const workerTotal = workerAdvances.reduce((sum, a) => sum + Number(a.amount || 0), 0)
+            return (
+              <details key={workerId || '—'} className="toggle-section" style={{ marginBottom: 10 }} open={i === 0}>
+                <summary>
+                  {staffName(workerId || null)} — {fmt(workerTotal)}
+                </summary>
+                <div className="table-scroll" style={{ marginTop: 10 }}>
+                  <table className="data">
+                    <thead>
+                      <tr>
+                        <th>{t('Date')}</th>
+                        <th style={{ textAlign: 'right' }}>{t('Amount')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {workerAdvances.map((a) => (
+                        <tr key={a.id}>
+                          <td>{fmtDate(a.date)}</td>
+                          <td className="amt">{fmt(a.amount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+            )
+          })}
+          {advanceWorkerIds.length === 0 && <div className="note">{t('No advances in this range.')}</div>}
         </div>
       )}
     </div>

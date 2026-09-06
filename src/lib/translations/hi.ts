@@ -104,9 +104,6 @@ export const HI: Record<string, string> = {
   Category: 'श्रेणी',
   'No Site Imprest payments received yet.': 'अभी तक कोई साइट इम्प्रेस्ट भुगतान प्राप्त नहीं हुआ।',
 
-  // ProjectExpensesSection.tsx
-  'Project expense records': 'प्रोजेक्ट खर्च रिकॉर्ड',
-
   // TeamCalendarSection.tsx / CalendarPage.tsx
   Sun: 'रवि',
   Mon: 'सोम',
@@ -116,14 +113,17 @@ export const HI: Record<string, string> = {
   Fri: 'शुक्र',
   Sat: 'शनि',
   'Site not set': 'साइट सेट नहीं है',
+  Holiday: 'अवकाश',
   pending: 'लंबित',
   'No team members assigned to this supervisor.': 'इस सुपरवाइज़र को कोई टीम सदस्य नहीं सौंपा गया है।',
 
   // SupervisorRecordsPage.tsx
-  'Total expenses': 'कुल खर्च',
-  'Pending approval': 'स्वीकृति लंबित',
-  'Site imprest float held': 'साइट इम्प्रेस्ट में रखी राशि',
+  'Claims Approved': 'स्वीकृत दावे',
+  'Claims Pending': 'लंबित दावे',
+  'Payment Received': 'प्राप्त भुगतान',
+  'Advance received for workers': 'मज़दूरों के लिए प्राप्त एडवांस',
   'No expenses in this range.': 'इस अवधि में कोई खर्च नहीं है।',
   Reference: 'संदर्भ',
   'No payments in this range.': 'इस अवधि में कोई भुगतान नहीं है।',
+  'No advances in this range.': 'इस अवधि में कोई एडवांस नहीं है।',
 }

@@ -45,7 +45,6 @@ export function ProjectsSection() {
   const clientFullNameOf = (p: NonNullable<typeof projects>[number]) => clientFullName(clients?.find((c) => c.id === p.client_id))
 
   const { sorted: sortedProjects, sortKey, direction, toggleSort } = useSort(projects, {
-    id: (p) => p.display_id,
     code: (p) => p.code,
     name: (p) => p.name,
     client: (p) => clientNameOf(p),
@@ -61,9 +60,8 @@ export function ProjectsSection() {
   const exportSections: ExportSection[] = [
     {
       title: 'Projects',
-      columns: ['ID', 'Code', 'Project', 'Client', 'Project location', 'Budget', 'Total value', 'Start date', 'End date', 'Status'],
+      columns: ['Code', 'Project', 'Client', 'Project location', 'Budget', 'Total value', 'Start date', 'End date', 'Status'],
       rows: (sortedProjects ?? []).map((p) => [
-        p.display_id ?? '',
         p.code ?? '',
         p.name,
         clientFullNameOf(p),
@@ -282,7 +280,6 @@ export function ProjectsSection() {
         <table className="data">
           <thead>
             <tr>
-              <SortableTh label="ID" sortKey="id" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Code" sortKey="code" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Project" sortKey="name" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Client" sortKey="client" activeKey={sortKey} direction={direction} onSort={toggleSort} />
@@ -298,14 +295,14 @@ export function ProjectsSection() {
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={11} className="empty-row">
+                <td colSpan={10} className="empty-row">
                   Loading…
                 </td>
               </tr>
             )}
             {!isLoading && (!sortedProjects || sortedProjects.length === 0) && (
               <tr>
-                <td colSpan={11} className="empty-row">
+                <td colSpan={10} className="empty-row">
                   No projects yet — add your first one above
                 </td>
               </tr>
@@ -314,7 +311,6 @@ export function ProjectsSection() {
               const client = clients?.find((c) => c.id === p.client_id)
               return (
                 <tr key={p.id}>
-                  <td>{p.display_id ?? '—'}</td>
                   <td>{p.code ?? '—'}</td>
                   <td>{p.name}</td>
                   <td>{clientLabel(client)}</td>

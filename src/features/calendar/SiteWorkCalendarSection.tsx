@@ -58,7 +58,7 @@ export function SiteWorkCalendarSection({
   const supervisorById = new Map(supervisors.map((s) => [s.id, s]))
   const projectCode = (id: string) => {
     const p = projectById.get(id)
-    return p ? p.name ?? p.code ?? p.display_id : id
+    return p ? p.name ?? p.code ?? id : id
   }
 
   // date -> project_id -> supervisor ids whose team was there
