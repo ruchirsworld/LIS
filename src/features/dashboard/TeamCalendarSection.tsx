@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ATTENDANCE_DAY_TYPE_LABEL, type AttendanceDayType } from '../../lib/calc/payroll'
 import { fmtDate } from '../../lib/calc/format'
+import { useT } from '../../lib/i18n'
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
@@ -60,10 +61,11 @@ export function TeamCalendarSection({
   assignments?: ProjectAssignmentEntry[]
   projects?: ProjectRef[]
 }) {
+  const t = useT()
   const [month, setMonth] = useState(() => todayStr().slice(0, 7))
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
 
-  const teamIds = new Set(team.map((t) => t.id))
+  const teamIds = new Set(team.map((member) => member.id))
   const byDate = new Map<string, AttendanceEntry[]>()
   for (const a of attendance) {
     if (!teamIds.has(a.staff_id)) continue
@@ -91,8 +93,8 @@ export function TeamCalendarSection({
   }
   function siteCodesForDate(date: string): string[] {
     const codes = new Set<string>()
-    for (const t of team) {
-      const code = projectCode(siteFor(t.id, date, t.default_project_id))
+    for (const member of team) {
+      const code = projectCode(siteFor(member.id, date, member.default_project_id))
       if (code) codes.add(code)
     }
     return [...codes]
@@ -131,7 +133,7 @@ export function TeamCalendarSection({
       <div className="team-calendar-grid">
         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
           <div key={d} className="team-calendar-weekday">
-            {d}
+            {t(d)}
           </div>
         ))}
         {cells.map((date, i) => {
@@ -167,13 +169,13 @@ export function TeamCalendarSection({
 
       <div className="note" style={{ marginTop: 10, display: 'flex', gap: 14, flexWrap: 'wrap' }}>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-          <span className="team-calendar-dot" style={{ background: 'var(--amber)' }} /> Leave
+          <span className="team-calendar-dot" style={{ background: 'var(--amber)' }} /> {t('Leave')}
         </span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-          <span className="team-calendar-dot" style={{ background: 'var(--red)' }} /> Absent
+          <span className="team-calendar-dot" style={{ background: 'var(--red)' }} /> {t('Absent')}
         </span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-          <span className="team-calendar-dot" style={{ background: 'var(--blue)' }} /> Half day
+          <span className="team-calendar-dot" style={{ background: 'var(--blue)' }} /> {t('Half day')}
         </span>
       </div>
 
@@ -189,20 +191,20 @@ export function TeamCalendarSection({
             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {(() => {
                 const exceptionByStaff = new Map((byDate.get(selectedDate) ?? []).map((e) => [e.staff_id, e]))
-                return team.map((t) => {
-                  const exception = exceptionByStaff.get(t.id)
-                  const siteId = siteFor(t.id, selectedDate, t.default_project_id)
+                return team.map((member) => {
+                  const exception = exceptionByStaff.get(member.id)
+                  const siteId = siteFor(member.id, selectedDate, member.default_project_id)
                   const site = siteId ? projectById.get(siteId) : null
                   return (
-                    <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-                      <span>{t.name}</span>
+                    <div key={member.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                      <span>{member.name}</span>
                       <span style={{ textAlign: 'right' }}>
                         <span className="note" style={{ margin: 0 }}>
-                          {site ? `${site.code ?? site.display_id ?? ''} ${site.name}`.trim() : 'Site not set'}
+                          {site ? `${site.code ?? site.display_id ?? ''} ${site.name}`.trim() : t('Site not set')}
                         </span>
                         {exception && (
                           <span className="note" style={{ margin: 0, display: 'block', color: DAY_TYPE_COLOR[exception.day_type] }}>
-                            {ATTENDANCE_DAY_TYPE_LABEL[exception.day_type as AttendanceDayType] ?? exception.day_type} ({exception.status})
+                            {t(ATTENDANCE_DAY_TYPE_LABEL[exception.day_type as AttendanceDayType] ?? exception.day_type)} ({t(exception.status)})
                           </span>
                         )}
                       </span>

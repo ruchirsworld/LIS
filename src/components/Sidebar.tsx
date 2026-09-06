@@ -1,5 +1,6 @@
 import { TABS, isTabVisible, HEADER_MENU_TAB_IDS, type TabId } from '../lib/nav'
 import { useAuth } from '../lib/auth'
+import { useT } from '../lib/i18n'
 import { APP_VERSION } from '../lib/version'
 import { NavIcon } from './NavIcons'
 import { InstallAppButton } from './InstallAppButton'
@@ -23,6 +24,14 @@ export function Sidebar({
 }) {
   const { profile } = useAuth()
   const isAdminSide = profile?.role === 'admin' || profile?.role === 'cxo'
+  const isSupervisor = profile?.role === 'supervisor'
+  const t = useT()
+  // A Supervisor's Expenses tab only ever shows Project claims + advance
+  // requests — "Claims & Advances" says that more precisely than the
+  // generic "Expenses" label Admin/CXO keep (their tab covers Admin/Trips
+  // spend too).
+  const navLabel = (tab: { id: TabId; label: string }) =>
+    tab.id === 'expenses' && isSupervisor ? t('Claims & Advances') : t(tab.label)
 
   return (
     <>
@@ -40,24 +49,26 @@ export function Sidebar({
           <img src={laavinLogo} alt="Laavin InfraScapes" className="sidebar-logo" />
         </button>
         <nav className="sidebar-nav">
-          {TABS.filter((t) => isTabVisible(t, profile?.role) && !(isAdminSide && HEADER_MENU_TAB_IDS.includes(t.id))).map((t) => (
-            <button
-              key={t.id}
-              className={t.id === active ? 'sidebar-item active' : 'sidebar-item'}
-              onClick={() => {
-                onChange(t.id)
-                onClose()
-              }}
-            >
-              <span className="sidebar-icon" aria-hidden="true">
-                <NavIcon id={t.id} />
-                {t.id === 'approvals' && !!approvalsBadge && approvalsBadge > 0 && (
-                  <span className="sidebar-badge">{approvalsBadge}</span>
-                )}
-              </span>
-              {t.label}
-            </button>
-          ))}
+          {TABS.filter((tab) => isTabVisible(tab, profile?.role) && !(isAdminSide && HEADER_MENU_TAB_IDS.includes(tab.id))).map(
+            (tab) => (
+              <button
+                key={tab.id}
+                className={tab.id === active ? 'sidebar-item active' : 'sidebar-item'}
+                onClick={() => {
+                  onChange(tab.id)
+                  onClose()
+                }}
+              >
+                <span className="sidebar-icon" aria-hidden="true">
+                  <NavIcon id={tab.id} />
+                  {tab.id === 'approvals' && !!approvalsBadge && approvalsBadge > 0 && (
+                    <span className="sidebar-badge">{approvalsBadge}</span>
+                  )}
+                </span>
+                {navLabel(tab)}
+              </button>
+            )
+          )}
         </nav>
         <InstallAppButton />
         <div className="sidebar-version">{APP_VERSION}</div>

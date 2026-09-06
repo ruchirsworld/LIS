@@ -1,6 +1,7 @@
 import { ModuleHeader } from '../../components/ui'
 import { EXPENSE_COST_CENTERS, type ExpenseCostCenter } from '../../lib/nav'
 import { useAuth } from '../../lib/auth'
+import { useT } from '../../lib/i18n'
 import { AdminExpensesSection } from './AdminExpensesSection'
 import { ProjectExpensesSection } from './ProjectExpensesSection'
 import { TripsSection } from '../trips/TripsSection'
@@ -20,13 +21,15 @@ export function ExpensesPage({
   costCenters?: readonly ExpenseCostCenter[]
 }) {
   const { profile } = useAuth()
+  const isSupervisor = profile?.role === 'supervisor'
   const canImport = profile?.role === 'admin' || profile?.role === 'cxo'
+  const t = useT()
 
   return (
     <div className="expenses-page">
       <ModuleHeader>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'nowrap' }}>
-          <span style={{ fontSize: 13, flexShrink: 0 }}>Expenses</span>
+          <span style={{ fontSize: 13, flexShrink: 0 }}>{isSupervisor ? t('Claims & Advances') : 'Expenses'}</span>
           {costCenters.length > 1 && (
             <div className="cc-switch">
               {costCenters.map((cc) => (

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ModuleHeader } from '../../components/ui'
 import { SearchableSelect } from '../../components/SearchableSelect'
 import { useAuth } from '../../lib/auth'
+import { useT } from '../../lib/i18n'
 import { useStaff, useProjects } from '../../lib/queries/masters'
 import { useProfiles } from '../../lib/queries/admin'
 import { useAllStaffAttendance, useAllStaffProjectAssignments } from '../../lib/queries/teamTracking'
@@ -19,6 +20,7 @@ function todayStr() {
 export function CalendarPage() {
   const { profile } = useAuth()
   const isSupervisor = profile?.role === 'supervisor'
+  const t = useT()
   const today = todayStr()
 
   const { data: staff } = useStaff()
@@ -37,7 +39,7 @@ export function CalendarPage() {
 
   return (
     <div>
-      <ModuleHeader>Calendar</ModuleHeader>
+      <ModuleHeader>{t('Calendar')}</ModuleHeader>
 
       {!isSupervisor && (
         <div className="field" style={{ maxWidth: 320, marginBottom: 16 }}>
@@ -61,7 +63,7 @@ export function CalendarPage() {
           supervisors={supervisors}
         />
       ) : team.length === 0 ? (
-        <div className="note">No team members assigned to this supervisor.</div>
+        <div className="note">{t('No team members assigned to this supervisor.')}</div>
       ) : (
         <TeamCalendarSection
           team={team}

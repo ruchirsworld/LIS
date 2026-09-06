@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { AuthProvider, useAuth } from './lib/auth'
+import { LanguageProvider } from './lib/i18n'
 import { LoginPage } from './features/auth/LoginPage'
 import { Shell } from './components/Shell'
 import { LocationGate } from './components/LocationGate'
@@ -93,7 +94,9 @@ function AppInner() {
 function App() {
   return (
     <AuthProvider>
-      <AppInner />
+      <LanguageProvider>
+        <AppInner />
+      </LanguageProvider>
     </AuthProvider>
   )
 }

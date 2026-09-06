@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ModuleHeader, KpiCard } from '../../components/ui'
 import { useAuth } from '../../lib/auth'
+import { useT } from '../../lib/i18n'
 import { useProjects } from '../../lib/queries/masters'
 import { useExpenses, useExpenseReimbursements } from '../../lib/queries/expenses'
 import { useLedgerLines } from '../../lib/queries/ledger'
@@ -29,6 +30,7 @@ function currentWeekRange(todayIso: string): { from: string; to: string } {
 // logged.
 export function SupervisorRecordsPage() {
   const { profile } = useAuth()
+  const t = useT()
   const { data: projects } = useProjects()
   const { data: allExpenses } = useExpenses(null)
   const { data: allPendingExpenses } = useExpenses(null, 'pending')
@@ -98,7 +100,7 @@ export function SupervisorRecordsPage() {
 
   return (
     <div>
-      <ModuleHeader>Records</ModuleHeader>
+      <ModuleHeader>{t('Records')}</ModuleHeader>
 
       <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: 16 }}>
         <div style={{ display: 'flex', gap: 6 }}>
@@ -110,18 +112,18 @@ export function SupervisorRecordsPage() {
               style={period === p ? { background: 'var(--accent)', color: '#fff' } : undefined}
               onClick={() => setPeriod(p)}
             >
-              {p === 'week' ? 'This week' : p === 'month' ? 'This month' : 'Custom'}
+              {p === 'week' ? t('This week') : p === 'month' ? t('This month') : t('Custom')}
             </button>
           ))}
         </div>
         {period === 'custom' && (
           <>
             <div className="field field-narrow">
-              <label>From</label>
+              <label>{t('From')}</label>
               <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} />
             </div>
             <div className="field field-narrow">
-              <label>To</label>
+              <label>{t('To')}</label>
               <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} />
             </div>
           </>
@@ -130,15 +132,30 @@ export function SupervisorRecordsPage() {
 
       {datesInvalid && (
         <div className="note" style={{ color: 'var(--red)', marginTop: -10 }}>
-          "From" must be on or before "To".
+          "{t('From')}" {t('must be on or before')} "{t('To')}".
         </div>
       )}
 
       <div className="dash-grid">
-        <KpiCard label="Total expenses" value={fmt(totalExpenses)} onClick={() => toggle('expenses')} active={expanded === 'expenses'} />
-        <KpiCard label="Pending approval" value={fmt(totalPending)} onClick={() => toggle('pending')} active={expanded === 'pending'} />
-        <KpiCard label="Payments received" value={fmt(totalReceived)} onClick={() => toggle('payments')} active={expanded === 'payments'} />
-        <KpiCard label="Site imprest float held" value={fmt(imprestBalance)} />
+        <KpiCard
+          label={t('Total expenses')}
+          value={fmt(totalExpenses)}
+          onClick={() => toggle('expenses')}
+          active={expanded === 'expenses'}
+        />
+        <KpiCard
+          label={t('Pending approval')}
+          value={fmt(totalPending)}
+          onClick={() => toggle('pending')}
+          active={expanded === 'pending'}
+        />
+        <KpiCard
+          label={t('Payments received')}
+          value={fmt(totalReceived)}
+          onClick={() => toggle('payments')}
+          active={expanded === 'payments'}
+        />
+        <KpiCard label={t('Site imprest float held')} value={fmt(imprestBalance)} />
       </div>
 
       {expanded === 'expenses' && (
@@ -153,9 +170,9 @@ export function SupervisorRecordsPage() {
                   <table className="data">
                     <thead>
                       <tr>
-                        <th>Project</th>
-                        <th>Description</th>
-                        <th style={{ textAlign: 'right' }}>Amount</th>
+                        <th>{t('Project')}</th>
+                        <th>{t('Description')}</th>
+                        <th style={{ textAlign: 'right' }}>{t('Amount')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -172,7 +189,7 @@ export function SupervisorRecordsPage() {
               </details>
             )
           })}
-          {expenseDates.length === 0 && <div className="note">No expenses in this range.</div>}
+          {expenseDates.length === 0 && <div className="note">{t('No expenses in this range.')}</div>}
         </div>
       )}
 
@@ -188,9 +205,9 @@ export function SupervisorRecordsPage() {
                   <table className="data">
                     <thead>
                       <tr>
-                        <th>Project</th>
-                        <th>Description</th>
-                        <th style={{ textAlign: 'right' }}>Amount</th>
+                        <th>{t('Project')}</th>
+                        <th>{t('Description')}</th>
+                        <th style={{ textAlign: 'right' }}>{t('Amount')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -207,7 +224,7 @@ export function SupervisorRecordsPage() {
               </details>
             )
           })}
-          {pendingDates.length === 0 && <div className="note">Nothing awaiting approval.</div>}
+          {pendingDates.length === 0 && <div className="note">{t('Nothing awaiting approval.')}</div>}
         </div>
       )}
 
@@ -222,8 +239,8 @@ export function SupervisorRecordsPage() {
                   <table className="data">
                     <thead>
                       <tr>
-                        <th>Reference</th>
-                        <th style={{ textAlign: 'right' }}>Amount</th>
+                        <th>{t('Reference')}</th>
+                        <th style={{ textAlign: 'right' }}>{t('Amount')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -239,7 +256,7 @@ export function SupervisorRecordsPage() {
               </details>
             )
           })}
-          {paymentDates.length === 0 && <div className="note">No payments in this range.</div>}
+          {paymentDates.length === 0 && <div className="note">{t('No payments in this range.')}</div>}
         </div>
       )}
     </div>

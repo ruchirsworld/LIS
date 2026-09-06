@@ -5,6 +5,7 @@ import { RowMenu } from './RowMenu'
 import { MobileFooter } from './MobileFooter'
 import { MobileFab } from './MobileFab'
 import { usePendingApprovalsCount } from '../lib/queries/approvals'
+import { useLanguage } from '../lib/i18n'
 import { TABS, isTabVisible, HEADER_MENU_TAB_IDS, type TabId } from '../lib/nav'
 import laavinMark from '../assets/laavin-mark.png'
 import './Shell.css'
@@ -31,6 +32,8 @@ export function Shell({
   const { signOut, profile } = useAuth()
   const canApprove = profile?.role === 'admin' || profile?.role === 'cxo'
   const isAdminSide = canApprove
+  const isSupervisor = profile?.role === 'supervisor'
+  const { lang, setLang } = useLanguage()
   const pendingApprovalsCount = usePendingApprovalsCount(canApprove)
   // Admin/CXO only — these tabs live in the hamburger instead of the
   // Sidebar (see HEADER_MENU_TAB_IDS); a Supervisor's sidebar keeps them
@@ -83,6 +86,17 @@ export function Shell({
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              {isSupervisor && (
+                <button
+                  type="button"
+                  className="pay-btn"
+                  onClick={() => setLang(lang === 'en' ? 'hi' : 'en')}
+                  aria-label="Switch language"
+                  title="Switch language"
+                >
+                  {lang === 'en' ? 'हिं' : 'EN'}
+                </button>
+              )}
               {isAdminSide ? (
                 <RowMenu
                   badge={pendingApprovalsCount}

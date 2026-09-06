@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../../lib/auth'
+import { useT } from '../../lib/i18n'
 import { useStaff, useProjects, useExpenseSubHeads } from '../../lib/queries/masters'
 import {
   useStaffAttendanceForDate,
@@ -60,6 +61,7 @@ function writeLastProject(profileId: string, projectId: string) {
 
 export function SupervisorDashboardPage() {
   const { profile } = useAuth()
+  const t = useT()
   const today = todayStr()
   // The date the whole page — attendance, project assignment, leave count —
   // is being viewed/edited for. Defaults to today; tapping the date next to
@@ -230,9 +232,11 @@ export function SupervisorDashboardPage() {
   const pendingDates = [...pendingByDate.keys()].sort((a, b) => b.localeCompare(a))
 
   // "Payments received" — Site Imprest advances actually paid out to this
-  // Supervisor, not their claims (those are the "Claims (Pending)" KPI).
+  // Supervisor, not their claims (those are the "Claims (Pending)" KPI). A
+  // request they've made themselves (Expenses → Request advance) stays out
+  // of this total until an Admin approves it.
   const myAdvances = (imprestTransactions ?? [])
-    .filter((t) => t.profile_id === profile?.id && t.kind === 'advance' && inKpiRange(t.date))
+    .filter((t) => t.profile_id === profile?.id && t.kind === 'advance' && t.status === 'approved' && inKpiRange(t.date))
     .sort((a, b) => b.date.localeCompare(a.date))
   const myAdvancesTotal = myAdvances.reduce((s, t) => s + Number(t.amount || 0), 0)
 
@@ -250,13 +254,13 @@ export function SupervisorDashboardPage() {
 
   return (
     <div>
-      <ModuleHeader>Dashboard</ModuleHeader>
+      <ModuleHeader>{t('Dashboard')}</ModuleHeader>
 
       {myTeam.length > 0 && (
         <div className="field" style={{ maxWidth: 320, marginBottom: 20 }}>
-          <label htmlFor="sup-site">Site</label>
+          <label htmlFor="sup-site">{t('Site')}</label>
           <select id="sup-site" value={sitePickerValue} onChange={(e) => void applySiteToTeam(e.target.value)}>
-            <option value="">Not set</option>
+            <option value="">{t('Not set')}</option>
             {pickableProjects.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
@@ -267,7 +271,7 @@ export function SupervisorDashboardPage() {
       )}
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 24, marginBottom: 10, flexWrap: 'wrap' }}>
-        <h3 style={{ margin: 0 }}>Attendance</h3>
+        <h3 style={{ margin: 0 }}>{t('Attendance')}</h3>
         <button
           type="button"
           className="pay-btn"
@@ -289,7 +293,7 @@ export function SupervisorDashboardPage() {
         )}
         {selectedDate !== today && (
           <button type="button" className="pay-btn" onClick={() => setSelectedDate(today)}>
-            Today
+            {t('Today')}
           </button>
         )}
       </div>
@@ -297,17 +301,17 @@ export function SupervisorDashboardPage() {
         <table className="data">
           <thead>
             <tr>
-              <th>Name</th>
-              <th>OFF(s)</th>
+              <th>{t('Name')}</th>
+              <th>{t('OFF(s)')}</th>
               <th>{fmtDate(selectedDate)}</th>
-              <th>Site</th>
+              <th>{t('Site')}</th>
             </tr>
           </thead>
           <tbody>
             {myTeam.length === 0 && (
               <tr>
                 <td colSpan={4} className="empty-row">
-                  No team members assigned to you yet
+                  {t('No team members assigned to you yet')}
                 </td>
               </tr>
             )}
@@ -332,14 +336,14 @@ export function SupervisorDashboardPage() {
                   <td>
                     {holidayToday ? (
                       <div>
-                        <span className="badge paid">Holiday (Paid)</span>
+                        <span className="badge paid">{t('Holiday (Paid)')}</span>
                         <div className="note" style={{ margin: '4px 0 0' }}>
-                          Worked anyway? Set their Site → earns a compensatory leave this month.
+                          {t('Worked anyway? Set their Site → earns a compensatory leave this month.')}
                         </div>
                       </div>
                     ) : approved ? (
                       <span className="badge paid">
-                        {ATTENDANCE_DAY_TYPE_LABEL[record?.day_type as AttendanceDayType] ?? 'Leave'} (approved)
+                        {t(ATTENDANCE_DAY_TYPE_LABEL[record?.day_type as AttendanceDayType] ?? 'Leave')} ({t('approved')})
                       </span>
                     ) : (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -348,7 +352,7 @@ export function SupervisorDashboardPage() {
                           className="pay-btn"
                           aria-pressed={record?.day_type === 'absent'}
                           aria-label={`Mark ${s.name} absent`}
-                          title="Absent"
+                          title={t('Absent')}
                           style={{
                             fontSize: 15,
                             lineHeight: 1,
@@ -363,7 +367,7 @@ export function SupervisorDashboardPage() {
                           className="pay-btn"
                           aria-pressed={record?.day_type === 'half_day'}
                           aria-label={`Mark ${s.name} half day`}
-                          title="Half day"
+                          title={t('Half day')}
                           style={{
                             fontSize: 15,
                             lineHeight: 1,
@@ -374,7 +378,7 @@ export function SupervisorDashboardPage() {
                           ◐
                         </button>
                         {!record && (
-                          <span className="note" style={{ margin: 0, fontSize: 15 }} title="Present">
+                          <span className="note" style={{ margin: 0, fontSize: 15 }} title={t('Present')}>
                             ✓
                           </span>
                         )}
@@ -387,7 +391,9 @@ export function SupervisorDashboardPage() {
                       value={staffProjectOverride}
                       onChange={(e) => void changeStaffProject(s.id, e.target.value)}
                     >
-                      <option value="">Default ({projectName(s.default_project_id) ?? 'not set'})</option>
+                      <option value="">
+                        {t('Default')} ({projectName(s.default_project_id) ?? t('not set')})
+                      </option>
                       {pickableProjects
                         .filter((p) => p.id !== s.default_project_id)
                         .map((p) => (
@@ -440,7 +446,7 @@ export function SupervisorDashboardPage() {
                 // earned this month, so call out which date that actually is.
                 const compOffDates = new Set(paidLeaveRows.slice(baseQuota).map((r) => r.date))
 
-                const leaveTitle = `First ${baseQuota}${isProRated ? ' (pro rata)' : ''} free${compOffEarned > 0 ? ` + ${compOffEarned} comp-off` : ''}`
+                const leaveTitle = `${t('First')} ${baseQuota}${isProRated ? ` (${t('pro rata')})` : ''} ${t('free')}${compOffEarned > 0 ? ` + ${compOffEarned} ${t('comp-off')}` : ''}`
 
                 const groups: { label: string; rows: typeof allRows; title?: string }[] = [
                   { label: 'Paid Leaves', rows: paidLeaveRows, title: leaveTitle },
@@ -453,14 +459,14 @@ export function SupervisorDashboardPage() {
                     group.rows.length > 0 && (
                       <div key={group.label}>
                         <div style={{ fontSize: 15, color: 'var(--ink, inherit)', marginBottom: 6 }} title={group.title}>
-                          {group.label} <strong style={{ fontWeight: 700 }}>({group.rows.length})</strong>
+                          {t(group.label)} <strong style={{ fontWeight: 700 }}>({group.rows.length})</strong>
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                           {group.rows.map((r) => (
                             <div key={r.date} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 12 }}>
                               <span>
                                 {fmtDate(r.date)}
-                                {compOffDates.has(r.date) ? ' (comp off)' : ''}
+                                {compOffDates.has(r.date) ? ` (${t('comp off')})` : ''}
                               </span>
                             </div>
                           ))}
@@ -475,7 +481,7 @@ export function SupervisorDashboardPage() {
                 return (
                   <div>
                     <div style={{ fontSize: 15, color: 'var(--ink, inherit)', marginBottom: 6 }}>
-                      Holidays <strong style={{ fontWeight: 700 }}>({monthHolidays.length})</strong>
+                      {t('Holidays')} <strong style={{ fontWeight: 700 }}>({monthHolidays.length})</strong>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                       {monthHolidays.map((h) => (
@@ -490,7 +496,7 @@ export function SupervisorDashboardPage() {
               })()}
               {(leaveRecordsByStaff.get(openLeaveDatesStaffId) ?? []).length === 0 &&
                 (holidays ?? []).filter((h) => h.date.startsWith(monthPrefix)).length === 0 && (
-                  <div className="note">Nothing recorded this month.</div>
+                  <div className="note">{t('Nothing recorded this month.')}</div>
                 )}
             </div>
           </div>
@@ -507,18 +513,18 @@ export function SupervisorDashboardPage() {
               style={kpiPeriod === p ? { background: 'var(--accent)', color: '#fff' } : undefined}
               onClick={() => setKpiPeriod(p)}
             >
-              {p === 'week' ? 'This week' : p === 'month' ? 'This month' : 'Custom'}
+              {p === 'week' ? t('This week') : p === 'month' ? t('This month') : t('Custom')}
             </button>
           ))}
         </div>
         {kpiPeriod === 'custom' && (
           <>
             <div className="field field-narrow">
-              <label>From</label>
+              <label>{t('From')}</label>
               <input type="date" value={kpiCustomFrom} onChange={(e) => setKpiCustomFrom(e.target.value)} />
             </div>
             <div className="field field-narrow">
-              <label>To</label>
+              <label>{t('To')}</label>
               <input type="date" value={kpiCustomTo} onChange={(e) => setKpiCustomTo(e.target.value)} />
             </div>
           </>
@@ -526,19 +532,19 @@ export function SupervisorDashboardPage() {
       </div>
       {kpiRangeInvalid && (
         <div className="note" style={{ color: 'var(--red)' }}>
-          "From" must be on or before "To".
+          "{t('From')}" {t('must be on or before')} "{t('To')}".
         </div>
       )}
 
       <div className="dash-grid" style={{ marginTop: 12 }}>
         <KpiCard
-          label="Claims (Pending)"
+          label={t('Claims (Pending)')}
           value={fmt(myPendingTotal)}
           onClick={() => toggleKpi('claims')}
           active={expandedKpi === 'claims'}
         />
         <KpiCard
-          label="Payments received"
+          label={t('Payments received')}
           value={fmt(myAdvancesTotal)}
           onClick={() => toggleKpi('payments')}
           active={expandedKpi === 'payments'}
@@ -547,7 +553,7 @@ export function SupervisorDashboardPage() {
 
       {expandedKpi === 'claims' && (
         <div style={{ marginTop: 16 }}>
-          {pendingDates.length === 0 && <div className="note">Nothing awaiting approval.</div>}
+          {pendingDates.length === 0 && <div className="note">{t('Nothing awaiting approval.')}</div>}
           {pendingDates.map((d, i) => {
             const dayExpenses = pendingByDate.get(d)!
             const dayTotal = dayExpenses.reduce((s, e) => s + Number(e.amount || 0), 0)
@@ -560,14 +566,14 @@ export function SupervisorDashboardPage() {
                   <table className="data">
                     <thead>
                       <tr>
-                        <th>Category</th>
-                        <th style={{ textAlign: 'right' }}>Amount</th>
+                        <th>{t('Category')}</th>
+                        <th style={{ textAlign: 'right' }}>{t('Amount')}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {dayExpenses.map((e) => (
                         <tr key={e.id}>
-                          <td>{categoryName(e.sub_head_id)}</td>
+                          <td>{t(categoryName(e.sub_head_id))}</td>
                           <td className="amt">{fmt(e.amount)}</td>
                         </tr>
                       ))}
@@ -582,7 +588,7 @@ export function SupervisorDashboardPage() {
 
       {expandedKpi === 'payments' && (
         <div style={{ marginTop: 16 }}>
-          {advanceDates.length === 0 && <div className="note">No Site Imprest payments received yet.</div>}
+          {advanceDates.length === 0 && <div className="note">{t('No Site Imprest payments received yet.')}</div>}
           {advanceDates.map((d, i) => {
             const dayAdvances = advancesByDate.get(d)!
             const dayTotal = dayAdvances.reduce((s, t) => s + Number(t.amount || 0), 0)
@@ -595,15 +601,15 @@ export function SupervisorDashboardPage() {
                   <table className="data">
                     <thead>
                       <tr>
-                        <th>Remarks</th>
-                        <th style={{ textAlign: 'right' }}>Amount</th>
+                        <th>{t('Remarks')}</th>
+                        <th style={{ textAlign: 'right' }}>{t('Amount')}</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {dayAdvances.map((t) => (
-                        <tr key={t.id}>
-                          <td>{t.remarks || '—'}</td>
-                          <td className="amt">{fmt(t.amount)}</td>
+                      {dayAdvances.map((row) => (
+                        <tr key={row.id}>
+                          <td>{row.remarks || '—'}</td>
+                          <td className="amt">{fmt(row.amount)}</td>
                         </tr>
                       ))}
                     </tbody>

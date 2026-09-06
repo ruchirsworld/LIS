@@ -1,5 +1,6 @@
 import { TABS, isTabVisible, type TabId } from '../lib/nav'
 import { useAuth } from '../lib/auth'
+import { useT } from '../lib/i18n'
 import { usePendingApprovalsCount } from '../lib/queries/approvals'
 import { NavIcon } from './NavIcons'
 import './MobileFooter.css'
@@ -12,8 +13,12 @@ const FOOTER_ITEMS = QUICK_ACCESS_IDS.map((id) => TABS.find((t) => t.id === id)!
 export function MobileFooter({ active, onChange }: { active: TabId; onChange: (tab: TabId) => void }) {
   const { profile } = useAuth()
   const canApprove = profile?.role === 'admin' || profile?.role === 'cxo'
+  const isSupervisor = profile?.role === 'supervisor'
   const pendingApprovalsCount = usePendingApprovalsCount(canApprove)
+  const t = useT()
   const visibleItems = FOOTER_ITEMS.filter((item) => isTabVisible(item, profile?.role))
+  const navLabel = (item: { id: TabId; label: string }) =>
+    item.id === 'expenses' && isSupervisor ? t('Claims & Advances') : t(item.label)
 
   return (
     <nav className="mobile-footer" aria-label="Quick access">
@@ -30,7 +35,7 @@ export function MobileFooter({ active, onChange }: { active: TabId; onChange: (t
               <span className="mobile-footer-badge">{pendingApprovalsCount}</span>
             )}
           </span>
-          <span className="mobile-footer-label">{item.label}</span>
+          <span className="mobile-footer-label">{navLabel(item)}</span>
         </button>
       ))}
     </nav>

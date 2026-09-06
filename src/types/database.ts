@@ -14,6 +14,35 @@ export type Database = {
   };
   public: {
     Tables: {
+      app_settings: {
+        Row: {
+          key: string;
+          updated_at: string;
+          updated_by: string | null;
+          value: number;
+        };
+        Insert: {
+          key: string;
+          updated_at?: string;
+          updated_by?: string | null;
+          value: number;
+        };
+        Update: {
+          key?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+          value?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "app_settings_updated_by_fkey";
+            columns: ["updated_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       audit_log: {
         Row: {
           changed_at: string;
@@ -1566,6 +1595,8 @@ export type Database = {
           kind: string;
           profile_id: string;
           remarks: string | null;
+          staff_id: string | null;
+          status: string;
         };
         Insert: {
           amount: number;
@@ -1578,6 +1609,8 @@ export type Database = {
           kind: string;
           profile_id: string;
           remarks?: string | null;
+          staff_id?: string | null;
+          status?: string;
         };
         Update: {
           amount?: number;
@@ -1590,6 +1623,8 @@ export type Database = {
           kind?: string;
           profile_id?: string;
           remarks?: string | null;
+          staff_id?: string | null;
+          status?: string;
         };
         Relationships: [
           {
@@ -1626,6 +1661,13 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "v_capital_summary";
             referencedColumns: ["partner_id"];
+          },
+          {
+            foreignKeyName: "staff_imprest_transactions_staff_id_fkey";
+            columns: ["staff_id"];
+            isOneToOne: false;
+            referencedRelation: "staff";
+            referencedColumns: ["id"];
           },
         ];
       };
@@ -1744,6 +1786,8 @@ export type Database = {
           display_id: string | null;
           id: string;
           remarks: string | null;
+          source_id: string | null;
+          source_table: string | null;
           staff_id: string;
         };
         Insert: {
@@ -1755,6 +1799,8 @@ export type Database = {
           display_id?: string | null;
           id?: string;
           remarks?: string | null;
+          source_id?: string | null;
+          source_table?: string | null;
           staff_id: string;
         };
         Update: {
@@ -1766,6 +1812,8 @@ export type Database = {
           display_id?: string | null;
           id?: string;
           remarks?: string | null;
+          source_id?: string | null;
+          source_table?: string | null;
           staff_id?: string;
         };
         Relationships: [

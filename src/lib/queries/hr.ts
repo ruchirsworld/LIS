@@ -6,6 +6,7 @@ type HolidayInsert = Database['public']['Tables']['holidays']['Insert']
 type WageAccrualInsert = Database['public']['Tables']['wage_accruals']['Insert']
 type WagePaymentInsert = Database['public']['Tables']['wage_payments']['Insert']
 type StaffImprestTransactionInsert = Database['public']['Tables']['staff_imprest_transactions']['Insert']
+type StaffImprestTransactionUpdate = Database['public']['Tables']['staff_imprest_transactions']['Update']
 type StaffSalaryAdvanceInsert = Database['public']['Tables']['staff_salary_advances']['Insert']
 
 export function useHolidays() {
@@ -108,6 +109,21 @@ export function useCreateStaffImprestTransaction() {
       return data
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['staff_imprest_transactions'] }),
+  })
+}
+
+export function useUpdateStaffImprestTransaction() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, patch }: { id: string; patch: StaffImprestTransactionUpdate }) => {
+      const { data, error } = await supabase.from('staff_imprest_transactions').update(patch).eq('id', id).select().single()
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['staff_imprest_transactions'] })
+      qc.invalidateQueries({ queryKey: ['ledger_lines'] })
+    },
   })
 }
 

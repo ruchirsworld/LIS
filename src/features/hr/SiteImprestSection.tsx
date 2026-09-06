@@ -2,10 +2,10 @@ import { useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
 import { SearchableSelect } from '../../components/SearchableSelect'
-import { useBankAccounts } from '../../lib/queries/masters'
+import { useBankAccounts, useStaff } from '../../lib/queries/masters'
 import { useProfiles } from '../../lib/queries/admin'
 import { useLedgerLines } from '../../lib/queries/ledger'
-import { useStaffImprestTransactions, useCreateStaffImprestTransaction } from '../../lib/queries/hr'
+import { useStaffImprestTransactions, useCreateStaffImprestTransaction, useUpdateStaffImprestTransaction } from '../../lib/queries/hr'
 import { ReportPeriodFilter } from '../reports/ReportPeriodFilter'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import { ImportFileBlock } from '../admin/DataImportSection'
@@ -16,6 +16,9 @@ import type { ExportSection } from '../../lib/export/report'
 import type { DateRange } from '../../lib/calc/reportPeriod'
 import { fmt, fmtDate, parseINR } from '../../lib/calc/format'
 import { getErrorMessage } from '../../lib/errors'
+import type { Database } from '../../types/database'
+
+type StaffImprestTransaction = Database['public']['Tables']['staff_imprest_transactions']['Row']
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
@@ -31,10 +34,24 @@ export function SiteImprestSection() {
   const canImport = profile?.role === 'admin' || profile?.role === 'cxo'
   const { data: profiles } = useProfiles()
   const { data: bankAccounts } = useBankAccounts()
-  const { data: allTransactions } = useStaffImprestTransactions()
+  const { data: staff } = useStaff()
+  const { data: allTransactionsRaw } = useStaffImprestTransactions()
   const createTransaction = useCreateStaffImprestTransaction()
+  const updateTransaction = useUpdateStaffImprestTransaction()
 
   const supervisors = (profiles ?? []).filter((p) => p.role === 'supervisor')
+  const staffName = (id: string | null) => (id ? staff?.find((s) => s.id === id)?.name ?? '—' : null)
+
+  // A Supervisor-requested advance sits at status 'pending' until an Admin
+  // approves it below — it isn't real money yet, so every balance/list on
+  // this page (besides the approval queue itself) only ever looks at
+  // 'approved' rows, same as the GL only posts those. A request tagged with
+  // a specific worker (staff_id set) posts as a Salary Advance instead of
+  // Site Imprest once approved — see the Salary tab for those, not here.
+  const allTransactions = (allTransactionsRaw ?? []).filter((t) => t.status === 'approved' && !t.staff_id)
+  const pendingRequests = (allTransactionsRaw ?? [])
+    .filter((t) => t.status === 'pending')
+    .sort((a, b) => a.date.localeCompare(b.date) || a.created_at.localeCompare(b.created_at))
 
   const [supervisorId, setSupervisorId] = useState('')
   const [kind, setKind] = useState<'advance' | 'return'>('advance')
@@ -46,6 +63,10 @@ export function SiteImprestSection() {
   const [formError, setFormError] = useState<string | null>(null)
   const [paymentsRange, setPaymentsRange] = useState<DateRange | null>(null)
   const [recordsView, setRecordsView] = useState<'payments' | 'all'>('payments')
+  const [requestBusyId, setRequestBusyId] = useState<string | null>(null)
+  const [requestError, setRequestError] = useState<Record<string, string>>({})
+  const [editingRequestId, setEditingRequestId] = useState<string | null>(null)
+  const [requestDraft, setRequestDraft] = useState({ date: '', amount: '', staffId: '' })
 
   // "Float currently held" still needs the full GL picture (advances minus
   // whatever their own Project expenses have drawn against it) to be
@@ -103,6 +124,65 @@ export function SiteImprestSection() {
     (a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at)
   )
 
+  async function handleApproveRequest(id: string) {
+    setRequestBusyId(id)
+    setRequestError((m) => ({ ...m, [id]: '' }))
+    try {
+      await updateTransaction.mutateAsync({ id, patch: { status: 'approved' } })
+    } catch (err) {
+      setRequestError((m) => ({ ...m, [id]: getErrorMessage(err, 'Could not approve this request.') }))
+    } finally {
+      setRequestBusyId(null)
+    }
+  }
+
+  async function handleRejectRequest(id: string) {
+    setRequestBusyId(id)
+    setRequestError((m) => ({ ...m, [id]: '' }))
+    try {
+      await updateTransaction.mutateAsync({ id, patch: { status: 'rejected' } })
+    } catch (err) {
+      setRequestError((m) => ({ ...m, [id]: getErrorMessage(err, 'Could not reject this request.') }))
+    } finally {
+      setRequestBusyId(null)
+    }
+  }
+
+  function startEditRequest(t: StaffImprestTransaction) {
+    setEditingRequestId(t.id)
+    setRequestDraft({ date: t.date, amount: String(t.amount), staffId: t.staff_id ?? '' })
+    setRequestError((m) => ({ ...m, [t.id]: '' }))
+  }
+
+  async function handleSaveRequest(id: string) {
+    const amt = parseINR(requestDraft.amount)
+    if (amt <= 0) {
+      setRequestError((m) => ({ ...m, [id]: 'Enter an amount.' }))
+      return
+    }
+    if (!requestDraft.date) {
+      setRequestError((m) => ({ ...m, [id]: 'Date is required.' }))
+      return
+    }
+    if (!requestDraft.staffId) {
+      setRequestError((m) => ({ ...m, [id]: 'Pick a worker.' }))
+      return
+    }
+    setRequestBusyId(id)
+    setRequestError((m) => ({ ...m, [id]: '' }))
+    try {
+      await updateTransaction.mutateAsync({
+        id,
+        patch: { date: requestDraft.date, amount: amt, staff_id: requestDraft.staffId },
+      })
+      setEditingRequestId(null)
+    } catch (err) {
+      setRequestError((m) => ({ ...m, [id]: getErrorMessage(err, 'Could not save these changes.') }))
+    } finally {
+      setRequestBusyId(null)
+    }
+  }
+
   function resetForm() {
     setKind('advance')
     setDate(todayStr())
@@ -144,6 +224,130 @@ export function SiteImprestSection() {
 
   return (
     <div>
+      {pendingRequests.length > 0 && (
+        <div className="card" style={{ padding: 16, marginBottom: 14 }}>
+          <h3 style={{ marginTop: 0, fontSize: 13 }}>Pending advance requests</h3>
+          <div className="note" style={{ marginTop: -4, marginBottom: 12 }}>
+            Requested by a Supervisor from their own screen, for one of their workers — approving records it as a
+            salary advance for that worker, recovered from their pay later.
+          </div>
+          <div className="table-scroll">
+            <table className="data">
+              <thead>
+                <tr>
+                  <th>Supervisor</th>
+                  <th>Date</th>
+                  <th>Worker</th>
+                  <th style={{ textAlign: 'right' }}>Amount</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {pendingRequests.map((t) =>
+                  editingRequestId === t.id ? (
+                    <tr key={t.id}>
+                      <td>{supervisorName(t.profile_id)}</td>
+                      <td>
+                        <input
+                          type="date"
+                          aria-label="Date"
+                          value={requestDraft.date}
+                          onChange={(e) => setRequestDraft((d) => ({ ...d, date: e.target.value }))}
+                        />
+                      </td>
+                      <td>
+                        <SearchableSelect
+                          items={(staff ?? []).filter((s) => s.supervisor_id === t.profile_id)}
+                          value={requestDraft.staffId}
+                          onChange={(v) => setRequestDraft((d) => ({ ...d, staffId: v }))}
+                          getId={(s) => s.id}
+                          getLabel={(s) => s.name}
+                          placeholder="— Select worker —"
+                        />
+                      </td>
+                      <td>
+                        <CurrencyInput
+                          value={requestDraft.amount}
+                          onValueChange={(v) => setRequestDraft((d) => ({ ...d, amount: v }))}
+                        />
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          <Button type="button" disabled={requestBusyId === t.id} onClick={() => handleSaveRequest(t.id)}>
+                            Save
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            disabled={requestBusyId === t.id}
+                            onClick={() => setEditingRequestId(null)}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                        {requestError[t.id] && (
+                          <div className="note" style={{ color: 'var(--red)', marginTop: 4 }}>
+                            {requestError[t.id]}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ) : (
+                    <tr key={t.id}>
+                      <td>{supervisorName(t.profile_id)}</td>
+                      <td>{fmtDate(t.date)}</td>
+                      <td>{staffName(t.staff_id) ?? '—'}</td>
+                      <td className="amt">{fmt(t.amount)}</td>
+                      <td>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          <Button
+                            type="button"
+                            className="icon-btn-sq"
+                            disabled={requestBusyId === t.id}
+                            onClick={() => handleApproveRequest(t.id)}
+                            title="Approve"
+                            aria-label="Approve"
+                          >
+                            ✓
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            className="icon-btn-sq"
+                            disabled={requestBusyId === t.id}
+                            onClick={() => handleRejectRequest(t.id)}
+                            title="Reject"
+                            aria-label="Reject"
+                          >
+                            ✕
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            className="icon-btn-sq"
+                            disabled={requestBusyId === t.id}
+                            onClick={() => startEditRequest(t)}
+                            title="Edit"
+                            aria-label="Edit"
+                          >
+                            ✎
+                          </Button>
+                        </div>
+                        {requestError[t.id] && (
+                          <div className="note" style={{ color: 'var(--red)', marginTop: 4 }}>
+                            {requestError[t.id]}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       <div className="card" style={{ padding: 16, marginBottom: 14 }}>
         <h3 style={{ marginTop: 0, fontSize: 13 }}>Imprest</h3>
         <div className="note" style={{ marginTop: -4, marginBottom: 12 }}>

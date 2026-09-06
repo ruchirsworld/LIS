@@ -1,4 +1,5 @@
 import { useAuth } from '../../lib/auth'
+import { useT } from '../../lib/i18n'
 import { ExpenseForm } from './ExpenseForm'
 import { SupervisorProjectExpenseForm } from './SupervisorProjectExpenseForm'
 import { ExpenseTable } from './ExpenseTable'
@@ -10,6 +11,7 @@ export function ProjectExpensesSection() {
   const { profile } = useAuth()
   const isSupervisor = profile?.role === 'supervisor'
   const canImport = profile?.role === 'admin' || profile?.role === 'cxo'
+  const t = useT()
 
   return (
     <div>
@@ -18,7 +20,7 @@ export function ProjectExpensesSection() {
       ) : (
         <ExpenseForm editingExpense={null} onDoneEditing={() => {}} lockToProjects />
       )}
-      <ExpenseTable costCenterFilter="Project" title="Project expense records" />
+      <ExpenseTable costCenterFilter="Project" title={t('Project expense records')} />
 
       {canImport && (
         <ImportFileBlock
