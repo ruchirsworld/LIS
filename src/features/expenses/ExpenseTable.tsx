@@ -47,11 +47,17 @@ function CalendarIcon() {
 export function ExpenseTable({
   costCenterFilter,
   title = 'Expense records',
+  groupByDate = false,
 }: {
   /** Only show expenses with this exact cost_center — e.g. "Project" on the
    * Project section. Omit to show everything, as on the Admin section. */
   costCenterFilter?: string
   title?: string
+  /** Cluster rows under a date heading (with that day's total) instead of a
+   * flat sortable list — used on the Project section, where "which day did
+   * this cost land on" matters more than sorting by amount/description. To
+   * keep the groups contiguous, only the Date column stays sortable. */
+  groupByDate?: boolean
 } = {}) {
   const { profile } = useAuth()
   const [range, setRange] = useState<DateRange | null>(null)
@@ -177,7 +183,7 @@ export function ExpenseTable({
       costCenter: (e) => e.cost_center,
       amount: (e) => e.amount,
     },
-    'id'
+    groupByDate ? 'date' : 'id'
   )
   const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedExpenses)
 
@@ -295,11 +301,27 @@ export function ExpenseTable({
                 <input type="checkbox" checked={allPageSelected} onChange={toggleSelectAllOnPage} aria-label="Select all on page" />
               </th>
               <th></th>
-              <SortableTh label="ID" sortKey="id" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              {groupByDate ? (
+                <th>ID</th>
+              ) : (
+                <SortableTh label="ID" sortKey="id" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              )}
               <SortableTh label="Date" sortKey="date" activeKey={sortKey} direction={direction} onSort={toggleSort} />
-              <SortableTh label="Amount" sortKey="amount" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
-              <SortableTh label="Description" sortKey="description" activeKey={sortKey} direction={direction} onSort={toggleSort} />
-              <SortableTh label="Cost center" sortKey="costCenter" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              {groupByDate ? (
+                <th style={{ textAlign: 'right' }}>Amount</th>
+              ) : (
+                <SortableTh label="Amount" sortKey="amount" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+              )}
+              {groupByDate ? (
+                <th>Description</th>
+              ) : (
+                <SortableTh label="Description" sortKey="description" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              )}
+              {groupByDate ? (
+                <th>Cost center</th>
+              ) : (
+                <SortableTh label="Cost center" sortKey="costCenter" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              )}
             </tr>
           </thead>
           <tbody>
@@ -317,7 +339,7 @@ export function ExpenseTable({
                 </td>
               </tr>
             )}
-            {pageRows?.map((e) => {
+            {pageRows?.map((e, idx) => {
               const projLabel = projLabelOf(e)
               const vendorName = vendorNameOf(e)
               const expReimbursements = reimbursementsOf(e)
@@ -325,9 +347,20 @@ export function ExpenseTable({
               const due = dueOf(e)
               const hasHistory = expReimbursements.length > 0
               const isExpanded = expandedIds.has(e.id)
+              const isNewDateGroup = groupByDate && (idx === 0 || pageRows[idx - 1].date !== e.date)
+              const dayTotal = isNewDateGroup
+                ? pageRows.filter((r) => r.date === e.date).reduce((s, r) => s + Number(r.amount || 0), 0)
+                : 0
 
               return (
                 <Fragment key={e.id}>
+                  {isNewDateGroup && (
+                    <tr className="expense-date-group-row">
+                      <td colSpan={COL_SPAN} style={{ fontWeight: 600, background: 'var(--paper-2)' }}>
+                        {fmtDate(e.date)} — {fmt(dayTotal)}
+                      </td>
+                    </tr>
+                  )}
                   <tr>
                     <td>
                       <input type="checkbox" checked={selectedIds.has(e.id)} onChange={() => toggleSelected(e.id)} aria-label={`Select ${e.display_id ?? 'row'}`} />

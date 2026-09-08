@@ -18,7 +18,7 @@ export function ProjectExpensesSection() {
       ) : (
         <>
           <ExpenseForm editingExpense={null} onDoneEditing={() => {}} lockToProjects />
-          <ExpenseTable costCenterFilter="Project" />
+          <ExpenseTable costCenterFilter="Project" groupByDate />
         </>
       )}
 
