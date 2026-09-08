@@ -6,6 +6,7 @@ import { useBankAccounts } from '../../lib/queries/masters'
 import { useVendorBills, useVendorBillPayments, useCreateVendorBillPayment } from '../../lib/queries/purchases'
 import { billDue } from '../../lib/calc/vendorBills'
 import { fmt, parseINR } from '../../lib/calc/format'
+import { getErrorMessage } from '../../lib/errors'
 
 const CASH = 'cash'
 
@@ -60,7 +61,7 @@ export function VendorPaymentForm({ vendorId, onDone }: { vendorId: string; onDo
       })
       onDone()
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Could not record payment.')
+      setFormError(getErrorMessage(err, 'Could not record payment.'))
     } finally {
       setSubmitting(false)
     }

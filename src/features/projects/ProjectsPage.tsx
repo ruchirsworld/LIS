@@ -4,10 +4,12 @@ import { SearchableSelect } from '../../components/SearchableSelect'
 import { ReceiptLink } from '../../components/ReceiptLink'
 import { ExpenseForm } from '../expenses/ExpenseForm'
 import { VendorBillForm } from '../purchases/VendorBillForm'
-import { useProjects, useClients, useVendors, useExpenseSubHeads } from '../../lib/queries/masters'
+import { useProjects, useClients, useVendors, useExpenseSubHeads, useStaff } from '../../lib/queries/masters'
 import { useExpenses } from '../../lib/queries/expenses'
 import { useVendorBills } from '../../lib/queries/purchases'
 import { useInvoices, useInvoicePayments } from '../../lib/queries/invoices'
+import { useAllStaffAttendance, useAllStaffProjectAssignments } from '../../lib/queries/teamTracking'
+import { useHolidays } from '../../lib/queries/hr'
 import { fmt, fmtDate } from '../../lib/calc/format'
 import { billTotal, billGstAmt } from '../../lib/calc/vendorBills'
 import { clientLabel } from '../../lib/labels'
@@ -16,7 +18,12 @@ import {
   projectVendorBillTotal,
   projectInvoicedRevenue,
   projectReceivedRevenue,
+  projectWageByStaff,
 } from '../../lib/calc/projects'
+
+function todayStr() {
+  return new Date().toISOString().slice(0, 10)
+}
 
 export function ProjectsPage() {
   const { data: projects } = useProjects()
@@ -27,10 +34,14 @@ export function ProjectsPage() {
   const { data: vendorBills } = useVendorBills(null)
   const { data: invoices } = useInvoices(null)
   const { data: invoicePayments } = useInvoicePayments()
+  const { data: staff } = useStaff()
+  const { data: staffAttendance } = useAllStaffAttendance()
+  const { data: staffAssignments } = useAllStaffProjectAssignments()
+  const { data: holidays } = useHolidays()
 
   const [clientFilter, setClientFilter] = useState('')
   const [selectedId, setSelectedId] = useState('')
-  const [breakdown, setBreakdownState] = useState<'purchases' | 'expenses' | null>(null)
+  const [breakdown, setBreakdownState] = useState<'purchases' | 'expenses' | 'salaries' | null>(null)
   const [purchaseSubHeadId, setPurchaseSubHeadId] = useState<string | null>(null)
   const [expenseSubHeadId, setExpenseSubHeadId] = useState<string | null>(null)
   const [expandedBillId, setExpandedBillId] = useState<string | null>(null)
@@ -39,7 +50,7 @@ export function ProjectsPage() {
   const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null)
   const selected = projects?.find((p) => p.id === selectedId)
 
-  function setBreakdown(next: 'purchases' | 'expenses' | null) {
+  function setBreakdown(next: 'purchases' | 'expenses' | 'salaries' | null) {
     setBreakdownState(next)
     setPurchaseSubHeadId(null)
     setExpenseSubHeadId(null)
@@ -72,7 +83,24 @@ export function ProjectsPage() {
   const client = selected ? clients?.find((c) => c.id === selected.client_id) : undefined
   const expenseTotal = selected ? projectExpenseTotal(selected.id, expenses ?? []) : 0
   const vendorBillTotal = selected ? projectVendorBillTotal(selected.id, vendorBills ?? []) : 0
-  const costTotal = expenseTotal + vendorBillTotal
+  // Wage cost for the days this project's crew actually worked it, per
+  // resolveStaffSite (the same rule the Team Calendar shows) — a very
+  // early floor date is safe since computeAccrualDays clamps to each
+  // staff member's own employment window anyway.
+  const salaryByWorker = selected
+    ? projectWageByStaff(
+        selected.id,
+        todayStr(),
+        staff ?? [],
+        staffAttendance ?? [],
+        staffAssignments ?? [],
+        new Set((holidays ?? []).map((h) => h.date)),
+        '2000-01-01',
+        todayStr(),
+      )
+    : []
+  const salaryTotal = salaryByWorker.reduce((s, r) => s + r.amount, 0)
+  const costTotal = expenseTotal + vendorBillTotal + salaryTotal
   const invoicedRevenue = selected ? projectInvoicedRevenue(selected.id, invoices ?? []) : 0
   const receivedRevenue = selected ? projectReceivedRevenue(selected.id, invoices ?? [], invoicePayments ?? []) : 0
   const balanceDue = invoicedRevenue - receivedRevenue
@@ -157,7 +185,30 @@ export function ProjectsPage() {
                   active={breakdown === 'expenses'}
                   onClick={() => setBreakdown(breakdown === 'expenses' ? null : 'expenses')}
                 />
+                <KpiCard
+                  label="Salaries"
+                  value={fmt(salaryTotal)}
+                  active={breakdown === 'salaries'}
+                  onClick={() => setBreakdown(breakdown === 'salaries' ? null : 'salaries')}
+                />
               </div>
+
+              {breakdown === 'salaries' && (
+                <div style={{ marginBottom: 18 }}>
+                  <div className="note" style={{ marginBottom: 8 }}>
+                    Salaries by worker — days actually worked on this project only
+                  </div>
+                  {salaryByWorker.length === 0 ? (
+                    <div className="note">No worked days attributed to this project yet.</div>
+                  ) : (
+                    <div className="kpi-grid-2col">
+                      {salaryByWorker.map((row) => (
+                        <KpiCard key={row.staffId} label={row.name} value={fmt(row.amount)} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {breakdown === 'purchases' && (
                 <div style={{ marginBottom: 18 }}>

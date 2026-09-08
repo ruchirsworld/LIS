@@ -139,25 +139,31 @@ export interface AccrualBreakdown {
   amount: number
 }
 
-// Same day-by-day model as computeAccrued (see below) but returns the full
-// per-category breakdown instead of just the final total — for showing a
-// worker's leave/present/holiday counts wherever the raw number needs
-// explaining, e.g. the payroll confirmation dialog.
-export function computeAccrualBreakdown(
+export type AccrualDayType = 'holiday' | 'half_day' | 'paid_off' | 'unpaid_off' | 'present'
+
+export interface AccrualDay {
+  date: string
+  type: AccrualDayType
+  amount: number
+}
+
+// Single source of truth for the day-by-day payroll model — both
+// computeAccrualBreakdown (below) and project wage attribution
+// (projectWageTotal in projects.ts) build on this, so a day's classification
+// and pay never disagree between the two.
+export function computeAccrualDays(
   staff: AccrualStaff,
   allAttendanceDays: AttendanceDay[],
   holidayDates: Set<string>,
   rangeStart: string,
   rangeEnd: string,
   workedHolidayDates: string[] = []
-): AccrualBreakdown {
+): AccrualDay[] {
   const today = todayStr()
   const employmentEnd = staff.end_date && staff.end_date < today ? staff.end_date : today
   const start = rangeStart > staff.start_date ? rangeStart : staff.start_date
   const end = rangeEnd < employmentEnd ? rangeEnd : employmentEnd
-  if (start > end) {
-    return { totalDays: 0, presentDays: 0, paidOffDays: 0, unpaidOffDays: 0, halfDays: 0, holidayDays: 0, amount: 0 }
-  }
+  if (start > end) return []
 
   // A date that's already a Holiday pays in full regardless of any marking
   // on it (see the loop below), so it must not compete for a free-quota
@@ -179,33 +185,53 @@ export function computeAccrualBreakdown(
   const freeOffDates = leaveFreeDates(offDates, quotaForMonth)
   const halfDaySet = new Set(allAttendanceDays.filter((a) => a.day_type === 'half_day').map((a) => a.date))
 
+  const days: AccrualDay[] = []
+  for (const date of isoDatesBetween(start, end)) {
+    if (holidayDates.has(date)) {
+      days.push({ date, type: 'holiday', amount: staff.daily_rate })
+    } else if (halfDaySet.has(date)) {
+      days.push({ date, type: 'half_day', amount: staff.daily_rate * 0.5 })
+    } else if (offSet.has(date)) {
+      if (freeOffDates.has(date)) {
+        days.push({ date, type: 'paid_off', amount: staff.daily_rate })
+      } else {
+        days.push({ date, type: 'unpaid_off', amount: 0 })
+      }
+    } else {
+      days.push({ date, type: 'present', amount: staff.daily_rate })
+    }
+  }
+  return days
+}
+
+// Same day-by-day model as computeAccrued (see below) but returns the full
+// per-category breakdown instead of just the final total — for showing a
+// worker's leave/present/holiday counts wherever the raw number needs
+// explaining, e.g. the payroll confirmation dialog.
+export function computeAccrualBreakdown(
+  staff: AccrualStaff,
+  allAttendanceDays: AttendanceDay[],
+  holidayDates: Set<string>,
+  rangeStart: string,
+  rangeEnd: string,
+  workedHolidayDates: string[] = []
+): AccrualBreakdown {
+  const days = computeAccrualDays(staff, allAttendanceDays, holidayDates, rangeStart, rangeEnd, workedHolidayDates)
   let amount = 0
   let presentDays = 0
   let paidOffDays = 0
   let unpaidOffDays = 0
   let halfDays = 0
   let holidayDays = 0
-  const dates = isoDatesBetween(start, end)
-  for (const date of dates) {
-    if (holidayDates.has(date)) {
-      amount += staff.daily_rate
-      holidayDays++
-    } else if (halfDaySet.has(date)) {
-      amount += staff.daily_rate * 0.5
-      halfDays++
-    } else if (offSet.has(date)) {
-      if (freeOffDates.has(date)) {
-        amount += staff.daily_rate
-        paidOffDays++
-      } else {
-        unpaidOffDays++
-      }
-    } else {
-      amount += staff.daily_rate
-      presentDays++
-    }
+  for (const day of days) {
+    amount += day.amount
+    if (day.type === 'present') presentDays++
+    else if (day.type === 'paid_off') paidOffDays++
+    else if (day.type === 'unpaid_off') unpaidOffDays++
+    else if (day.type === 'half_day') halfDays++
+    else if (day.type === 'holiday') holidayDays++
   }
-  return { totalDays: dates.length, presentDays, paidOffDays, unpaidOffDays, halfDays, holidayDays, amount }
+  return { totalDays: days.length, presentDays, paidOffDays, unpaidOffDays, halfDays, holidayDays, amount }
 }
 
 export function computeAccrued(
