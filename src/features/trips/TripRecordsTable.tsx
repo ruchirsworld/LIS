@@ -5,10 +5,11 @@ import { SearchableSelect } from '../../components/SearchableSelect'
 import { TableScroll } from '../../components/TableScroll'
 import { PeriodFilter } from '../../components/PeriodFilter'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
-import { useTrips, useUpdateTrip } from '../../lib/queries/trips'
+import { useTrips, useUpdateTrip, useDeleteTrip } from '../../lib/queries/trips'
 import { useExpenses } from '../../lib/queries/expenses'
 import { useProfiles } from '../../lib/queries/admin'
 import { useProjects, useExpenseSubHeads } from '../../lib/queries/masters'
+import { useAuth } from '../../lib/auth'
 import { fmt, fmtDate } from '../../lib/calc/format'
 import { getErrorMessage } from '../../lib/errors'
 import type { DateRange } from '../../lib/calc/period'
@@ -126,15 +127,37 @@ function EditTripModal({ trip, onClose }: { trip: Trip; onClose: () => void }) {
  * shows the traveler's own currently-open trip, so this is the only place
  * to browse past trips or see someone else's. */
 export function TripRecordsTable() {
+  const { profile } = useAuth()
+  // Deleting un-does the trip entirely (and fails outright if it still has
+  // expenses logged against it, via the plain FK) — a heavier action than
+  // editing, so it's Admin-only, matching the same precedent used for
+  // Imprest transactions.
+  const canDelete = profile?.role === 'admin'
   const { data: trips } = useTrips()
   const { data: expenses } = useExpenses(null)
   const { data: profiles } = useProfiles()
   const { data: projects } = useProjects()
   const { data: subHeads } = useExpenseSubHeads()
+  const deleteTrip = useDeleteTrip()
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [range, setRange] = useState<DateRange | null>(null)
   const [showPeriodFilter, setShowPeriodFilter] = useState(false)
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null)
+  const [deleteError, setDeleteError] = useState<Record<string, string>>({})
+  const [deleteBusyId, setDeleteBusyId] = useState<string | null>(null)
+
+  async function handleDeleteTrip(t: Trip) {
+    if (!window.confirm(`Delete trip "${t.name}"? This cannot be undone, and will fail if any expenses are still logged against it.`)) return
+    setDeleteBusyId(t.id)
+    setDeleteError((m) => ({ ...m, [t.id]: '' }))
+    try {
+      await deleteTrip.mutateAsync(t.id)
+    } catch (err) {
+      setDeleteError((m) => ({ ...m, [t.id]: getErrorMessage(err, 'Could not delete this trip.') }))
+    } finally {
+      setDeleteBusyId(null)
+    }
+  }
 
   const travelerName = (id: string | null) => (id ? profiles?.find((p) => p.id === id)?.name ?? '—' : '—')
   const projectName = (id: string | null) => (id ? projects?.find((p) => p.id === id)?.name ?? '—' : '—')
@@ -229,19 +252,42 @@ export function TripRecordsTable() {
                     <td>{t.status}</td>
                     <td className="amt">{fmt(tripTotal(t.id))}</td>
                     <td>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        className="icon-btn-sq"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setEditingTrip(t)
-                        }}
-                        title="Edit"
-                        aria-label="Edit"
-                      >
-                        ✎
-                      </Button>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          className="icon-btn-sq"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setEditingTrip(t)
+                          }}
+                          title="Edit"
+                          aria-label="Edit"
+                        >
+                          ✎
+                        </Button>
+                        {canDelete && (
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            className="icon-btn-sq"
+                            disabled={deleteBusyId === t.id}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDeleteTrip(t)
+                            }}
+                            title="Delete"
+                            aria-label="Delete"
+                          >
+                            🗑
+                          </Button>
+                        )}
+                      </div>
+                      {deleteError[t.id] && (
+                        <div className="note" style={{ color: 'var(--red)', marginTop: 4 }}>
+                          {deleteError[t.id]}
+                        </div>
+                      )}
                     </td>
                   </tr>
                   {isExpanded && (
