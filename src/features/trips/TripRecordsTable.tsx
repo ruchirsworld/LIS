@@ -1,17 +1,125 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui'
+import { Modal } from '../../components/Modal'
+import { SearchableSelect } from '../../components/SearchableSelect'
 import { TableScroll } from '../../components/TableScroll'
 import { PeriodFilter } from '../../components/PeriodFilter'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
-import { useTrips } from '../../lib/queries/trips'
+import { useTrips, useUpdateTrip } from '../../lib/queries/trips'
 import { useExpenses } from '../../lib/queries/expenses'
 import { useProfiles } from '../../lib/queries/admin'
 import { useProjects, useExpenseSubHeads } from '../../lib/queries/masters'
 import { fmt, fmtDate } from '../../lib/calc/format'
+import { getErrorMessage } from '../../lib/errors'
 import type { DateRange } from '../../lib/calc/period'
 import type { ExportSection } from '../../lib/export/report'
+import type { Database } from '../../types/database'
 
-const COL_SPAN = 8
+type Trip = Database['public']['Tables']['trips']['Row']
+
+const COL_SPAN = 9
+
+/** Popup to edit a trip's own details (name/traveler/project/start
+ * date/notes) — status/end date stay controlled by the "End Trip" toggle
+ * in TripsSection above, not duplicated here. */
+function EditTripModal({ trip, onClose }: { trip: Trip; onClose: () => void }) {
+  const { data: profiles } = useProfiles()
+  const { data: projects } = useProjects()
+  const updateTrip = useUpdateTrip()
+
+  const [name, setName] = useState(trip.name)
+  const [travelerId, setTravelerId] = useState(trip.traveler_id)
+  const [projectId, setProjectId] = useState(trip.project_id ?? '')
+  const [startDate, setStartDate] = useState(trip.start_date)
+  const [notes, setNotes] = useState(trip.notes ?? '')
+  const [submitting, setSubmitting] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    setFormError(null)
+    if (!name.trim()) {
+      setFormError('Give the trip a name or purpose.')
+      return
+    }
+    if (!travelerId) {
+      setFormError('Pick who is traveling.')
+      return
+    }
+    setSubmitting(true)
+    try {
+      await updateTrip.mutateAsync({
+        id: trip.id,
+        patch: {
+          name: name.trim(),
+          traveler_id: travelerId,
+          project_id: projectId || null,
+          start_date: startDate,
+          notes: notes.trim() || null,
+        },
+      })
+      onClose()
+    } catch (err) {
+      setFormError(getErrorMessage(err, 'Could not save changes.'))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <Modal title="Edit trip" onClose={onClose}>
+      <form className="form-grid exp-compact" onSubmit={handleSubmit}>
+        <div className="field full">
+          <label>Trip name / purpose</label>
+          <input type="text" required value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>Traveler</label>
+          <SearchableSelect
+            items={profiles}
+            value={travelerId}
+            onChange={setTravelerId}
+            getId={(p) => p.id}
+            getLabel={(p) => p.name}
+            placeholder="— Select traveler —"
+          />
+        </div>
+        <div className="field">
+          <label>Project (optional)</label>
+          <SearchableSelect
+            items={projects}
+            value={projectId}
+            onChange={setProjectId}
+            getId={(p) => p.id}
+            getLabel={(p) => p.name}
+            placeholder="— No specific project —"
+          />
+        </div>
+        <div className="field">
+          <label>Start date</label>
+          <input type="date" required value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+        </div>
+        <div className="field full">
+          <label>Notes</label>
+          <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} />
+        </div>
+        <div className="field full" style={{ display: 'flex', gap: 8 }}>
+          <Button type="submit" disabled={submitting}>
+            {submitting ? 'Saving…' : 'Save changes'}
+          </Button>
+          <Button type="button" variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+        </div>
+      </form>
+      {formError && (
+        <div className="note" style={{ color: 'var(--red)', marginTop: 8 }}>
+          {formError}
+        </div>
+      )}
+    </Modal>
+  )
+}
 
 /** Every trip (open or closed), grouped — one row per trip with its total,
  * expandable to the entries logged on it. TripsSection above only ever
@@ -26,6 +134,7 @@ export function TripRecordsTable() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [range, setRange] = useState<DateRange | null>(null)
   const [showPeriodFilter, setShowPeriodFilter] = useState(false)
+  const [editingTrip, setEditingTrip] = useState<Trip | null>(null)
 
   const travelerName = (id: string | null) => (id ? profiles?.find((p) => p.id === id)?.name ?? '—' : '—')
   const projectName = (id: string | null) => (id ? projects?.find((p) => p.id === id)?.name ?? '—' : '—')
@@ -82,6 +191,7 @@ export function TripRecordsTable() {
               <th>End</th>
               <th>Status</th>
               <th style={{ textAlign: 'right' }}>Total</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -118,6 +228,21 @@ export function TripRecordsTable() {
                     <td>{t.end_date ? fmtDate(t.end_date) : '—'}</td>
                     <td>{t.status}</td>
                     <td className="amt">{fmt(tripTotal(t.id))}</td>
+                    <td>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="icon-btn-sq"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setEditingTrip(t)
+                        }}
+                        title="Edit"
+                        aria-label="Edit"
+                      >
+                        ✎
+                      </Button>
+                    </td>
                   </tr>
                   {isExpanded && (
                     <tr className="pay-form-row">
@@ -155,6 +280,8 @@ export function TripRecordsTable() {
           </tbody>
         </table>
       </TableScroll>
+
+      {editingTrip && <EditTripModal trip={editingTrip} onClose={() => setEditingTrip(null)} />}
     </div>
   )
 }

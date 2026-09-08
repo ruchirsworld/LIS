@@ -83,8 +83,10 @@ export function ProjectsPage() {
 
   const client = selected ? clients?.find((c) => c.id === selected.client_id) : undefined
   const expenseTotal = selected ? projectExpenseTotal(selected.id, expenses ?? []) : 0
-  // Not yet approved, so not real cost — informational only, never folded
-  // into costTotal/profit/utilizedPct below.
+  // Not yet approved, so not folded into costTotal/profit — Profit stays a
+  // measure of realized cost only. It IS folded into Budget Utilized below,
+  // since a pending claim still represents money that's committed against
+  // the budget, just not booked yet.
   const pendingClaimsTotal = selected ? projectExpenseTotal(selected.id, pendingExpenses ?? []) : 0
   const vendorBillTotal = selected ? projectVendorBillTotal(selected.id, vendorBills ?? []) : 0
   // Wage cost for the days this project's crew actually worked it, per
@@ -110,7 +112,8 @@ export function ProjectsPage() {
   const balanceDue = invoicedRevenue - receivedRevenue
   const profit = invoicedRevenue - costTotal
   const budget = selected?.budget ?? null
-  const utilizedPct = budget !== null && budget > 0 ? Math.round((costTotal / budget) * 100) : null
+  const utilizedTotal = costTotal + pendingClaimsTotal
+  const utilizedPct = budget !== null && budget > 0 ? Math.round((utilizedTotal / budget) * 100) : null
 
   const projectBillRows = selected ? (vendorBills ?? []).filter((b) => b.project_id === selected.id) : []
 
@@ -176,7 +179,7 @@ export function ProjectsPage() {
                 <KpiCard label="Due" value={fmt(balanceDue)} />
                 <div className="kpi-grid-divider terracotta" />
                 <KpiCard label="Budget" value={budget !== null ? fmt(budget) : '—'} />
-                <KpiCard label="Utilized" value={utilizedPct !== null ? `${utilizedPct}%` : '—'} />
+                <KpiCard label="Utilized" value={utilizedPct !== null ? `${fmt(utilizedTotal)} (${utilizedPct}%)` : fmt(utilizedTotal)} />
                 <KpiCard
                   label="Purchases"
                   value={fmt(vendorBillTotal)}
