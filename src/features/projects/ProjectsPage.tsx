@@ -31,6 +31,7 @@ export function ProjectsPage() {
   const { data: vendors } = useVendors()
   const { data: subHeads } = useExpenseSubHeads()
   const { data: expenses } = useExpenses(null)
+  const { data: pendingExpenses } = useExpenses(null, 'pending')
   const { data: vendorBills } = useVendorBills(null)
   const { data: invoices } = useInvoices(null)
   const { data: invoicePayments } = useInvoicePayments()
@@ -82,6 +83,9 @@ export function ProjectsPage() {
 
   const client = selected ? clients?.find((c) => c.id === selected.client_id) : undefined
   const expenseTotal = selected ? projectExpenseTotal(selected.id, expenses ?? []) : 0
+  // Not yet approved, so not real cost — informational only, never folded
+  // into costTotal/profit/utilizedPct below.
+  const pendingClaimsTotal = selected ? projectExpenseTotal(selected.id, pendingExpenses ?? []) : 0
   const vendorBillTotal = selected ? projectVendorBillTotal(selected.id, vendorBills ?? []) : 0
   // Wage cost for the days this project's crew actually worked it, per
   // resolveStaffSite (the same rule the Team Calendar shows) — a very
@@ -191,6 +195,7 @@ export function ProjectsPage() {
                   active={breakdown === 'salaries'}
                   onClick={() => setBreakdown(breakdown === 'salaries' ? null : 'salaries')}
                 />
+                <KpiCard label="Pending Claims" value={fmt(pendingClaimsTotal)} />
               </div>
 
               {breakdown === 'salaries' && (
