@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { useAuth } from '../../lib/auth'
 import { useT } from '../../lib/i18n'
 import { useStaff, useProjects, useExpenseSubHeads } from '../../lib/queries/masters'
@@ -608,32 +608,37 @@ export function SupervisorDashboardPage() {
                     <tbody>
                       {dayExpenses.map((e) =>
                         editingClaimId === e.id ? (
-                          <tr key={e.id}>
-                            <td>{t(categoryName(e.sub_head_id))}</td>
-                            <td>
-                              <CurrencyInput value={claimAmountDraft} onValueChange={setClaimAmountDraft} />
-                            </td>
-                            <td>
-                              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                                <Button type="button" disabled={claimBusyId === e.id} onClick={() => handleSaveClaim(e.id)}>
-                                  {t('Save')}
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="secondary"
-                                  disabled={claimBusyId === e.id}
-                                  onClick={() => setEditingClaimId(null)}
-                                >
-                                  {t('Cancel')}
-                                </Button>
-                              </div>
-                              {claimError[e.id] && (
-                                <div className="note" style={{ color: 'var(--red)', marginTop: 4 }}>
-                                  {claimError[e.id]}
+                          <Fragment key={e.id}>
+                            <tr>
+                              <td>{t(categoryName(e.sub_head_id))}</td>
+                              <td>
+                                <CurrencyInput value={claimAmountDraft} onValueChange={setClaimAmountDraft} />
+                              </td>
+                              <td></td>
+                            </tr>
+                            <tr>
+                              <td colSpan={3}>
+                                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                  <Button type="button" disabled={claimBusyId === e.id} onClick={() => handleSaveClaim(e.id)}>
+                                    {t('Save')}
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="secondary"
+                                    disabled={claimBusyId === e.id}
+                                    onClick={() => setEditingClaimId(null)}
+                                  >
+                                    {t('Cancel')}
+                                  </Button>
                                 </div>
-                              )}
-                            </td>
-                          </tr>
+                                {claimError[e.id] && (
+                                  <div className="note" style={{ color: 'var(--red)', marginTop: 4 }}>
+                                    {claimError[e.id]}
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          </Fragment>
                         ) : (
                           <tr key={e.id}>
                             <td>{t(categoryName(e.sub_head_id))}</td>

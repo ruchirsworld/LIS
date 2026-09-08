@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { SearchableSelect } from '../../components/SearchableSelect'
 import { Button } from '../../components/ui'
 import { useProjects, useExpenseSubHeads } from '../../lib/queries/masters'
@@ -132,62 +132,67 @@ export function PendingClaimApprovals() {
   function renderSupervisorRow(e: ExpenseRow) {
     if (editingSupervisorId === e.id) {
       return (
-        <tr key={e.id}>
-          <td colSpan={2}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <div style={{ minWidth: 180 }}>
-                <SearchableSelect
-                  items={activeProjects}
-                  value={supervisorDraft.projectId}
-                  onChange={(id) => setSupervisorDraft((d) => ({ ...d, projectId: id }))}
-                  getId={(p) => p.id}
-                  getLabel={(p) => p.name}
-                  placeholder="— Select project —"
-                />
-              </div>
-              <div style={{ display: 'flex', gap: 6 }}>
+        <Fragment key={e.id}>
+          <tr>
+            <td colSpan={2}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ minWidth: 180 }}>
+                  <SearchableSelect
+                    items={activeProjects}
+                    value={supervisorDraft.projectId}
+                    onChange={(id) => setSupervisorDraft((d) => ({ ...d, projectId: id }))}
+                    getId={(p) => p.id}
+                    getLabel={(p) => p.name}
+                    placeholder="— Select project —"
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    aria-label="Amount"
+                    value={supervisorDraft.amount}
+                    onChange={(ev) => setSupervisorDraft((d) => ({ ...d, amount: ev.target.value }))}
+                    style={{ flex: 1, minWidth: 0 }}
+                  />
+                  <input
+                    type="date"
+                    aria-label="Date"
+                    value={supervisorDraft.date}
+                    onChange={(ev) => setSupervisorDraft((d) => ({ ...d, date: ev.target.value }))}
+                    style={{ flex: 1, minWidth: 0 }}
+                  />
+                </div>
                 <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  aria-label="Amount"
-                  value={supervisorDraft.amount}
-                  onChange={(ev) => setSupervisorDraft((d) => ({ ...d, amount: ev.target.value }))}
-                  style={{ flex: 1, minWidth: 0 }}
-                />
-                <input
-                  type="date"
-                  aria-label="Date"
-                  value={supervisorDraft.date}
-                  onChange={(ev) => setSupervisorDraft((d) => ({ ...d, date: ev.target.value }))}
-                  style={{ flex: 1, minWidth: 0 }}
+                  type="text"
+                  aria-label="Description"
+                  placeholder="Description"
+                  value={supervisorDraft.description}
+                  onChange={(ev) => setSupervisorDraft((d) => ({ ...d, description: ev.target.value }))}
                 />
               </div>
-              <input
-                type="text"
-                aria-label="Description"
-                placeholder="Description"
-                value={supervisorDraft.description}
-                onChange={(ev) => setSupervisorDraft((d) => ({ ...d, description: ev.target.value }))}
-              />
-            </div>
-          </td>
-          <td>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              <Button type="button" disabled={busyKey === e.id} onClick={() => handleSaveSupervisor(e)}>
-                Save
-              </Button>
-              <Button type="button" variant="secondary" disabled={busyKey === e.id} onClick={() => setEditingSupervisorId(null)}>
-                Cancel
-              </Button>
-            </div>
-            {rowError[e.id] && (
-              <div className="note" style={{ color: 'var(--red)', marginTop: 4 }}>
-                {rowError[e.id]}
+            </td>
+            <td></td>
+          </tr>
+          <tr>
+            <td colSpan={3}>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <Button type="button" disabled={busyKey === e.id} onClick={() => handleSaveSupervisor(e)}>
+                  Save
+                </Button>
+                <Button type="button" variant="secondary" disabled={busyKey === e.id} onClick={() => setEditingSupervisorId(null)}>
+                  Cancel
+                </Button>
               </div>
-            )}
-          </td>
-        </tr>
+              {rowError[e.id] && (
+                <div className="note" style={{ color: 'var(--red)', marginTop: 4 }}>
+                  {rowError[e.id]}
+                </div>
+              )}
+            </td>
+          </tr>
+        </Fragment>
       )
     }
     return (

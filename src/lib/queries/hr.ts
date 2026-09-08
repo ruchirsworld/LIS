@@ -127,6 +127,20 @@ export function useUpdateStaffImprestTransaction() {
   })
 }
 
+export function useDeleteStaffImprestTransaction() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('staff_imprest_transactions').delete().eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['staff_imprest_transactions'] })
+      qc.invalidateQueries({ queryKey: ['ledger_lines'] })
+    },
+  })
+}
+
 export function useStaffSalaryAdvances() {
   return useQuery({
     queryKey: ['staff_salary_advances'],

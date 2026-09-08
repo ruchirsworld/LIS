@@ -1,11 +1,16 @@
-import { useState, type FormEvent } from 'react'
+import { Fragment, useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
 import { SearchableSelect } from '../../components/SearchableSelect'
 import { useBankAccounts, useStaff } from '../../lib/queries/masters'
 import { useProfiles } from '../../lib/queries/admin'
 import { useLedgerLines } from '../../lib/queries/ledger'
-import { useStaffImprestTransactions, useCreateStaffImprestTransaction, useUpdateStaffImprestTransaction } from '../../lib/queries/hr'
+import {
+  useStaffImprestTransactions,
+  useCreateStaffImprestTransaction,
+  useUpdateStaffImprestTransaction,
+  useDeleteStaffImprestTransaction,
+} from '../../lib/queries/hr'
 import { ReportPeriodFilter } from '../reports/ReportPeriodFilter'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import { ImportFileBlock } from '../admin/DataImportSection'
@@ -32,12 +37,16 @@ function todayStr() {
 export function SiteImprestSection() {
   const { profile } = useAuth()
   const canImport = profile?.role === 'admin' || profile?.role === 'cxo'
+  // Deleting a transaction un-posts its GL entry entirely — a heavier
+  // action than editing, so it's Admin-only, unlike everything else here.
+  const canDelete = profile?.role === 'admin'
   const { data: profiles } = useProfiles()
   const { data: bankAccounts } = useBankAccounts()
   const { data: staff } = useStaff()
   const { data: allTransactionsRaw } = useStaffImprestTransactions()
   const createTransaction = useCreateStaffImprestTransaction()
   const updateTransaction = useUpdateStaffImprestTransaction()
+  const deleteTransaction = useDeleteStaffImprestTransaction()
 
   const supervisors = (profiles ?? []).filter((p) => p.role === 'supervisor')
   const staffName = (id: string | null) => (id ? staff?.find((s) => s.id === id)?.name ?? '—' : null)
@@ -218,6 +227,33 @@ export function SiteImprestSection() {
     }
   }
 
+  async function handleDeleteTxn(t: StaffImprestTransaction) {
+    if (!window.confirm(`Delete this ${t.kind === 'advance' ? 'advance' : 'return'} of ${fmt(t.amount)} dated ${fmtDate(t.date)}? This cannot be undone.`))
+      return
+    setTxnBusyId(t.id)
+    setTxnError((m) => ({ ...m, [t.id]: '' }))
+    try {
+      await deleteTransaction.mutateAsync(t.id)
+    } catch (err) {
+      setTxnError((m) => ({ ...m, [t.id]: getErrorMessage(err, 'Could not delete this transaction.') }))
+    } finally {
+      setTxnBusyId(null)
+    }
+  }
+
+  async function handleDeleteRequest(t: StaffImprestTransaction) {
+    if (!window.confirm(`Delete this pending request for ${fmt(t.amount)} dated ${fmtDate(t.date)}? This cannot be undone.`)) return
+    setRequestBusyId(t.id)
+    setRequestError((m) => ({ ...m, [t.id]: '' }))
+    try {
+      await deleteTransaction.mutateAsync(t.id)
+    } catch (err) {
+      setRequestError((m) => ({ ...m, [t.id]: getErrorMessage(err, 'Could not delete this request.') }))
+    } finally {
+      setRequestBusyId(null)
+    }
+  }
+
   function resetForm() {
     setKind('advance')
     setDate(todayStr())
@@ -280,53 +316,58 @@ export function SiteImprestSection() {
               <tbody>
                 {pendingRequests.map((t) =>
                   editingRequestId === t.id ? (
-                    <tr key={t.id}>
-                      <td>{supervisorName(t.profile_id)}</td>
-                      <td>
-                        <input
-                          type="date"
-                          aria-label="Date"
-                          value={requestDraft.date}
-                          onChange={(e) => setRequestDraft((d) => ({ ...d, date: e.target.value }))}
-                        />
-                      </td>
-                      <td>
-                        <SearchableSelect
-                          items={(staff ?? []).filter((s) => s.supervisor_id === t.profile_id)}
-                          value={requestDraft.staffId}
-                          onChange={(v) => setRequestDraft((d) => ({ ...d, staffId: v }))}
-                          getId={(s) => s.id}
-                          getLabel={(s) => s.name}
-                          placeholder="— Select worker —"
-                        />
-                      </td>
-                      <td>
-                        <CurrencyInput
-                          value={requestDraft.amount}
-                          onValueChange={(v) => setRequestDraft((d) => ({ ...d, amount: v }))}
-                        />
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                          <Button type="button" disabled={requestBusyId === t.id} onClick={() => handleSaveRequest(t.id)}>
-                            Save
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            disabled={requestBusyId === t.id}
-                            onClick={() => setEditingRequestId(null)}
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                        {requestError[t.id] && (
-                          <div className="note" style={{ color: 'var(--red)', marginTop: 4 }}>
-                            {requestError[t.id]}
+                    <Fragment key={t.id}>
+                      <tr>
+                        <td>{supervisorName(t.profile_id)}</td>
+                        <td>
+                          <input
+                            type="date"
+                            aria-label="Date"
+                            value={requestDraft.date}
+                            onChange={(e) => setRequestDraft((d) => ({ ...d, date: e.target.value }))}
+                          />
+                        </td>
+                        <td>
+                          <SearchableSelect
+                            items={(staff ?? []).filter((s) => s.supervisor_id === t.profile_id)}
+                            value={requestDraft.staffId}
+                            onChange={(v) => setRequestDraft((d) => ({ ...d, staffId: v }))}
+                            getId={(s) => s.id}
+                            getLabel={(s) => s.name}
+                            placeholder="— Select worker —"
+                          />
+                        </td>
+                        <td>
+                          <CurrencyInput
+                            value={requestDraft.amount}
+                            onValueChange={(v) => setRequestDraft((d) => ({ ...d, amount: v }))}
+                          />
+                        </td>
+                        <td></td>
+                      </tr>
+                      <tr>
+                        <td colSpan={5}>
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            <Button type="button" disabled={requestBusyId === t.id} onClick={() => handleSaveRequest(t.id)}>
+                              Save
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              disabled={requestBusyId === t.id}
+                              onClick={() => setEditingRequestId(null)}
+                            >
+                              Cancel
+                            </Button>
                           </div>
-                        )}
-                      </td>
-                    </tr>
+                          {requestError[t.id] && (
+                            <div className="note" style={{ color: 'var(--red)', marginTop: 4 }}>
+                              {requestError[t.id]}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    </Fragment>
                   ) : (
                     <tr key={t.id}>
                       <td>{supervisorName(t.profile_id)}</td>
@@ -367,6 +408,19 @@ export function SiteImprestSection() {
                           >
                             ✎
                           </Button>
+                          {canDelete && (
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              className="icon-btn-sq"
+                              disabled={requestBusyId === t.id}
+                              onClick={() => handleDeleteRequest(t)}
+                              title="Delete"
+                              aria-label="Delete"
+                            >
+                              🗑
+                            </Button>
+                          )}
                         </div>
                         {requestError[t.id] && (
                           <div className="note" style={{ color: 'var(--red)', marginTop: 4 }}>
@@ -527,68 +581,73 @@ export function SiteImprestSection() {
                   )}
                   {recordsShown.map((t) =>
                     editingTxnId === t.id ? (
-                      <tr key={t.id}>
-                        <td>
-                          <input
-                            type="date"
-                            aria-label="Date"
-                            value={txnDraft.date}
-                            onChange={(e) => setTxnDraft((d) => ({ ...d, date: e.target.value }))}
-                          />
-                        </td>
-                        {recordsView === 'all' && (
+                      <Fragment key={t.id}>
+                        <tr>
+                          <td>
+                            <input
+                              type="date"
+                              aria-label="Date"
+                              value={txnDraft.date}
+                              onChange={(e) => setTxnDraft((d) => ({ ...d, date: e.target.value }))}
+                            />
+                          </td>
+                          {recordsView === 'all' && (
+                            <td>
+                              <select
+                                aria-label="Type"
+                                value={txnDraft.kind}
+                                onChange={(e) => setTxnDraft((d) => ({ ...d, kind: e.target.value as 'advance' | 'return' }))}
+                              >
+                                <option value="advance">Advance</option>
+                                <option value="return">Return</option>
+                              </select>
+                            </td>
+                          )}
+                          <td>
+                            <CurrencyInput
+                              value={txnDraft.amount}
+                              onValueChange={(v) => setTxnDraft((d) => ({ ...d, amount: v }))}
+                            />
+                          </td>
                           <td>
                             <select
-                              aria-label="Type"
-                              value={txnDraft.kind}
-                              onChange={(e) => setTxnDraft((d) => ({ ...d, kind: e.target.value as 'advance' | 'return' }))}
+                              aria-label="Account"
+                              value={txnDraft.bankAccountId}
+                              onChange={(e) => setTxnDraft((d) => ({ ...d, bankAccountId: e.target.value }))}
                             >
-                              <option value="advance">Advance</option>
-                              <option value="return">Return</option>
+                              <option value="">Cash</option>
+                              {(bankAccounts ?? []).map((a) => (
+                                <option key={a.id} value={a.id}>
+                                  {a.name}
+                                </option>
+                              ))}
                             </select>
                           </td>
-                        )}
-                        <td>
-                          <CurrencyInput
-                            value={txnDraft.amount}
-                            onValueChange={(v) => setTxnDraft((d) => ({ ...d, amount: v }))}
-                          />
-                        </td>
-                        <td>
-                          <select
-                            aria-label="Account"
-                            value={txnDraft.bankAccountId}
-                            onChange={(e) => setTxnDraft((d) => ({ ...d, bankAccountId: e.target.value }))}
-                          >
-                            <option value="">Cash</option>
-                            {(bankAccounts ?? []).map((a) => (
-                              <option key={a.id} value={a.id}>
-                                {a.name}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                        <td>
-                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                            <Button type="button" disabled={txnBusyId === t.id} onClick={() => handleSaveTxn(t.id)}>
-                              Save
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="secondary"
-                              disabled={txnBusyId === t.id}
-                              onClick={() => setEditingTxnId(null)}
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                          {txnError[t.id] && (
-                            <div className="note" style={{ color: 'var(--red)', marginTop: 4 }}>
-                              {txnError[t.id]}
+                          <td></td>
+                        </tr>
+                        <tr>
+                          <td colSpan={recordsView === 'all' ? 5 : 4}>
+                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                              <Button type="button" disabled={txnBusyId === t.id} onClick={() => handleSaveTxn(t.id)}>
+                                Save
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                disabled={txnBusyId === t.id}
+                                onClick={() => setEditingTxnId(null)}
+                              >
+                                Cancel
+                              </Button>
                             </div>
-                          )}
-                        </td>
-                      </tr>
+                            {txnError[t.id] && (
+                              <div className="note" style={{ color: 'var(--red)', marginTop: 4 }}>
+                                {txnError[t.id]}
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      </Fragment>
                     ) : (
                       <tr key={t.id}>
                         <td>{fmtDate(t.date)}</td>
@@ -596,16 +655,36 @@ export function SiteImprestSection() {
                         <td className="amt">{fmt(t.amount)}</td>
                         <td>{bankAccountName(t.bank_account_id)}</td>
                         <td>
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            className="icon-btn-sq"
-                            onClick={() => startEditTxn(t)}
-                            title="Edit"
-                            aria-label="Edit"
-                          >
-                            ✎
-                          </Button>
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              className="icon-btn-sq"
+                              onClick={() => startEditTxn(t)}
+                              title="Edit"
+                              aria-label="Edit"
+                            >
+                              ✎
+                            </Button>
+                            {canDelete && (
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                className="icon-btn-sq"
+                                disabled={txnBusyId === t.id}
+                                onClick={() => handleDeleteTxn(t)}
+                                title="Delete"
+                                aria-label="Delete"
+                              >
+                                🗑
+                              </Button>
+                            )}
+                          </div>
+                          {txnError[t.id] && (
+                            <div className="note" style={{ color: 'var(--red)', marginTop: 4 }}>
+                              {txnError[t.id]}
+                            </div>
+                          )}
                         </td>
                       </tr>
                     )
@@ -650,66 +729,71 @@ export function SiteImprestSection() {
               )}
               {allTransactionsSorted.map((t) =>
                 editingTxnId === t.id ? (
-                  <tr key={t.id}>
-                    <td>
-                      <input
-                        type="date"
-                        aria-label="Date"
-                        value={txnDraft.date}
-                        onChange={(e) => setTxnDraft((d) => ({ ...d, date: e.target.value }))}
-                      />
-                    </td>
-                    <td>
-                      <select
-                        aria-label="Type"
-                        value={txnDraft.kind}
-                        onChange={(e) => setTxnDraft((d) => ({ ...d, kind: e.target.value as 'advance' | 'return' }))}
-                      >
-                        <option value="advance">Advance</option>
-                        <option value="return">Return</option>
-                      </select>
-                    </td>
-                    <td>
-                      <CurrencyInput
-                        value={txnDraft.amount}
-                        onValueChange={(v) => setTxnDraft((d) => ({ ...d, amount: v }))}
-                      />
-                    </td>
-                    <td>
-                      <select
-                        aria-label="Account"
-                        value={txnDraft.bankAccountId}
-                        onChange={(e) => setTxnDraft((d) => ({ ...d, bankAccountId: e.target.value }))}
-                      >
-                        <option value="">Cash</option>
-                        {(bankAccounts ?? []).map((a) => (
-                          <option key={a.id} value={a.id}>
-                            {a.name}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        <Button type="button" disabled={txnBusyId === t.id} onClick={() => handleSaveTxn(t.id)}>
-                          Save
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          disabled={txnBusyId === t.id}
-                          onClick={() => setEditingTxnId(null)}
+                  <Fragment key={t.id}>
+                    <tr>
+                      <td>
+                        <input
+                          type="date"
+                          aria-label="Date"
+                          value={txnDraft.date}
+                          onChange={(e) => setTxnDraft((d) => ({ ...d, date: e.target.value }))}
+                        />
+                      </td>
+                      <td>
+                        <select
+                          aria-label="Type"
+                          value={txnDraft.kind}
+                          onChange={(e) => setTxnDraft((d) => ({ ...d, kind: e.target.value as 'advance' | 'return' }))}
                         >
-                          Cancel
-                        </Button>
-                      </div>
-                      {txnError[t.id] && (
-                        <div className="note" style={{ color: 'var(--red)', marginTop: 4 }}>
-                          {txnError[t.id]}
+                          <option value="advance">Advance</option>
+                          <option value="return">Return</option>
+                        </select>
+                      </td>
+                      <td>
+                        <CurrencyInput
+                          value={txnDraft.amount}
+                          onValueChange={(v) => setTxnDraft((d) => ({ ...d, amount: v }))}
+                        />
+                      </td>
+                      <td>
+                        <select
+                          aria-label="Account"
+                          value={txnDraft.bankAccountId}
+                          onChange={(e) => setTxnDraft((d) => ({ ...d, bankAccountId: e.target.value }))}
+                        >
+                          <option value="">Cash</option>
+                          {(bankAccounts ?? []).map((a) => (
+                            <option key={a.id} value={a.id}>
+                              {a.name}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td></td>
+                    </tr>
+                    <tr>
+                      <td colSpan={5}>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          <Button type="button" disabled={txnBusyId === t.id} onClick={() => handleSaveTxn(t.id)}>
+                            Save
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            disabled={txnBusyId === t.id}
+                            onClick={() => setEditingTxnId(null)}
+                          >
+                            Cancel
+                          </Button>
                         </div>
-                      )}
-                    </td>
-                  </tr>
+                        {txnError[t.id] && (
+                          <div className="note" style={{ color: 'var(--red)', marginTop: 4 }}>
+                            {txnError[t.id]}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  </Fragment>
                 ) : (
                   <tr key={t.id}>
                     <td>{fmtDate(t.date)}</td>
@@ -717,16 +801,36 @@ export function SiteImprestSection() {
                     <td className="amt">{fmt(t.amount)}</td>
                     <td>{bankAccountName(t.bank_account_id)}</td>
                     <td>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        className="icon-btn-sq"
-                        onClick={() => startEditTxn(t)}
-                        title="Edit"
-                        aria-label="Edit"
-                      >
-                        ✎
-                      </Button>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          className="icon-btn-sq"
+                          onClick={() => startEditTxn(t)}
+                          title="Edit"
+                          aria-label="Edit"
+                        >
+                          ✎
+                        </Button>
+                        {canDelete && (
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            className="icon-btn-sq"
+                            disabled={txnBusyId === t.id}
+                            onClick={() => handleDeleteTxn(t)}
+                            title="Delete"
+                            aria-label="Delete"
+                          >
+                            🗑
+                          </Button>
+                        )}
+                      </div>
+                      {txnError[t.id] && (
+                        <div className="note" style={{ color: 'var(--red)', marginTop: 4 }}>
+                          {txnError[t.id]}
+                        </div>
+                      )}
                     </td>
                   </tr>
                 )
