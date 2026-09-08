@@ -2,11 +2,13 @@ import { useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
 import { SearchableSelect } from '../../components/SearchableSelect'
-import { useClients } from '../../lib/queries/masters'
+import { useClients, useBankAccounts } from '../../lib/queries/masters'
 import { useInvoices, useInvoicePayments, useCreateInvoicePayment } from '../../lib/queries/invoices'
 import { dueAmount } from '../../lib/calc/invoices'
 import { fmt, fmtDate, parseINR } from '../../lib/calc/format'
 import { clientLabel } from '../../lib/labels'
+
+const CASH = 'cash'
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
@@ -16,12 +18,15 @@ export function InvoiceReceiptForm() {
   const { data: clients } = useClients()
   const { data: invoices } = useInvoices(null)
   const { data: payments } = useInvoicePayments()
+  const { data: bankAccounts } = useBankAccounts()
   const createPayment = useCreateInvoicePayment()
+  const accountOptions = [{ id: CASH, name: 'Cash' }, ...(bankAccounts ?? [])]
 
   const [clientId, setClientId] = useState('')
   const [invoiceId, setInvoiceId] = useState('')
   const [date, setDate] = useState(todayStr())
   const [amount, setAmount] = useState('0')
+  const [accountId, setAccountId] = useState(CASH)
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -63,11 +68,14 @@ export function InvoiceReceiptForm() {
         invoice_id: target.invoice.id,
         date,
         amount: amt,
+        payment_mode: accountId === CASH ? 'Cash' : 'Bank',
+        bank_account_id: accountId === CASH ? null : accountId,
       })
       setClientId('')
       setInvoiceId('')
       setDate(todayStr())
       setAmount('0')
+      setAccountId(CASH)
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Could not record receipt.')
     } finally {
@@ -127,6 +135,18 @@ export function InvoiceReceiptForm() {
             <label>Amount (₹)</label>
             <CurrencyInput value={amount} onValueChange={setAmount} required />
           </div>
+        </div>
+
+        <div className="field full rr-account">
+          <label>Account</label>
+          <SearchableSelect
+            items={accountOptions}
+            value={accountId}
+            onChange={setAccountId}
+            getId={(a) => a.id}
+            getLabel={(a) => a.name}
+            placeholder="— Select account —"
+          />
         </div>
 
         <div className="field full rr-submit">

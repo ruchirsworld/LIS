@@ -84,6 +84,16 @@ export function ExpenseTable({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [payFormId, setPayFormId] = useState<string | null>(null)
   const [editingReimbursement, setEditingReimbursement] = useState<ExpenseReimbursement | null>(null)
+  const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set())
+
+  function toggleDateGroup(date: string) {
+    setCollapsedDates((prev) => {
+      const next = new Set(prev)
+      if (next.has(date)) next.delete(date)
+      else next.add(date)
+      return next
+    })
+  }
 
   function toggleSelected(id: string) {
     setSelectedIds((prev) => {
@@ -351,16 +361,26 @@ export function ExpenseTable({
               const dayTotal = isNewDateGroup
                 ? pageRows.filter((r) => r.date === e.date).reduce((s, r) => s + Number(r.amount || 0), 0)
                 : 0
+              const isDateCollapsed = groupByDate && collapsedDates.has(e.date)
 
               return (
                 <Fragment key={e.id}>
                   {isNewDateGroup && (
-                    <tr className="expense-date-group-row">
+                    <tr
+                      className="expense-date-group-row"
+                      onClick={() => toggleDateGroup(e.date)}
+                      style={{ cursor: 'pointer' }}
+                    >
                       <td colSpan={COL_SPAN} style={{ fontWeight: 600, background: 'var(--paper-2)' }}>
+                        <span style={{ display: 'inline-block', width: 14, fontSize: 11, opacity: 0.6 }}>
+                          {isDateCollapsed ? '▸' : '▾'}
+                        </span>
                         {fmtDate(e.date)} — {fmt(dayTotal)}
                       </td>
                     </tr>
                   )}
+                  {!isDateCollapsed && (
+                    <>
                   <tr>
                     <td>
                       <input type="checkbox" checked={selectedIds.has(e.id)} onChange={() => toggleSelected(e.id)} aria-label={`Select ${e.display_id ?? 'row'}`} />
@@ -511,6 +531,8 @@ export function ExpenseTable({
                       colSpan={COL_SPAN}
                       onClose={closePayForm}
                     />
+                  )}
+                    </>
                   )}
                 </Fragment>
               )
