@@ -8,6 +8,9 @@ import { useSiteImprestBalances } from '../../lib/queries/ledger'
 import { FIXED_EXPENSE_CATEGORIES, LABOUR_SUB_HEAD_CODE } from '../../lib/supervisorProjectExpenseCategories'
 import { fmt, fmtDate } from '../../lib/calc/format'
 import { getErrorMessage } from '../../lib/errors'
+import { ImportFileBlock } from '../admin/DataImportSection'
+import { downloadSupervisorExpenseImportTemplate } from '../../lib/import/supervisorExpenseTemplate'
+import { parseSupervisorExpenseImport, commitSupervisorExpenseImport } from '../../lib/import/runSupervisorExpenseImport'
 import type { Database } from '../../types/database'
 
 type ExpenseRow = Database['public']['Tables']['expenses']['Row']
@@ -255,6 +258,14 @@ export function PendingClaimApprovals() {
             placeholder="— Select supervisor —"
           />
         </div>
+
+        <ImportFileBlock
+          label="Bulk-add Supervisor Project expense claims from Excel"
+          onDownload={downloadSupervisorExpenseImportTemplate}
+          onParse={parseSupervisorExpenseImport}
+          onCommit={commitSupervisorExpenseImport}
+          invalidateKeys={['expenses', 'pending-field-expenses']}
+        />
 
         {!supervisorId ? (
           <div className="note">Pick a supervisor to see their pending claims.</div>
