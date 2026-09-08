@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
 import { SearchableSelect } from '../../components/SearchableSelect'
@@ -9,6 +9,7 @@ import { fmt, fmtDate, parseINR } from '../../lib/calc/format'
 import { clientLabel } from '../../lib/labels'
 
 const CASH = 'cash'
+const BANK_ORDER = ['Kotak', 'CBI']
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
@@ -20,7 +21,18 @@ export function InvoiceReceiptForm() {
   const { data: payments } = useInvoicePayments()
   const { data: bankAccounts } = useBankAccounts()
   const createPayment = useCreateInvoicePayment()
-  const accountOptions = [{ id: CASH, name: 'Cash' }, ...(bankAccounts ?? [])]
+  // Kotak first, then CBI, then anything else alphabetically, Cash always
+  // last — same order and pill-button treatment as Expenses/Imprest.
+  const sortedBankAccounts = [...(bankAccounts ?? [])].sort((a, b) => {
+    const ai = BANK_ORDER.indexOf(a.name)
+    const bi = BANK_ORDER.indexOf(b.name)
+    if (ai === -1 && bi === -1) return a.name.localeCompare(b.name)
+    if (ai === -1) return 1
+    if (bi === -1) return -1
+    return ai - bi
+  })
+  const accountOptions = [...sortedBankAccounts, { id: CASH, name: 'Cash' }]
+  const cbiAccountId = sortedBankAccounts.find((a) => a.name.trim().toLowerCase() === 'cbi')?.id ?? CASH
 
   const [clientId, setClientId] = useState('')
   const [invoiceId, setInvoiceId] = useState('')
@@ -29,6 +41,16 @@ export function InvoiceReceiptForm() {
   const [accountId, setAccountId] = useState(CASH)
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+
+  // Defaults Account to CBI once bank accounts load — only ever once, so it
+  // doesn't fight a deliberate later choice of Cash (also represented by
+  // '' internally).
+  const defaultedAccountRef = useRef(false)
+  useEffect(() => {
+    if (defaultedAccountRef.current || !cbiAccountId) return
+    defaultedAccountRef.current = true
+    setAccountId(cbiAccountId)
+  }, [cbiAccountId])
 
   // If the user picks a specific invoice, the receipt applies to that one.
   // Otherwise, the oldest outstanding invoice for the client absorbs it (FIFO).
@@ -75,7 +97,7 @@ export function InvoiceReceiptForm() {
       setInvoiceId('')
       setDate(todayStr())
       setAmount('0')
-      setAccountId(CASH)
+      setAccountId(cbiAccountId)
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Could not record receipt.')
     } finally {
@@ -139,14 +161,18 @@ export function InvoiceReceiptForm() {
 
         <div className="field full rr-account">
           <label>Account</label>
-          <SearchableSelect
-            items={accountOptions}
-            value={accountId}
-            onChange={setAccountId}
-            getId={(a) => a.id}
-            getLabel={(a) => a.name}
-            placeholder="— Select account —"
-          />
+          <div className="pill-tabs">
+            {accountOptions.map((a) => (
+              <button
+                key={a.id}
+                type="button"
+                className={accountId === a.id ? 'pill active' : 'pill'}
+                onClick={() => setAccountId(a.id)}
+              >
+                {a.name}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="field full rr-submit">

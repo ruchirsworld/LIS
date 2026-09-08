@@ -3,6 +3,7 @@ import { ModuleHeader } from '../../components/ui'
 import { useAuth } from '../../lib/auth'
 import { InvoiceForm } from './InvoiceForm'
 import { InvoiceReceiptForm } from './InvoiceReceiptForm'
+import { InvoicePaymentRecordsTable } from './InvoicePaymentRecordsTable'
 import { InvoiceTable } from './InvoiceTable'
 import { ClientSummaryTable } from './ClientSummaryTable'
 import { ProjectSummaryTable } from './ProjectSummaryTable'
@@ -23,6 +24,7 @@ export function InvoicesPage() {
       <ModuleHeader>Invoices</ModuleHeader>
       <InvoiceForm editingInvoice={editingInvoice} onDoneEditing={() => setEditingInvoice(null)} />
       <InvoiceReceiptForm />
+      <InvoicePaymentRecordsTable />
       <InvoiceTable onEdit={setEditingInvoice} />
       <ClientSummaryTable />
       <ProjectSummaryTable />

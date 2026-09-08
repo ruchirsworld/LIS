@@ -1,7 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
-import { SearchableSelect } from '../../components/SearchableSelect'
 import { useBankAccounts } from '../../lib/queries/masters'
 import { useCreateInvoicePayment, useUpdateInvoicePayment } from '../../lib/queries/invoices'
 import { fmtPlain, parseINR } from '../../lib/calc/format'
@@ -10,6 +9,7 @@ import type { Database } from '../../types/database'
 type InvoicePayment = Database['public']['Tables']['invoice_payments']['Row']
 
 const CASH = 'cash'
+const BANK_ORDER = ['Kotak', 'CBI']
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
@@ -27,7 +27,18 @@ function InvoicePaymentFields(
   const createPayment = useCreateInvoicePayment()
   const updatePayment = useUpdateInvoicePayment()
   const { data: bankAccounts } = useBankAccounts()
-  const accountOptions = [{ id: CASH, name: 'Cash' }, ...(bankAccounts ?? [])]
+  // Kotak first, then CBI, then anything else alphabetically, Cash always
+  // last — same order and pill-button treatment as Expenses/Imprest.
+  const sortedBankAccounts = [...(bankAccounts ?? [])].sort((a, b) => {
+    const ai = BANK_ORDER.indexOf(a.name)
+    const bi = BANK_ORDER.indexOf(b.name)
+    if (ai === -1 && bi === -1) return a.name.localeCompare(b.name)
+    if (ai === -1) return 1
+    if (bi === -1) return -1
+    return ai - bi
+  })
+  const accountOptions = [...sortedBankAccounts, { id: CASH, name: 'Cash' }]
+  const cbiAccountId = sortedBankAccounts.find((a) => a.name.trim().toLowerCase() === 'cbi')?.id ?? CASH
 
   const initial = props.mode === 'edit' ? props.payment : null
   const [date, setDate] = useState(initial ? initial.date : todayStr())
@@ -36,6 +47,18 @@ function InvoicePaymentFields(
   const [accountId, setAccountId] = useState(initial?.bank_account_id ?? CASH)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Defaults a brand-new payment's Account to CBI once bank accounts load —
+  // only ever once, so it doesn't fight a deliberate later choice of Cash
+  // (also represented by '' internally) — and never for an existing payment
+  // being edited, which keeps whatever it was actually saved with.
+  const defaultedAccountRef = useRef(false)
+  useEffect(() => {
+    if (props.mode !== 'create' || defaultedAccountRef.current || !cbiAccountId) return
+    defaultedAccountRef.current = true
+    setAccountId(cbiAccountId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cbiAccountId])
 
   async function save() {
     const amt = parseINR(amount)
@@ -79,14 +102,18 @@ function InvoicePaymentFields(
       </div>
       <div className="field">
         <label>Account</label>
-        <SearchableSelect
-          items={accountOptions}
-          value={accountId}
-          onChange={setAccountId}
-          getId={(a) => a.id}
-          getLabel={(a) => a.name}
-          placeholder="— Select account —"
-        />
+        <div className="pill-tabs">
+          {accountOptions.map((a) => (
+            <button
+              key={a.id}
+              type="button"
+              className={accountId === a.id ? 'pill active' : 'pill'}
+              onClick={() => setAccountId(a.id)}
+            >
+              {a.name}
+            </button>
+          ))}
+        </div>
       </div>
       <div className="field">
         <label>Reference / receipt no.</label>
