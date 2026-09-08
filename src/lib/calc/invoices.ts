@@ -30,6 +30,13 @@ export function netPayable(inv: InvoiceRow): number {
   return Number(inv.amount || 0) + gstAmt(inv) - tdsAmt(inv)
 }
 
+// Same as netPayable but leaving GST out — GST is collected on the
+// government's behalf, never real revenue, so a few displays (Project
+// Invoiced/Due) show this instead of the GST-inclusive figure.
+export function netPayableExGst(inv: InvoiceRow): number {
+  return Number(inv.amount || 0) - tdsAmt(inv)
+}
+
 // The % of net_payable a client contractually holds back for a period —
 // still owed, but not collectible (or overdue) until released. Doesn't
 // reduce GST liability, which is charged on the full invoice value.

@@ -16,7 +16,7 @@ import { clientLabel } from '../../lib/labels'
 import {
   projectExpenseTotal,
   projectVendorBillTotal,
-  projectInvoicedRevenue,
+  projectInvoicedRevenueExGst,
   projectReceivedRevenue,
   projectWageByStaff,
 } from '../../lib/calc/projects'
@@ -107,7 +107,10 @@ export function ProjectsPage() {
     : []
   const salaryTotal = salaryByWorker.reduce((s, r) => s + r.amount, 0)
   const costTotal = expenseTotal + vendorBillTotal + salaryTotal
-  const invoicedRevenue = selected ? projectInvoicedRevenue(selected.id, invoices ?? []) : 0
+  // GST is collected on the government's behalf, never real revenue, so
+  // Invoiced/Due (and Profit, derived from Invoiced) show the ex-GST
+  // figure here — same reasoning as excluding it from cost totals above.
+  const invoicedRevenue = selected ? projectInvoicedRevenueExGst(selected.id, invoices ?? []) : 0
   const receivedRevenue = selected ? projectReceivedRevenue(selected.id, invoices ?? [], invoicePayments ?? []) : 0
   const balanceDue = invoicedRevenue - receivedRevenue
   const profit = invoicedRevenue - costTotal

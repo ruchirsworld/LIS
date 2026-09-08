@@ -1,5 +1,5 @@
 import { billTotal, type VendorBillRow } from './vendorBills'
-import { netPayable, totalPaid, type InvoiceRow, type InvoicePaymentRow } from './invoices'
+import { netPayable, netPayableExGst, totalPaid, type InvoiceRow, type InvoicePaymentRow } from './invoices'
 import { computeAccrualDays, type AccrualStaff, type AttendanceDay, type AttendanceDayType } from './payroll'
 import { resolveStaffSite, type SiteAssignmentException } from './siteAssignment'
 
@@ -27,6 +27,15 @@ export function projectInvoicedRevenue(
   return invoices
     .filter((i) => i.project_id === projectId)
     .reduce((s, i) => s + netPayable(i), 0)
+}
+
+export function projectInvoicedRevenueExGst(
+  projectId: string,
+  invoices: (InvoiceRow & { id: string; project_id: string | null })[],
+): number {
+  return invoices
+    .filter((i) => i.project_id === projectId)
+    .reduce((s, i) => s + netPayableExGst(i), 0)
 }
 
 export function projectReceivedRevenue(
