@@ -1,11 +1,14 @@
 import { Fragment, useState } from 'react'
+import { Button } from '../../components/ui'
 import { TableScroll } from '../../components/TableScroll'
+import { PeriodFilter } from '../../components/PeriodFilter'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import { useTrips } from '../../lib/queries/trips'
 import { useExpenses } from '../../lib/queries/expenses'
 import { useProfiles } from '../../lib/queries/admin'
 import { useProjects, useExpenseSubHeads } from '../../lib/queries/masters'
 import { fmt, fmtDate } from '../../lib/calc/format'
+import type { DateRange } from '../../lib/calc/period'
 import type { ExportSection } from '../../lib/export/report'
 
 const COL_SPAN = 8
@@ -21,12 +24,16 @@ export function TripRecordsTable() {
   const { data: projects } = useProjects()
   const { data: subHeads } = useExpenseSubHeads()
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [range, setRange] = useState<DateRange | null>(null)
+  const [showPeriodFilter, setShowPeriodFilter] = useState(false)
 
   const travelerName = (id: string | null) => (id ? profiles?.find((p) => p.id === id)?.name ?? '—' : '—')
   const projectName = (id: string | null) => (id ? projects?.find((p) => p.id === id)?.name ?? '—' : '—')
   const subHeadName = (id: string | null) => (id ? subHeads?.find((s) => s.id === id)?.name ?? '—' : '—')
 
-  const sortedTrips = [...(trips ?? [])].sort((a, b) => b.start_date.localeCompare(a.start_date))
+  const sortedTrips = [...(trips ?? [])]
+    .filter((t) => (!range?.from || t.start_date >= range.from) && (!range?.to || t.start_date <= range.to))
+    .sort((a, b) => b.start_date.localeCompare(a.start_date))
   const expensesByTrip = (tripId: string) => (expenses ?? []).filter((e) => e.trip_id === tripId)
   const tripTotal = (tripId: string) => expensesByTrip(tripId).reduce((s, e) => s + Number(e.amount || 0), 0)
 
@@ -50,8 +57,19 @@ export function TripRecordsTable() {
     <div className="card" style={{ padding: 16, marginTop: 24 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
         <h3 style={{ margin: 0, fontSize: 13 }}>Trip records</h3>
-        <ReportExportButtons title="Trip records" sections={exportSections} range={null} iconOnly />
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <Button
+            type="button"
+            variant="secondary"
+            style={{ fontSize: 12, padding: '5px 12px' }}
+            onClick={() => setShowPeriodFilter((v) => !v)}
+          >
+            Filter by date
+          </Button>
+          <ReportExportButtons title="Trip records" sections={exportSections} range={range} iconOnly />
+        </div>
       </div>
+      {showPeriodFilter && <PeriodFilter onChange={setRange} allowCustom />}
       <TableScroll>
         <table className="data">
           <thead>
