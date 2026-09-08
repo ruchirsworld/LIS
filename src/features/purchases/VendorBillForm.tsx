@@ -13,6 +13,7 @@ import { uploadReceiptToDrive } from '../../lib/storage'
 import { getErrorMessage } from '../../lib/errors'
 import { clientLabel } from '../../lib/labels'
 import { VendorCombobox } from './VendorCombobox'
+import { AddVendorModal } from './AddVendorModal'
 import { useVendorCategoryFilter, VendorCategoryPills } from './VendorCategoryFilter'
 import type { Database } from '../../types/database'
 
@@ -67,6 +68,7 @@ export function VendorBillForm({
   const createVendorBillPayment = useCreateVendorBillPayment()
 
   const [vendorId, setVendorId] = useState('')
+  const [showAddVendor, setShowAddVendor] = useState(false)
   const { categories: vendorCategories, category: vendorCategory, setCategory: setVendorCategory, filteredVendors } =
     useVendorCategoryFilter(vendors, () => setVendorId(''))
   const [subHeadId, setSubHeadId] = useState('')
@@ -312,8 +314,27 @@ export function VendorBillForm({
         {/* Row 3: Vendor */}
         <div className="field full">
           <label>Vendor</label>
-          <VendorCombobox vendors={filteredVendors} value={vendorId} onChange={setVendorId} allowCreate={canAddVendor} />
+          <VendorCombobox vendors={filteredVendors} value={vendorId} onChange={setVendorId} />
+          {canAddVendor && (
+            <label style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 6, fontSize: 12, fontWeight: 400 }}>
+              <input type="checkbox" checked={showAddVendor} onChange={(e) => setShowAddVendor(e.target.checked)} />
+              Vendor isn't in the list — add a new one
+            </label>
+          )}
         </div>
+        {showAddVendor && (
+          <AddVendorModal
+            onClose={() => setShowAddVendor(false)}
+            onCreated={(v) => {
+              // Reset the type filter first — otherwise a category that
+              // doesn't match the newly created vendor would hide it right
+              // after picking it.
+              setVendorCategory(null)
+              setVendorId(v.id)
+              setShowAddVendor(false)
+            }}
+          />
+        )}
 
         {/* Row 3b: Sub-head — what this bill is actually for. Major head is
             always Materials & Consumables for Procurement, so it isn't a

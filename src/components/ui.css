@@ -68,7 +68,8 @@ details.toggle-section .note:last-child {
 /* Pages whose header carries a cost-center/section switcher (Expenses, HR)
    sit directly above their content — tighter than the app default. */
 .expenses-page .module-header,
-.hr-page .module-header {
+.hr-page .module-header,
+.purchases-page .module-header {
   margin-bottom: 8px;
 }
 

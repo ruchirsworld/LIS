@@ -5,6 +5,7 @@ import { SearchableSelect } from '../../components/SearchableSelect'
 import { useBankAccounts, useStaff } from '../../lib/queries/masters'
 import { useProfiles } from '../../lib/queries/admin'
 import { useLedgerLines } from '../../lib/queries/ledger'
+import { useExpenses } from '../../lib/queries/expenses'
 import {
   useStaffImprestTransactions,
   useCreateStaffImprestTransaction,
@@ -44,6 +45,8 @@ export function SiteImprestSection() {
   const { data: bankAccounts } = useBankAccounts()
   const { data: staff } = useStaff()
   const { data: allTransactionsRaw } = useStaffImprestTransactions()
+  const { data: pendingClaimsRaw } = useExpenses(null, 'pending')
+  const { data: approvedClaimsRaw } = useExpenses(null, 'approved')
   const createTransaction = useCreateStaffImprestTransaction()
   const updateTransaction = useUpdateStaffImprestTransaction()
   const deleteTransaction = useDeleteStaffImprestTransaction()
@@ -106,7 +109,6 @@ export function SiteImprestSection() {
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [paymentsRange, setPaymentsRange] = useState<DateRange | null>(null)
-  const [recordsView, setRecordsView] = useState<'payments' | 'all'>('payments')
   const [requestBusyId, setRequestBusyId] = useState<string | null>(null)
   const [requestError, setRequestError] = useState<Record<string, string>>({})
   const [editingRequestId, setEditingRequestId] = useState<string | null>(null)
@@ -141,8 +143,8 @@ export function SiteImprestSection() {
     .sort((a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at))
 
   // Same supervisor, same date range, but every kind — advances and returns
-  // both — for the "All transactions" KPI block.
-  const supervisorAllTransactions = (allTransactions ?? [])
+  // both — this is now the sole view shown in "Imprest payment records".
+  const recordsShown = (allTransactions ?? [])
     .filter(
       (t) =>
         t.profile_id === supervisorId &&
@@ -151,28 +153,35 @@ export function SiteImprestSection() {
     )
     .sort((a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at))
 
-  const recordsShown = recordsView === 'payments' ? supervisorPayments : supervisorAllTransactions
-
   const supervisorName = (id: string) => supervisors.find((p) => p.id === id)?.name ?? '—'
   const bankAccountName = (id: string | null) => (id ? bankAccounts?.find((a) => a.id === id)?.name ?? '—' : 'Cash')
   const accountLabel = (t: StaffImprestTransaction) => (t.reimbursable ? 'Reimbursement' : bankAccountName(t.bank_account_id))
 
   const recordsExportSections: ExportSection[] = [
     {
-      title: `${supervisorName(supervisorId)} — Imprest ${recordsView === 'payments' ? 'payments' : 'transactions'}`,
-      columns:
-        recordsView === 'payments' ? ['Date', 'Amount', 'Account'] : ['Date', 'Type', 'Amount', 'Account'],
-      rows:
-        recordsView === 'payments'
-          ? supervisorPayments.map((t) => [fmtDate(t.date), t.amount, accountLabel(t)])
-          : supervisorAllTransactions.map((t) => [
-              fmtDate(t.date),
-              t.kind === 'advance' ? 'Advance' : 'Return',
-              t.amount,
-              accountLabel(t),
-            ]),
+      title: `${supervisorName(supervisorId)} — Imprest transactions`,
+      columns: ['Date', 'Type', 'Amount', 'Account'],
+      rows: recordsShown.map((t) => [fmtDate(t.date), t.kind === 'advance' ? 'Advance' : 'Return', t.amount, accountLabel(t)]),
     },
   ]
+
+  // Same "claims" this Supervisor's Project cost-center expenses represent
+  // elsewhere (Approvals, Records) — same filter PendingClaimApprovals.tsx
+  // uses. Deliberately all-time, not scoped to the period filter below:
+  // "Claims Pending" is a queue depth (what's outstanding right now), and
+  // "Claims — Payments" next to the heading is a running health check, not
+  // an activity total for a window.
+  const supervisorPendingClaims = (pendingClaimsRaw ?? [])
+    .filter((e) => e.cost_center === 'Project' && e.created_by === supervisorId)
+    .sort((a, b) => b.date.localeCompare(a.date))
+  const totalClaimsPending = supervisorPendingClaims.reduce((s, e) => s + Number(e.amount || 0), 0)
+  const totalClaimsApproved = (approvedClaimsRaw ?? [])
+    .filter((e) => e.cost_center === 'Project' && e.created_by === supervisorId)
+    .reduce((s, e) => s + Number(e.amount || 0), 0)
+  const allTimePaymentsMade = (allTransactions ?? [])
+    .filter((t) => t.profile_id === supervisorId && t.kind === 'advance')
+    .reduce((s, t) => s + Number(t.amount || 0), 0)
+  const claimsMinusPayments = totalClaimsApproved - allTimePaymentsMade
 
   async function handleApproveRequest(id: string) {
     setRequestBusyId(id)
@@ -581,44 +590,32 @@ export function SiteImprestSection() {
               </div>
             )}
 
-            <h4 style={{ marginBottom: 10 }}>Imprest payment records</h4>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+              <h4 style={{ marginBottom: 10 }}>Imprest payment records</h4>
+              <div className="note" style={{ margin: 0 }}>
+                CLAIMS - PAYMENTS:{' '}
+                <strong style={{ color: allTimePaymentsMade > totalClaimsApproved ? 'var(--blue)' : 'var(--red)' }}>
+                  {fmt(claimsMinusPayments)}
+                </strong>
+              </div>
+            </div>
             <div className="dash-grid" style={{ marginBottom: 16 }}>
-              <button
-                type="button"
-                className="dash-card"
-                style={{
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                  border: recordsView === 'payments' ? '2px solid var(--accent)' : undefined,
-                }}
-                onClick={() => setRecordsView('payments')}
-              >
-                <div className="dash-label">Payments</div>
+              <div className="dash-card">
+                <div className="dash-label">Payments made</div>
                 <div className="dash-value">{fmt(supervisorPayments.reduce((s, t) => s + Number(t.amount), 0))}</div>
                 <div className="note" style={{ margin: 0 }}>{supervisorPayments.length} record(s)</div>
-              </button>
-              <button
-                type="button"
-                className="dash-card"
-                style={{
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                  border: recordsView === 'all' ? '2px solid var(--accent)' : undefined,
-                }}
-                onClick={() => setRecordsView('all')}
-              >
-                <div className="dash-label">All transactions</div>
-                <div className="dash-value">
-                  {fmt(supervisorAllTransactions.reduce((s, t) => s + Number(t.amount), 0))}
-                </div>
-                <div className="note" style={{ margin: 0 }}>{supervisorAllTransactions.length} record(s)</div>
-              </button>
+              </div>
+              <div className="dash-card">
+                <div className="dash-label">Claims Pending</div>
+                <div className="dash-value">{fmt(totalClaimsPending)}</div>
+                <div className="note" style={{ margin: 0 }}>{supervisorPendingClaims.length} record(s)</div>
+              </div>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
               <ReportPeriodFilter onChange={(r) => setPaymentsRange(r)} />
               <ReportExportButtons
-                title={`${supervisorName(supervisorId)} — Imprest ${recordsView === 'payments' ? 'payments' : 'transactions'}`}
+                title={`${supervisorName(supervisorId)} — Imprest transactions`}
                 sections={recordsExportSections}
                 range={paymentsRange}
                 iconOnly
@@ -630,7 +627,7 @@ export function SiteImprestSection() {
                 <thead>
                   <tr>
                     <th>Date</th>
-                    {recordsView === 'all' && <th>Type</th>}
+                    <th>Type</th>
                     <th style={{ textAlign: 'right' }}>Amount</th>
                     <th>Account</th>
                     <th></th>
@@ -639,8 +636,8 @@ export function SiteImprestSection() {
                 <tbody>
                   {recordsShown.length === 0 && (
                     <tr>
-                      <td colSpan={recordsView === 'all' ? 5 : 4} className="empty-row">
-                        No {recordsView === 'payments' ? 'payments' : 'transactions'} recorded yet
+                      <td colSpan={5} className="empty-row">
+                        No transactions recorded yet
                       </td>
                     </tr>
                   )}
@@ -656,25 +653,23 @@ export function SiteImprestSection() {
                               onChange={(e) => setTxnDraft((d) => ({ ...d, date: e.target.value }))}
                             />
                           </td>
-                          {recordsView === 'all' && (
-                            <td>
-                              <select
-                                aria-label="Type"
-                                value={txnDraft.kind}
-                                onChange={(e) => {
-                                  const k = e.target.value as 'advance' | 'return'
-                                  setTxnDraft((d) => ({
-                                    ...d,
-                                    kind: k,
-                                    bankAccountId: k === 'return' && d.bankAccountId === REIMBURSE_ID ? kotakAccountId : d.bankAccountId,
-                                  }))
-                                }}
-                              >
-                                <option value="advance">Advance</option>
-                                <option value="return">Return</option>
-                              </select>
-                            </td>
-                          )}
+                          <td>
+                            <select
+                              aria-label="Type"
+                              value={txnDraft.kind}
+                              onChange={(e) => {
+                                const k = e.target.value as 'advance' | 'return'
+                                setTxnDraft((d) => ({
+                                  ...d,
+                                  kind: k,
+                                  bankAccountId: k === 'return' && d.bankAccountId === REIMBURSE_ID ? kotakAccountId : d.bankAccountId,
+                                }))
+                              }}
+                            >
+                              <option value="advance">Advance</option>
+                              <option value="return">Return</option>
+                            </select>
+                          </td>
                           <td>
                             <CurrencyInput
                               value={txnDraft.amount}
@@ -684,7 +679,7 @@ export function SiteImprestSection() {
                           <td></td>
                         </tr>
                         <tr>
-                          <td colSpan={recordsView === 'all' ? 5 : 4}>
+                          <td colSpan={5}>
                             <div className="field full" style={{ marginBottom: 8 }}>
                               <label>Account</label>
                               <div className="pill-tabs">
@@ -724,7 +719,7 @@ export function SiteImprestSection() {
                     ) : (
                       <tr key={t.id}>
                         <td>{fmtDate(t.date)}</td>
-                        {recordsView === 'all' && <td>{t.kind === 'advance' ? 'Advance' : 'Return'}</td>}
+                        <td>{t.kind === 'advance' ? 'Advance' : 'Return'}</td>
                         <td className="amt">{fmt(t.amount)}</td>
                         <td>{accountLabel(t)}</td>
                         <td>
