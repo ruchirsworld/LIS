@@ -131,13 +131,13 @@ export function InvoiceReceiptForm() {
               getId={(inv) => inv.id}
               getLabel={(inv) => {
                 const row = clientOpenInvoices.find((r) => r.invoice.id === inv.id)
-                return `${inv.display_id ?? inv.invoice_number ?? 'Invoice'} — ${fmtDate(inv.invoice_date)} — Due: ${fmt(row?.due ?? 0)}`
+                return `${inv.invoice_number ?? inv.display_id ?? 'Invoice'} — ${fmtDate(inv.invoice_date)} — Due: ${fmt(row?.due ?? 0)}`
               }}
               placeholder="— Auto-adjust against oldest due —"
             />
             {target && (
               <div className="note" style={{ marginTop: 2 }}>
-                {invoiceId ? 'Applies to' : 'Will auto-adjust against'} {target.invoice.display_id ?? target.invoice.invoice_number ?? 'this invoice'} — Due: {fmt(target.due)}
+                {invoiceId ? 'Applies to' : 'Will auto-adjust against'} {target.invoice.invoice_number ?? target.invoice.display_id ?? 'this invoice'} — Due: {fmt(target.due)}
               </div>
             )}
             {!target && (
