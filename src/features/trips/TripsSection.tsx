@@ -12,6 +12,7 @@ import { fmt, fmtDate } from '../../lib/calc/format'
 import { getErrorMessage } from '../../lib/errors'
 import { ExpenseForm } from '../expenses/ExpenseForm'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
+import { TripRecordsTable } from './TripRecordsTable'
 import type { ExportSection } from '../../lib/export/report'
 
 function todayStr() {
@@ -282,6 +283,8 @@ export function TripsSection() {
           No trip in progress — tap "Start trip" above to begin one.
         </div>
       )}
+
+      <TripRecordsTable />
     </div>
   )
 }

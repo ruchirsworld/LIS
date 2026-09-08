@@ -6,7 +6,7 @@ export function AdminExpensesSection() {
   return (
     <div>
       <ExpenseForm editingExpense={null} onDoneEditing={() => {}} />
-      <ExpenseTable />
+      <ExpenseTable costCenterFilter="Admin" />
       <ReimbursementRecordsTable />
     </div>
   )

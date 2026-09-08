@@ -1,5 +1,6 @@
 import { useAuth } from '../../lib/auth'
 import { ExpenseForm } from './ExpenseForm'
+import { ExpenseTable } from './ExpenseTable'
 import { SupervisorProjectExpenseForm } from './SupervisorProjectExpenseForm'
 import { ImportFileBlock } from '../admin/DataImportSection'
 import { downloadSupervisorExpenseImportTemplate } from '../../lib/import/supervisorExpenseTemplate'
@@ -15,7 +16,10 @@ export function ProjectExpensesSection() {
       {isSupervisor ? (
         <SupervisorProjectExpenseForm />
       ) : (
-        <ExpenseForm editingExpense={null} onDoneEditing={() => {}} lockToProjects />
+        <>
+          <ExpenseForm editingExpense={null} onDoneEditing={() => {}} lockToProjects />
+          <ExpenseTable costCenterFilter="Project" />
+        </>
       )}
 
       {canImport && (
