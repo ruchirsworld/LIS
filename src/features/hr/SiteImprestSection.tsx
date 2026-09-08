@@ -57,8 +57,7 @@ export function SiteImprestSection() {
   // 'approved' rows, same as the GL only posts those. A worker-tagged
   // advance (staff_id set) posts as a Salary Advance instead of Site
   // Imprest once approved, and shows up on the Salary tab instead — so it's
-  // excluded here. A Reimbursement is always worker-tagged too, but has
-  // nowhere else to show yet, so it stays visible in this list.
+  // excluded here.
   const allTransactions = (allTransactionsRaw ?? []).filter(
     (t) => t.status === 'approved' && !(t.staff_id && t.kind === 'advance')
   )
@@ -67,13 +66,13 @@ export function SiteImprestSection() {
     .sort((a, b) => a.date.localeCompare(b.date) || a.created_at.localeCompare(b.created_at))
 
   const [supervisorId, setSupervisorId] = useState('')
-  const [kind, setKind] = useState<'advance' | 'return' | 'reimbursement'>('advance')
+  const [kind, setKind] = useState<'advance' | 'return'>('advance')
   const [date, setDate] = useState(todayStr())
   const [amount, setAmount] = useState('0')
   const [bankAccountId, setBankAccountId] = useState('')
-  const [reimbursementStaffId, setReimbursementStaffId] = useState('')
   // Bank accounts first (Kotak, then CBI, then anything else alphabetically),
-  // Cash always last — same order and pill-button treatment as Expenses.
+  // Cash next, Reimbursement always last — same order and pill-button
+  // treatment as Expenses.
   const BANK_ORDER = ['Kotak', 'CBI']
   const sortedBankAccounts = [...(bankAccounts ?? [])].sort((a, b) => {
     const ai = BANK_ORDER.indexOf(a.name)
@@ -84,7 +83,14 @@ export function SiteImprestSection() {
     return ai - bi
   })
   const CASH_ID = ''
-  const accountOptions = [...sortedBankAccounts, { id: CASH_ID, name: 'Cash' }]
+  // Not a real account — picking this means the Admin/CXO paid this advance
+  // out of their own pocket rather than from a company account, so no
+  // cash/bank actually moves and the firm owes it back to them. Only
+  // meaningful for an advance (money going out), never a return.
+  const REIMBURSE_ID = 'reimburse'
+  const accountOptions = [...sortedBankAccounts, { id: CASH_ID, name: 'Cash' }, { id: REIMBURSE_ID, name: 'Reimbursement' }]
+  const visibleAccountOptions = (k: 'advance' | 'return') =>
+    k === 'return' ? accountOptions.filter((a) => a.id !== REIMBURSE_ID) : accountOptions
   const kotakAccountId = sortedBankAccounts.find((a) => a.name.trim().toLowerCase() === 'kotak')?.id ?? ''
   // Defaults the new-transaction form's Account to Kotak once the bank
   // accounts list loads — only ever once, so it doesn't fight a deliberate
@@ -108,7 +114,7 @@ export function SiteImprestSection() {
   const [editingTxnId, setEditingTxnId] = useState<string | null>(null)
   const [txnDraft, setTxnDraft] = useState({
     date: '',
-    kind: 'advance' as 'advance' | 'return' | 'reimbursement',
+    kind: 'advance' as 'advance' | 'return',
     amount: '',
     bankAccountId: '',
   })
@@ -149,6 +155,7 @@ export function SiteImprestSection() {
 
   const supervisorName = (id: string) => supervisors.find((p) => p.id === id)?.name ?? '—'
   const bankAccountName = (id: string | null) => (id ? bankAccounts?.find((a) => a.id === id)?.name ?? '—' : 'Cash')
+  const accountLabel = (t: StaffImprestTransaction) => (t.reimbursable ? 'Reimbursement' : bankAccountName(t.bank_account_id))
 
   const recordsExportSections: ExportSection[] = [
     {
@@ -157,12 +164,12 @@ export function SiteImprestSection() {
         recordsView === 'payments' ? ['Date', 'Amount', 'Account'] : ['Date', 'Type', 'Amount', 'Account'],
       rows:
         recordsView === 'payments'
-          ? supervisorPayments.map((t) => [fmtDate(t.date), t.amount, bankAccountName(t.bank_account_id)])
+          ? supervisorPayments.map((t) => [fmtDate(t.date), t.amount, accountLabel(t)])
           : supervisorAllTransactions.map((t) => [
               fmtDate(t.date),
-              t.kind === 'advance' ? 'Advance' : t.kind === 'return' ? 'Return' : 'Reimbursement',
+              t.kind === 'advance' ? 'Advance' : 'Return',
               t.amount,
-              bankAccountName(t.bank_account_id),
+              accountLabel(t),
             ]),
     },
   ]
@@ -230,9 +237,9 @@ export function SiteImprestSection() {
     setEditingTxnId(t.id)
     setTxnDraft({
       date: t.date,
-      kind: t.kind as 'advance' | 'return' | 'reimbursement',
+      kind: t.kind as 'advance' | 'return',
       amount: String(t.amount),
-      bankAccountId: t.bank_account_id ?? '',
+      bankAccountId: t.reimbursable ? REIMBURSE_ID : t.bank_account_id ?? '',
     })
     setTxnError((m) => ({ ...m, [t.id]: '' }))
   }
@@ -252,7 +259,13 @@ export function SiteImprestSection() {
     try {
       await updateTransaction.mutateAsync({
         id,
-        patch: { date: txnDraft.date, kind: txnDraft.kind, amount: amt, bank_account_id: txnDraft.bankAccountId || null },
+        patch: {
+          date: txnDraft.date,
+          kind: txnDraft.kind,
+          amount: amt,
+          bank_account_id: txnDraft.bankAccountId === REIMBURSE_ID ? null : txnDraft.bankAccountId || null,
+          reimbursable: txnDraft.bankAccountId === REIMBURSE_ID,
+        },
       })
       setEditingTxnId(null)
     } catch (err) {
@@ -263,7 +276,7 @@ export function SiteImprestSection() {
   }
 
   async function handleDeleteTxn(t: StaffImprestTransaction) {
-    const kindLabel = t.kind === 'advance' ? 'advance' : t.kind === 'return' ? 'return' : 'reimbursement'
+    const kindLabel = t.kind === 'advance' ? 'advance' : 'return'
     if (!window.confirm(`Delete this ${kindLabel} of ${fmt(t.amount)} dated ${fmtDate(t.date)}? This cannot be undone.`)) return
     setTxnBusyId(t.id)
     setTxnError((m) => ({ ...m, [t.id]: '' }))
@@ -294,7 +307,6 @@ export function SiteImprestSection() {
     setDate(todayStr())
     setAmount('0')
     setBankAccountId(kotakAccountId)
-    setReimbursementStaffId('')
     setRemarks('')
     setFormError(null)
   }
@@ -310,10 +322,6 @@ export function SiteImprestSection() {
       setFormError('Enter an amount.')
       return
     }
-    if (kind === 'reimbursement' && !reimbursementStaffId) {
-      setFormError('Pick which worker this reimbursement is for.')
-      return
-    }
     setSubmitting(true)
     setFormError(null)
     try {
@@ -322,8 +330,8 @@ export function SiteImprestSection() {
         date,
         kind,
         amount: amt,
-        bank_account_id: bankAccountId || null,
-        staff_id: kind === 'reimbursement' ? reimbursementStaffId : null,
+        bank_account_id: bankAccountId === REIMBURSE_ID ? null : bankAccountId || null,
+        reimbursable: bankAccountId === REIMBURSE_ID,
         remarks: remarks.trim() || null,
       })
       resetForm()
@@ -517,31 +525,18 @@ export function SiteImprestSection() {
                   <button type="button" className={kind === 'advance' ? 'pill active' : 'pill'} onClick={() => setKind('advance')}>
                     Give advance
                   </button>
-                  <button type="button" className={kind === 'return' ? 'pill active' : 'pill'} onClick={() => setKind('return')}>
-                    Record return
-                  </button>
                   <button
                     type="button"
-                    className={kind === 'reimbursement' ? 'pill active' : 'pill'}
-                    onClick={() => setKind('reimbursement')}
+                    className={kind === 'return' ? 'pill active' : 'pill'}
+                    onClick={() => {
+                      setKind('return')
+                      setBankAccountId((id) => (id === REIMBURSE_ID ? kotakAccountId : id))
+                    }}
                   >
-                    Record reimbursement
+                    Record return
                   </button>
                 </div>
               </div>
-              {kind === 'reimbursement' && (
-                <div className="field full">
-                  <label>Worker</label>
-                  <SearchableSelect
-                    items={(staff ?? []).filter((s) => s.supervisor_id === supervisorId)}
-                    value={reimbursementStaffId}
-                    onChange={setReimbursementStaffId}
-                    getId={(s) => s.id}
-                    getLabel={(s) => s.name}
-                    placeholder="— Select worker —"
-                  />
-                </div>
-              )}
               <div className="field field-narrow">
                 <label>Date</label>
                 <input type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
@@ -553,7 +548,7 @@ export function SiteImprestSection() {
               <div className="field full">
                 <label>Account</label>
                 <div className="pill-tabs">
-                  {accountOptions.map((a) => (
+                  {visibleAccountOptions(kind).map((a) => (
                     <button
                       key={a.id}
                       type="button"
@@ -564,6 +559,11 @@ export function SiteImprestSection() {
                     </button>
                   ))}
                 </div>
+                {bankAccountId === REIMBURSE_ID && (
+                  <div className="note" style={{ marginTop: 4 }}>
+                    Paid by the Admin/CXO out of pocket — no cash/bank moves; the firm owes it back to them.
+                  </div>
+                )}
               </div>
               <div className="field full">
                 <label>Remarks (optional)</label>
@@ -571,13 +571,7 @@ export function SiteImprestSection() {
               </div>
               <div className="field full">
                 <Button type="submit" disabled={submitting}>
-                  {submitting
-                    ? 'Saving…'
-                    : kind === 'advance'
-                      ? 'Give advance'
-                      : kind === 'return'
-                        ? 'Record return'
-                        : 'Record reimbursement'}
+                  {submitting ? 'Saving…' : kind === 'advance' ? 'Give advance' : 'Record return'}
                 </Button>
               </div>
             </form>
@@ -667,13 +661,17 @@ export function SiteImprestSection() {
                               <select
                                 aria-label="Type"
                                 value={txnDraft.kind}
-                                onChange={(e) =>
-                                  setTxnDraft((d) => ({ ...d, kind: e.target.value as 'advance' | 'return' | 'reimbursement' }))
-                                }
+                                onChange={(e) => {
+                                  const k = e.target.value as 'advance' | 'return'
+                                  setTxnDraft((d) => ({
+                                    ...d,
+                                    kind: k,
+                                    bankAccountId: k === 'return' && d.bankAccountId === REIMBURSE_ID ? kotakAccountId : d.bankAccountId,
+                                  }))
+                                }}
                               >
                                 <option value="advance">Advance</option>
                                 <option value="return">Return</option>
-                                <option value="reimbursement">Reimbursement</option>
                               </select>
                             </td>
                           )}
@@ -690,7 +688,7 @@ export function SiteImprestSection() {
                             <div className="field full" style={{ marginBottom: 8 }}>
                               <label>Account</label>
                               <div className="pill-tabs">
-                                {accountOptions.map((a) => (
+                                {visibleAccountOptions(txnDraft.kind).map((a) => (
                                   <button
                                     key={a.id}
                                     type="button"
@@ -726,13 +724,9 @@ export function SiteImprestSection() {
                     ) : (
                       <tr key={t.id}>
                         <td>{fmtDate(t.date)}</td>
-                        {recordsView === 'all' && (
-                          <td>
-                            {t.kind === 'advance' ? 'Advance' : t.kind === 'return' ? 'Return' : 'Reimbursement'}
-                          </td>
-                        )}
+                        {recordsView === 'all' && <td>{t.kind === 'advance' ? 'Advance' : 'Return'}</td>}
                         <td className="amt">{fmt(t.amount)}</td>
-                        <td>{bankAccountName(t.bank_account_id)}</td>
+                        <td>{accountLabel(t)}</td>
                         <td>
                           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                             <Button

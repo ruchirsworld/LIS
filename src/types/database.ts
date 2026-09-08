@@ -1594,6 +1594,7 @@ export type Database = {
           id: string;
           kind: string;
           profile_id: string;
+          reimbursable: boolean;
           remarks: string | null;
           staff_id: string | null;
           status: string;
@@ -1608,6 +1609,7 @@ export type Database = {
           id?: string;
           kind: string;
           profile_id: string;
+          reimbursable?: boolean;
           remarks?: string | null;
           staff_id?: string | null;
           status?: string;
@@ -1622,6 +1624,7 @@ export type Database = {
           id?: string;
           kind?: string;
           profile_id?: string;
+          reimbursable?: boolean;
           remarks?: string | null;
           staff_id?: string | null;
           status?: string;
