@@ -67,6 +67,10 @@ export function SiteImprestSection() {
   const [requestError, setRequestError] = useState<Record<string, string>>({})
   const [editingRequestId, setEditingRequestId] = useState<string | null>(null)
   const [requestDraft, setRequestDraft] = useState({ date: '', amount: '', staffId: '' })
+  const [editingTxnId, setEditingTxnId] = useState<string | null>(null)
+  const [txnDraft, setTxnDraft] = useState({ date: '', kind: 'advance' as 'advance' | 'return', amount: '', bankAccountId: '' })
+  const [txnBusyId, setTxnBusyId] = useState<string | null>(null)
+  const [txnError, setTxnError] = useState<Record<string, string>>({})
 
   // "Float currently held" still needs the full GL picture (advances minus
   // whatever their own Project expenses have drawn against it) to be
@@ -180,6 +184,37 @@ export function SiteImprestSection() {
       setRequestError((m) => ({ ...m, [id]: getErrorMessage(err, 'Could not save these changes.') }))
     } finally {
       setRequestBusyId(null)
+    }
+  }
+
+  function startEditTxn(t: StaffImprestTransaction) {
+    setEditingTxnId(t.id)
+    setTxnDraft({ date: t.date, kind: t.kind as 'advance' | 'return', amount: String(t.amount), bankAccountId: t.bank_account_id ?? '' })
+    setTxnError((m) => ({ ...m, [t.id]: '' }))
+  }
+
+  async function handleSaveTxn(id: string) {
+    const amt = parseINR(txnDraft.amount)
+    if (amt <= 0) {
+      setTxnError((m) => ({ ...m, [id]: 'Enter an amount.' }))
+      return
+    }
+    if (!txnDraft.date) {
+      setTxnError((m) => ({ ...m, [id]: 'Date is required.' }))
+      return
+    }
+    setTxnBusyId(id)
+    setTxnError((m) => ({ ...m, [id]: '' }))
+    try {
+      await updateTransaction.mutateAsync({
+        id,
+        patch: { date: txnDraft.date, kind: txnDraft.kind, amount: amt, bank_account_id: txnDraft.bankAccountId || null },
+      })
+      setEditingTxnId(null)
+    } catch (err) {
+      setTxnError((m) => ({ ...m, [id]: getErrorMessage(err, 'Could not save these changes.') }))
+    } finally {
+      setTxnBusyId(null)
     }
   }
 
@@ -479,24 +514,102 @@ export function SiteImprestSection() {
                     {recordsView === 'all' && <th>Type</th>}
                     <th style={{ textAlign: 'right' }}>Amount</th>
                     <th>Account</th>
+                    <th></th>
                   </tr>
                 </thead>
                 <tbody>
                   {recordsShown.length === 0 && (
                     <tr>
-                      <td colSpan={recordsView === 'all' ? 4 : 3} className="empty-row">
+                      <td colSpan={recordsView === 'all' ? 5 : 4} className="empty-row">
                         No {recordsView === 'payments' ? 'payments' : 'transactions'} recorded yet
                       </td>
                     </tr>
                   )}
-                  {recordsShown.map((t) => (
-                    <tr key={t.id}>
-                      <td>{fmtDate(t.date)}</td>
-                      {recordsView === 'all' && <td>{t.kind === 'advance' ? 'Advance' : 'Return'}</td>}
-                      <td className="amt">{fmt(t.amount)}</td>
-                      <td>{bankAccountName(t.bank_account_id)}</td>
-                    </tr>
-                  ))}
+                  {recordsShown.map((t) =>
+                    editingTxnId === t.id ? (
+                      <tr key={t.id}>
+                        <td>
+                          <input
+                            type="date"
+                            aria-label="Date"
+                            value={txnDraft.date}
+                            onChange={(e) => setTxnDraft((d) => ({ ...d, date: e.target.value }))}
+                          />
+                        </td>
+                        {recordsView === 'all' && (
+                          <td>
+                            <select
+                              aria-label="Type"
+                              value={txnDraft.kind}
+                              onChange={(e) => setTxnDraft((d) => ({ ...d, kind: e.target.value as 'advance' | 'return' }))}
+                            >
+                              <option value="advance">Advance</option>
+                              <option value="return">Return</option>
+                            </select>
+                          </td>
+                        )}
+                        <td>
+                          <CurrencyInput
+                            value={txnDraft.amount}
+                            onValueChange={(v) => setTxnDraft((d) => ({ ...d, amount: v }))}
+                          />
+                        </td>
+                        <td>
+                          <select
+                            aria-label="Account"
+                            value={txnDraft.bankAccountId}
+                            onChange={(e) => setTxnDraft((d) => ({ ...d, bankAccountId: e.target.value }))}
+                          >
+                            <option value="">Cash</option>
+                            {(bankAccounts ?? []).map((a) => (
+                              <option key={a.id} value={a.id}>
+                                {a.name}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            <Button type="button" disabled={txnBusyId === t.id} onClick={() => handleSaveTxn(t.id)}>
+                              Save
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              disabled={txnBusyId === t.id}
+                              onClick={() => setEditingTxnId(null)}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                          {txnError[t.id] && (
+                            <div className="note" style={{ color: 'var(--red)', marginTop: 4 }}>
+                              {txnError[t.id]}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ) : (
+                      <tr key={t.id}>
+                        <td>{fmtDate(t.date)}</td>
+                        {recordsView === 'all' && <td>{t.kind === 'advance' ? 'Advance' : 'Return'}</td>}
+                        <td className="amt">{fmt(t.amount)}</td>
+                        <td>{bankAccountName(t.bank_account_id)}</td>
+                        <td>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            className="icon-btn-sq"
+                            onClick={() => startEditTxn(t)}
+                            title="Edit"
+                            aria-label="Edit"
+                          >
+                            ✎
+                          </Button>
+                        </td>
+                      </tr>
+                    )
+                  )}
                 </tbody>
               </table>
             </div>
