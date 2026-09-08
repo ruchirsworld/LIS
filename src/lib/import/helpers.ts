@@ -13,13 +13,30 @@ export function num(v: unknown): number | null {
   return Number.isFinite(n) ? n : null
 }
 
+// Reads a Date object's own calendar fields rather than .toISOString() —
+// the xlsx/exceljs libraries (and Excel/LibreOffice's own auto-conversion
+// of a typed date) don't consistently construct date cells at UTC
+// midnight; some paths build them at *local* midnight instead. For anyone
+// in a timezone ahead of UTC (e.g. IST, +5:30) that's the difference
+// between "correct" and "one day earlier", since local-midnight-Aug-15
+// becomes Aug-14-18:30 in UTC. Local getters are correct in either case —
+// they're a no-op for a UTC-midnight Date (unaffected here) and exactly
+// right for a local-midnight one, so there's no tradeoff to prefer
+// .toISOString() over this.
+function localDateStr(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 // Every import template asks for DD-MM-YYYY, so that's parsed explicitly
 // rather than falling through to the native Date constructor — which reads
 // an ambiguous "05-08-2026" as MM-DD-YYYY (US-locale) and would silently
 // swap day and month. A real Excel date cell (cellDates: true) or an
 // already-ISO string still short-circuits above/below this, unaffected.
 export function toDateStr(v: unknown): string | null {
-  if (v instanceof Date && !isNaN(v.getTime())) return v.toISOString().slice(0, 10)
+  if (v instanceof Date && !isNaN(v.getTime())) return localDateStr(v)
   const s = str(v)
   if (!s) return null
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
@@ -34,7 +51,7 @@ export function toDateStr(v: unknown): string | null {
     return d.toISOString().slice(0, 10)
   }
   const d = new Date(s)
-  return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10)
+  return isNaN(d.getTime()) ? null : localDateStr(d)
 }
 
 export function isBlankRow(row: Record<string, unknown>): boolean {

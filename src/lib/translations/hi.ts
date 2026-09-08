@@ -126,4 +126,7 @@ export const HI: Record<string, string> = {
   Reference: 'संदर्भ',
   'No payments in this range.': 'इस अवधि में कोई भुगतान नहीं है।',
   'No advances in this range.': 'इस अवधि में कोई एडवांस नहीं है।',
+  Save: 'सेव करें',
+  Cancel: 'रद्द करें',
+  'Could not save this change.': 'यह बदलाव सेव नहीं हो सका।',
 }

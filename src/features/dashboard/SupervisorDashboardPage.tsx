@@ -13,12 +13,14 @@ import {
   useClearStaffProjectAssignment,
 } from '../../lib/queries/teamTracking'
 import { useSupervisorProjects } from '../../lib/queries/admin'
-import { useExpenses } from '../../lib/queries/expenses'
+import { useExpenses, useUpdateExpense } from '../../lib/queries/expenses'
 import { useHolidays, useStaffImprestTransactions } from '../../lib/queries/hr'
 import { FIXED_EXPENSE_CATEGORIES, LABOUR_SUB_HEAD_CODE } from '../../lib/supervisorProjectExpenseCategories'
 import { ATTENDANCE_DAY_TYPE_LABEL, leaveFreeDates, freeLeaveQuotaInfo, type AttendanceDayType } from '../../lib/calc/payroll'
-import { fmt, fmtDate } from '../../lib/calc/format'
-import { ModuleHeader, KpiCard } from '../../components/ui'
+import { fmt, fmtDate, parseINR } from '../../lib/calc/format'
+import { getErrorMessage } from '../../lib/errors'
+import { ModuleHeader, KpiCard, Button } from '../../components/ui'
+import { CurrencyInput } from '../../components/CurrencyInput'
 
 type ExpandedKpi = 'claims' | 'payments' | null
 type KpiPeriod = 'week' | 'month' | 'custom'
@@ -76,6 +78,10 @@ export function SupervisorDashboardPage() {
   const [kpiPeriod, setKpiPeriod] = useState<KpiPeriod>('month')
   const [kpiCustomFrom, setKpiCustomFrom] = useState(`${today.slice(0, 7)}-01`)
   const [kpiCustomTo, setKpiCustomTo] = useState(today)
+  const [editingClaimId, setEditingClaimId] = useState<string | null>(null)
+  const [claimAmountDraft, setClaimAmountDraft] = useState('')
+  const [claimBusyId, setClaimBusyId] = useState<string | null>(null)
+  const [claimError, setClaimError] = useState<Record<string, string>>({})
 
   const { data: staff } = useStaff()
   const { data: projects } = useProjects()
@@ -92,6 +98,7 @@ export function SupervisorDashboardPage() {
   const removeLeave = useRemoveLeave()
   const setAssignment = useSetStaffProjectAssignment()
   const clearAssignment = useClearStaffProjectAssignment()
+  const updateExpense = useUpdateExpense()
 
   // Filtered against the date being viewed, not today — so looking at a
   // past date only shows who had actually joined (and hadn't yet left) as
@@ -250,6 +257,33 @@ export function SupervisorDashboardPage() {
 
   function toggleKpi(kpi: ExpandedKpi) {
     setExpandedKpi((cur) => (cur === kpi ? null : kpi))
+  }
+
+  // A Supervisor can only ever edit their own claim's amount while it's
+  // still pending — this list only ever holds pending claims to begin
+  // with, so there's no path to editing an already-approved one from here.
+  function startEditClaim(id: string, currentAmount: number) {
+    setEditingClaimId(id)
+    setClaimAmountDraft(String(currentAmount))
+    setClaimError((m) => ({ ...m, [id]: '' }))
+  }
+
+  async function handleSaveClaim(id: string) {
+    const amt = parseINR(claimAmountDraft)
+    if (amt <= 0) {
+      setClaimError((m) => ({ ...m, [id]: t('Enter an amount.') }))
+      return
+    }
+    setClaimBusyId(id)
+    setClaimError((m) => ({ ...m, [id]: '' }))
+    try {
+      await updateExpense.mutateAsync({ id, patch: { amount: amt } })
+      setEditingClaimId(null)
+    } catch (err) {
+      setClaimError((m) => ({ ...m, [id]: getErrorMessage(err, t('Could not save this change.')) }))
+    } finally {
+      setClaimBusyId(null)
+    }
   }
 
   return (
@@ -568,15 +602,57 @@ export function SupervisorDashboardPage() {
                       <tr>
                         <th>{t('Category')}</th>
                         <th style={{ textAlign: 'right' }}>{t('Amount')}</th>
+                        <th></th>
                       </tr>
                     </thead>
                     <tbody>
-                      {dayExpenses.map((e) => (
-                        <tr key={e.id}>
-                          <td>{t(categoryName(e.sub_head_id))}</td>
-                          <td className="amt">{fmt(e.amount)}</td>
-                        </tr>
-                      ))}
+                      {dayExpenses.map((e) =>
+                        editingClaimId === e.id ? (
+                          <tr key={e.id}>
+                            <td>{t(categoryName(e.sub_head_id))}</td>
+                            <td>
+                              <CurrencyInput value={claimAmountDraft} onValueChange={setClaimAmountDraft} />
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                <Button type="button" disabled={claimBusyId === e.id} onClick={() => handleSaveClaim(e.id)}>
+                                  {t('Save')}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="secondary"
+                                  disabled={claimBusyId === e.id}
+                                  onClick={() => setEditingClaimId(null)}
+                                >
+                                  {t('Cancel')}
+                                </Button>
+                              </div>
+                              {claimError[e.id] && (
+                                <div className="note" style={{ color: 'var(--red)', marginTop: 4 }}>
+                                  {claimError[e.id]}
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        ) : (
+                          <tr key={e.id}>
+                            <td>{t(categoryName(e.sub_head_id))}</td>
+                            <td className="amt">{fmt(e.amount)}</td>
+                            <td>
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                className="icon-btn-sq"
+                                onClick={() => startEditClaim(e.id, e.amount)}
+                                title="Edit"
+                                aria-label="Edit"
+                              >
+                                ✎
+                              </Button>
+                            </td>
+                          </tr>
+                        )
+                      )}
                     </tbody>
                   </table>
                 </div>

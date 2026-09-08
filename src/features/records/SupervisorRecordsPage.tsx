@@ -1,11 +1,14 @@
 import { useState } from 'react'
-import { ModuleHeader, KpiCard } from '../../components/ui'
+import { ModuleHeader, KpiCard, Button } from '../../components/ui'
+import { CurrencyInput } from '../../components/CurrencyInput'
 import { useAuth } from '../../lib/auth'
 import { useT } from '../../lib/i18n'
-import { useProjects, useStaff } from '../../lib/queries/masters'
-import { useExpenses, useExpenseReimbursements } from '../../lib/queries/expenses'
+import { useProjects, useStaff, useExpenseSubHeads } from '../../lib/queries/masters'
+import { useExpenses, useExpenseReimbursements, useUpdateExpense } from '../../lib/queries/expenses'
 import { useStaffImprestTransactions } from '../../lib/queries/hr'
-import { fmt, fmtDate } from '../../lib/calc/format'
+import { FIXED_EXPENSE_CATEGORIES, LABOUR_SUB_HEAD_CODE } from '../../lib/supervisorProjectExpenseCategories'
+import { fmt, fmtDate, parseINR } from '../../lib/calc/format'
+import { getErrorMessage } from '../../lib/errors'
 
 type ExpandedKpi = 'expenses' | 'payments' | 'pending' | 'advances' | null
 type QuickPeriod = 'week' | 'month' | 'custom'
@@ -33,16 +36,22 @@ export function SupervisorRecordsPage() {
   const t = useT()
   const { data: projects } = useProjects()
   const { data: staff } = useStaff()
+  const { data: subHeads } = useExpenseSubHeads()
   const { data: allExpenses } = useExpenses(null)
   const { data: allPendingExpenses } = useExpenses(null, 'pending')
   const { data: allReimbursements } = useExpenseReimbursements()
   const { data: allImprestTransactions } = useStaffImprestTransactions()
+  const updateExpense = useUpdateExpense()
 
   const today = todayStr()
   const [period, setPeriod] = useState<QuickPeriod>('month')
   const [customFrom, setCustomFrom] = useState(`${today.slice(0, 7)}-01`)
   const [customTo, setCustomTo] = useState(today)
   const [expanded, setExpanded] = useState<ExpandedKpi>(null)
+  const [editingClaimId, setEditingClaimId] = useState<string | null>(null)
+  const [claimAmountDraft, setClaimAmountDraft] = useState('')
+  const [claimBusyId, setClaimBusyId] = useState<string | null>(null)
+  const [claimError, setClaimError] = useState<Record<string, string>>({})
 
   const range =
     period === 'week'
@@ -55,6 +64,18 @@ export function SupervisorRecordsPage() {
   const projectName = (id: string | null) => (id ? projects?.find((p) => p.id === id)?.name ?? '—' : '—')
   const staffName = (id: string | null) => (id ? staff?.find((s) => s.id === id)?.name ?? '—' : '—')
   const inRange = (date: string) => !datesInvalid && date >= range.from && date <= range.to
+
+  // Same category mapping the claim form itself uses, so "Category" here
+  // reads as the fixed list the Supervisor actually picked from, not the
+  // Chart of Accounts sub-head name behind it.
+  const claimCategoryLabelByCode = new Map<string, string>([[LABOUR_SUB_HEAD_CODE, 'Labour']])
+  for (const c of FIXED_EXPENSE_CATEGORIES) claimCategoryLabelByCode.set(c.subHeadCode, c.label)
+  const categoryName = (subHeadId: string | null) => {
+    if (!subHeadId) return '—'
+    const subHead = subHeads?.find((s) => s.id === subHeadId)
+    if (!subHead) return '—'
+    return claimCategoryLabelByCode.get(subHead.code) ?? subHead.name
+  }
 
   const myExpenses = (allExpenses ?? []).filter((e) => e.created_by === profile?.id)
   const myExpenseIds = new Set(myExpenses.map((e) => e.id))
@@ -114,6 +135,34 @@ export function SupervisorRecordsPage() {
 
   function toggle(kpi: ExpandedKpi) {
     setExpanded((cur) => (cur === kpi ? null : kpi))
+  }
+
+  // A Supervisor can only ever edit their own claim's amount while it's
+  // still pending — once an Admin/CXO approves it, this panel doesn't show
+  // it anymore (myPendingInRange only ever holds pending rows), so there's
+  // no path to editing it after the fact from here.
+  function startEditClaim(id: string, currentAmount: number) {
+    setEditingClaimId(id)
+    setClaimAmountDraft(String(currentAmount))
+    setClaimError((m) => ({ ...m, [id]: '' }))
+  }
+
+  async function handleSaveClaim(id: string) {
+    const amt = parseINR(claimAmountDraft)
+    if (amt <= 0) {
+      setClaimError((m) => ({ ...m, [id]: t('Enter an amount.') }))
+      return
+    }
+    setClaimBusyId(id)
+    setClaimError((m) => ({ ...m, [id]: '' }))
+    try {
+      await updateExpense.mutateAsync({ id, patch: { amount: amt } })
+      setEditingClaimId(null)
+    } catch (err) {
+      setClaimError((m) => ({ ...m, [id]: getErrorMessage(err, t('Could not save this change.')) }))
+    } finally {
+      setClaimBusyId(null)
+    }
   }
 
   return (
@@ -228,19 +277,59 @@ export function SupervisorRecordsPage() {
                   <table className="data">
                     <thead>
                       <tr>
-                        <th>{t('Project')}</th>
-                        <th>{t('Description')}</th>
+                        <th>{t('Category')}</th>
                         <th style={{ textAlign: 'right' }}>{t('Amount')}</th>
+                        <th></th>
                       </tr>
                     </thead>
                     <tbody>
-                      {dayPending.map((e) => (
-                        <tr key={e.id}>
-                          <td>{projectName(e.project_id)}</td>
-                          <td>{e.description}</td>
-                          <td className="amt">{fmt(e.amount)}</td>
-                        </tr>
-                      ))}
+                      {dayPending.map((e) =>
+                        editingClaimId === e.id ? (
+                          <tr key={e.id}>
+                            <td>{t(categoryName(e.sub_head_id))}</td>
+                            <td>
+                              <CurrencyInput value={claimAmountDraft} onValueChange={setClaimAmountDraft} />
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                <Button type="button" disabled={claimBusyId === e.id} onClick={() => handleSaveClaim(e.id)}>
+                                  {t('Save')}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="secondary"
+                                  disabled={claimBusyId === e.id}
+                                  onClick={() => setEditingClaimId(null)}
+                                >
+                                  {t('Cancel')}
+                                </Button>
+                              </div>
+                              {claimError[e.id] && (
+                                <div className="note" style={{ color: 'var(--red)', marginTop: 4 }}>
+                                  {claimError[e.id]}
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        ) : (
+                          <tr key={e.id}>
+                            <td>{t(categoryName(e.sub_head_id))}</td>
+                            <td className="amt">{fmt(e.amount)}</td>
+                            <td>
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                className="icon-btn-sq"
+                                onClick={() => startEditClaim(e.id, e.amount)}
+                                title="Edit"
+                                aria-label="Edit"
+                              >
+                                ✎
+                              </Button>
+                            </td>
+                          </tr>
+                        )
+                      )}
                     </tbody>
                   </table>
                 </div>

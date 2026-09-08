@@ -634,25 +634,103 @@ export function SiteImprestSection() {
             <thead>
               <tr>
                 <th>Date</th>
-                <th style={{ textAlign: 'right' }}>Debit</th>
+                <th>Type</th>
+                <th style={{ textAlign: 'right' }}>Amount</th>
                 <th>Account</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
               {allTransactionsSorted.length === 0 && (
                 <tr>
-                  <td colSpan={3} className="empty-row">
+                  <td colSpan={5} className="empty-row">
                     No transactions recorded yet
                   </td>
                 </tr>
               )}
-              {allTransactionsSorted.map((t) => (
-                <tr key={t.id}>
-                  <td>{fmtDate(t.date)}</td>
-                  <td className="amt">{t.kind === 'advance' ? fmt(t.amount) : '—'}</td>
-                  <td>{bankAccountName(t.bank_account_id)}</td>
-                </tr>
-              ))}
+              {allTransactionsSorted.map((t) =>
+                editingTxnId === t.id ? (
+                  <tr key={t.id}>
+                    <td>
+                      <input
+                        type="date"
+                        aria-label="Date"
+                        value={txnDraft.date}
+                        onChange={(e) => setTxnDraft((d) => ({ ...d, date: e.target.value }))}
+                      />
+                    </td>
+                    <td>
+                      <select
+                        aria-label="Type"
+                        value={txnDraft.kind}
+                        onChange={(e) => setTxnDraft((d) => ({ ...d, kind: e.target.value as 'advance' | 'return' }))}
+                      >
+                        <option value="advance">Advance</option>
+                        <option value="return">Return</option>
+                      </select>
+                    </td>
+                    <td>
+                      <CurrencyInput
+                        value={txnDraft.amount}
+                        onValueChange={(v) => setTxnDraft((d) => ({ ...d, amount: v }))}
+                      />
+                    </td>
+                    <td>
+                      <select
+                        aria-label="Account"
+                        value={txnDraft.bankAccountId}
+                        onChange={(e) => setTxnDraft((d) => ({ ...d, bankAccountId: e.target.value }))}
+                      >
+                        <option value="">Cash</option>
+                        {(bankAccounts ?? []).map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.name}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        <Button type="button" disabled={txnBusyId === t.id} onClick={() => handleSaveTxn(t.id)}>
+                          Save
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          disabled={txnBusyId === t.id}
+                          onClick={() => setEditingTxnId(null)}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                      {txnError[t.id] && (
+                        <div className="note" style={{ color: 'var(--red)', marginTop: 4 }}>
+                          {txnError[t.id]}
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ) : (
+                  <tr key={t.id}>
+                    <td>{fmtDate(t.date)}</td>
+                    <td>{t.kind === 'advance' ? 'Advance' : 'Return'}</td>
+                    <td className="amt">{fmt(t.amount)}</td>
+                    <td>{bankAccountName(t.bank_account_id)}</td>
+                    <td>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="icon-btn-sq"
+                        onClick={() => startEditTxn(t)}
+                        title="Edit"
+                        aria-label="Edit"
+                      >
+                        ✎
+                      </Button>
+                    </td>
+                  </tr>
+                )
+              )}
             </tbody>
           </table>
         </div>
