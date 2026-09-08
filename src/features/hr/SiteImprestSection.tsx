@@ -1,4 +1,4 @@
-import { Fragment, useState, type FormEvent } from 'react'
+import { Fragment, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
 import { SearchableSelect } from '../../components/SearchableSelect'
@@ -54,19 +54,48 @@ export function SiteImprestSection() {
   // A Supervisor-requested advance sits at status 'pending' until an Admin
   // approves it below — it isn't real money yet, so every balance/list on
   // this page (besides the approval queue itself) only ever looks at
-  // 'approved' rows, same as the GL only posts those. A request tagged with
-  // a specific worker (staff_id set) posts as a Salary Advance instead of
-  // Site Imprest once approved — see the Salary tab for those, not here.
-  const allTransactions = (allTransactionsRaw ?? []).filter((t) => t.status === 'approved' && !t.staff_id)
+  // 'approved' rows, same as the GL only posts those. A worker-tagged
+  // advance (staff_id set) posts as a Salary Advance instead of Site
+  // Imprest once approved, and shows up on the Salary tab instead — so it's
+  // excluded here. A Reimbursement is always worker-tagged too, but has
+  // nowhere else to show yet, so it stays visible in this list.
+  const allTransactions = (allTransactionsRaw ?? []).filter(
+    (t) => t.status === 'approved' && !(t.staff_id && t.kind === 'advance')
+  )
   const pendingRequests = (allTransactionsRaw ?? [])
     .filter((t) => t.status === 'pending')
     .sort((a, b) => a.date.localeCompare(b.date) || a.created_at.localeCompare(b.created_at))
 
   const [supervisorId, setSupervisorId] = useState('')
-  const [kind, setKind] = useState<'advance' | 'return'>('advance')
+  const [kind, setKind] = useState<'advance' | 'return' | 'reimbursement'>('advance')
   const [date, setDate] = useState(todayStr())
   const [amount, setAmount] = useState('0')
   const [bankAccountId, setBankAccountId] = useState('')
+  const [reimbursementStaffId, setReimbursementStaffId] = useState('')
+  // Bank accounts first (Kotak, then CBI, then anything else alphabetically),
+  // Cash always last — same order and pill-button treatment as Expenses.
+  const BANK_ORDER = ['Kotak', 'CBI']
+  const sortedBankAccounts = [...(bankAccounts ?? [])].sort((a, b) => {
+    const ai = BANK_ORDER.indexOf(a.name)
+    const bi = BANK_ORDER.indexOf(b.name)
+    if (ai === -1 && bi === -1) return a.name.localeCompare(b.name)
+    if (ai === -1) return 1
+    if (bi === -1) return -1
+    return ai - bi
+  })
+  const CASH_ID = ''
+  const accountOptions = [...sortedBankAccounts, { id: CASH_ID, name: 'Cash' }]
+  const kotakAccountId = sortedBankAccounts.find((a) => a.name.trim().toLowerCase() === 'kotak')?.id ?? ''
+  // Defaults the new-transaction form's Account to Kotak once the bank
+  // accounts list loads — only ever once, so it doesn't fight a deliberate
+  // choice of Cash (which is also represented by '' internally) made after
+  // this first applies.
+  const defaultedAccountRef = useRef(false)
+  useEffect(() => {
+    if (defaultedAccountRef.current || !kotakAccountId) return
+    defaultedAccountRef.current = true
+    setBankAccountId(kotakAccountId)
+  }, [kotakAccountId])
   const [remarks, setRemarks] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
@@ -77,7 +106,12 @@ export function SiteImprestSection() {
   const [editingRequestId, setEditingRequestId] = useState<string | null>(null)
   const [requestDraft, setRequestDraft] = useState({ date: '', amount: '', staffId: '' })
   const [editingTxnId, setEditingTxnId] = useState<string | null>(null)
-  const [txnDraft, setTxnDraft] = useState({ date: '', kind: 'advance' as 'advance' | 'return', amount: '', bankAccountId: '' })
+  const [txnDraft, setTxnDraft] = useState({
+    date: '',
+    kind: 'advance' as 'advance' | 'return' | 'reimbursement',
+    amount: '',
+    bankAccountId: '',
+  })
   const [txnBusyId, setTxnBusyId] = useState<string | null>(null)
   const [txnError, setTxnError] = useState<Record<string, string>>({})
 
@@ -126,16 +160,12 @@ export function SiteImprestSection() {
           ? supervisorPayments.map((t) => [fmtDate(t.date), t.amount, bankAccountName(t.bank_account_id)])
           : supervisorAllTransactions.map((t) => [
               fmtDate(t.date),
-              t.kind === 'advance' ? 'Advance' : 'Return',
+              t.kind === 'advance' ? 'Advance' : t.kind === 'return' ? 'Return' : 'Reimbursement',
               t.amount,
               bankAccountName(t.bank_account_id),
             ]),
     },
   ]
-
-  const allTransactionsSorted = [...(allTransactions ?? [])].sort(
-    (a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at)
-  )
 
   async function handleApproveRequest(id: string) {
     setRequestBusyId(id)
@@ -198,7 +228,12 @@ export function SiteImprestSection() {
 
   function startEditTxn(t: StaffImprestTransaction) {
     setEditingTxnId(t.id)
-    setTxnDraft({ date: t.date, kind: t.kind as 'advance' | 'return', amount: String(t.amount), bankAccountId: t.bank_account_id ?? '' })
+    setTxnDraft({
+      date: t.date,
+      kind: t.kind as 'advance' | 'return' | 'reimbursement',
+      amount: String(t.amount),
+      bankAccountId: t.bank_account_id ?? '',
+    })
     setTxnError((m) => ({ ...m, [t.id]: '' }))
   }
 
@@ -228,8 +263,8 @@ export function SiteImprestSection() {
   }
 
   async function handleDeleteTxn(t: StaffImprestTransaction) {
-    if (!window.confirm(`Delete this ${t.kind === 'advance' ? 'advance' : 'return'} of ${fmt(t.amount)} dated ${fmtDate(t.date)}? This cannot be undone.`))
-      return
+    const kindLabel = t.kind === 'advance' ? 'advance' : t.kind === 'return' ? 'return' : 'reimbursement'
+    if (!window.confirm(`Delete this ${kindLabel} of ${fmt(t.amount)} dated ${fmtDate(t.date)}? This cannot be undone.`)) return
     setTxnBusyId(t.id)
     setTxnError((m) => ({ ...m, [t.id]: '' }))
     try {
@@ -258,7 +293,8 @@ export function SiteImprestSection() {
     setKind('advance')
     setDate(todayStr())
     setAmount('0')
-    setBankAccountId('')
+    setBankAccountId(kotakAccountId)
+    setReimbursementStaffId('')
     setRemarks('')
     setFormError(null)
   }
@@ -274,6 +310,10 @@ export function SiteImprestSection() {
       setFormError('Enter an amount.')
       return
     }
+    if (kind === 'reimbursement' && !reimbursementStaffId) {
+      setFormError('Pick which worker this reimbursement is for.')
+      return
+    }
     setSubmitting(true)
     setFormError(null)
     try {
@@ -283,6 +323,7 @@ export function SiteImprestSection() {
         kind,
         amount: amt,
         bank_account_id: bankAccountId || null,
+        staff_id: kind === 'reimbursement' ? reimbursementStaffId : null,
         remarks: remarks.trim() || null,
       })
       resetForm()
@@ -479,8 +520,28 @@ export function SiteImprestSection() {
                   <button type="button" className={kind === 'return' ? 'pill active' : 'pill'} onClick={() => setKind('return')}>
                     Record return
                   </button>
+                  <button
+                    type="button"
+                    className={kind === 'reimbursement' ? 'pill active' : 'pill'}
+                    onClick={() => setKind('reimbursement')}
+                  >
+                    Record reimbursement
+                  </button>
                 </div>
               </div>
+              {kind === 'reimbursement' && (
+                <div className="field full">
+                  <label>Worker</label>
+                  <SearchableSelect
+                    items={(staff ?? []).filter((s) => s.supervisor_id === supervisorId)}
+                    value={reimbursementStaffId}
+                    onChange={setReimbursementStaffId}
+                    getId={(s) => s.id}
+                    getLabel={(s) => s.name}
+                    placeholder="— Select worker —"
+                  />
+                </div>
+              )}
               <div className="field field-narrow">
                 <label>Date</label>
                 <input type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
@@ -489,16 +550,20 @@ export function SiteImprestSection() {
                 <label>Amount (₹)</label>
                 <CurrencyInput value={amount} onValueChange={setAmount} required />
               </div>
-              <div className="field">
+              <div className="field full">
                 <label>Account</label>
-                <select value={bankAccountId} onChange={(e) => setBankAccountId(e.target.value)}>
-                  <option value="">Cash</option>
-                  {(bankAccounts ?? []).map((a) => (
-                    <option key={a.id} value={a.id}>
+                <div className="pill-tabs">
+                  {accountOptions.map((a) => (
+                    <button
+                      key={a.id}
+                      type="button"
+                      className={bankAccountId === a.id ? 'pill active' : 'pill'}
+                      onClick={() => setBankAccountId(a.id)}
+                    >
                       {a.name}
-                    </option>
+                    </button>
                   ))}
-                </select>
+                </div>
               </div>
               <div className="field full">
                 <label>Remarks (optional)</label>
@@ -506,7 +571,13 @@ export function SiteImprestSection() {
               </div>
               <div className="field full">
                 <Button type="submit" disabled={submitting}>
-                  {submitting ? 'Saving…' : kind === 'advance' ? 'Give advance' : 'Record return'}
+                  {submitting
+                    ? 'Saving…'
+                    : kind === 'advance'
+                      ? 'Give advance'
+                      : kind === 'return'
+                        ? 'Record return'
+                        : 'Record reimbursement'}
                 </Button>
               </div>
             </form>
@@ -596,10 +667,13 @@ export function SiteImprestSection() {
                               <select
                                 aria-label="Type"
                                 value={txnDraft.kind}
-                                onChange={(e) => setTxnDraft((d) => ({ ...d, kind: e.target.value as 'advance' | 'return' }))}
+                                onChange={(e) =>
+                                  setTxnDraft((d) => ({ ...d, kind: e.target.value as 'advance' | 'return' | 'reimbursement' }))
+                                }
                               >
                                 <option value="advance">Advance</option>
                                 <option value="return">Return</option>
+                                <option value="reimbursement">Reimbursement</option>
                               </select>
                             </td>
                           )}
@@ -609,24 +683,25 @@ export function SiteImprestSection() {
                               onValueChange={(v) => setTxnDraft((d) => ({ ...d, amount: v }))}
                             />
                           </td>
-                          <td>
-                            <select
-                              aria-label="Account"
-                              value={txnDraft.bankAccountId}
-                              onChange={(e) => setTxnDraft((d) => ({ ...d, bankAccountId: e.target.value }))}
-                            >
-                              <option value="">Cash</option>
-                              {(bankAccounts ?? []).map((a) => (
-                                <option key={a.id} value={a.id}>
-                                  {a.name}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
                           <td></td>
                         </tr>
                         <tr>
                           <td colSpan={recordsView === 'all' ? 5 : 4}>
+                            <div className="field full" style={{ marginBottom: 8 }}>
+                              <label>Account</label>
+                              <div className="pill-tabs">
+                                {accountOptions.map((a) => (
+                                  <button
+                                    key={a.id}
+                                    type="button"
+                                    className={txnDraft.bankAccountId === a.id ? 'pill active' : 'pill'}
+                                    onClick={() => setTxnDraft((d) => ({ ...d, bankAccountId: a.id }))}
+                                  >
+                                    {a.name}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
                             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                               <Button type="button" disabled={txnBusyId === t.id} onClick={() => handleSaveTxn(t.id)}>
                                 Save
@@ -651,7 +726,11 @@ export function SiteImprestSection() {
                     ) : (
                       <tr key={t.id}>
                         <td>{fmtDate(t.date)}</td>
-                        {recordsView === 'all' && <td>{t.kind === 'advance' ? 'Advance' : 'Return'}</td>}
+                        {recordsView === 'all' && (
+                          <td>
+                            {t.kind === 'advance' ? 'Advance' : t.kind === 'return' ? 'Return' : 'Reimbursement'}
+                          </td>
+                        )}
                         <td className="amt">{fmt(t.amount)}</td>
                         <td>{bankAccountName(t.bank_account_id)}</td>
                         <td>
@@ -704,140 +783,6 @@ export function SiteImprestSection() {
             invalidateKeys={['staff_imprest_transactions', 'ledger_lines']}
           />
         )}
-      </div>
-
-      <div className="card" style={{ padding: 16 }}>
-        <h3 style={{ marginTop: 0, fontSize: 13 }}>All imprest transactions</h3>
-        <div className="table-scroll">
-          <table className="data">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Type</th>
-                <th style={{ textAlign: 'right' }}>Amount</th>
-                <th>Account</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {allTransactionsSorted.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="empty-row">
-                    No transactions recorded yet
-                  </td>
-                </tr>
-              )}
-              {allTransactionsSorted.map((t) =>
-                editingTxnId === t.id ? (
-                  <Fragment key={t.id}>
-                    <tr>
-                      <td>
-                        <input
-                          type="date"
-                          aria-label="Date"
-                          value={txnDraft.date}
-                          onChange={(e) => setTxnDraft((d) => ({ ...d, date: e.target.value }))}
-                        />
-                      </td>
-                      <td>
-                        <select
-                          aria-label="Type"
-                          value={txnDraft.kind}
-                          onChange={(e) => setTxnDraft((d) => ({ ...d, kind: e.target.value as 'advance' | 'return' }))}
-                        >
-                          <option value="advance">Advance</option>
-                          <option value="return">Return</option>
-                        </select>
-                      </td>
-                      <td>
-                        <CurrencyInput
-                          value={txnDraft.amount}
-                          onValueChange={(v) => setTxnDraft((d) => ({ ...d, amount: v }))}
-                        />
-                      </td>
-                      <td>
-                        <select
-                          aria-label="Account"
-                          value={txnDraft.bankAccountId}
-                          onChange={(e) => setTxnDraft((d) => ({ ...d, bankAccountId: e.target.value }))}
-                        >
-                          <option value="">Cash</option>
-                          {(bankAccounts ?? []).map((a) => (
-                            <option key={a.id} value={a.id}>
-                              {a.name}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td></td>
-                    </tr>
-                    <tr>
-                      <td colSpan={5}>
-                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                          <Button type="button" disabled={txnBusyId === t.id} onClick={() => handleSaveTxn(t.id)}>
-                            Save
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            disabled={txnBusyId === t.id}
-                            onClick={() => setEditingTxnId(null)}
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                        {txnError[t.id] && (
-                          <div className="note" style={{ color: 'var(--red)', marginTop: 4 }}>
-                            {txnError[t.id]}
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  </Fragment>
-                ) : (
-                  <tr key={t.id}>
-                    <td>{fmtDate(t.date)}</td>
-                    <td>{t.kind === 'advance' ? 'Advance' : 'Return'}</td>
-                    <td className="amt">{fmt(t.amount)}</td>
-                    <td>{bankAccountName(t.bank_account_id)}</td>
-                    <td>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          className="icon-btn-sq"
-                          onClick={() => startEditTxn(t)}
-                          title="Edit"
-                          aria-label="Edit"
-                        >
-                          ✎
-                        </Button>
-                        {canDelete && (
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            className="icon-btn-sq"
-                            disabled={txnBusyId === t.id}
-                            onClick={() => handleDeleteTxn(t)}
-                            title="Delete"
-                            aria-label="Delete"
-                          >
-                            🗑
-                          </Button>
-                        )}
-                      </div>
-                      {txnError[t.id] && (
-                        <div className="note" style={{ color: 'var(--red)', marginTop: 4 }}>
-                          {txnError[t.id]}
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                )
-              )}
-            </tbody>
-          </table>
-        </div>
       </div>
     </div>
   )
