@@ -1,4 +1,4 @@
-import { Fragment, useState, type FormEvent } from 'react'
+import { Fragment, useEffect, useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui'
 import { Modal } from '../../components/Modal'
 import { SearchableSelect } from '../../components/SearchableSelect'
@@ -6,17 +6,23 @@ import { TableScroll } from '../../components/TableScroll'
 import { PeriodFilter } from '../../components/PeriodFilter'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import { useTrips, useUpdateTrip, useDeleteTrip } from '../../lib/queries/trips'
-import { useExpenses } from '../../lib/queries/expenses'
+import { useExpenses, useDeleteExpense } from '../../lib/queries/expenses'
 import { useProfiles } from '../../lib/queries/admin'
 import { useProjects, useExpenseSubHeads } from '../../lib/queries/masters'
 import { useAuth } from '../../lib/auth'
 import { fmt, fmtDate } from '../../lib/calc/format'
 import { getErrorMessage } from '../../lib/errors'
+import { ExpenseForm } from '../expenses/ExpenseForm'
 import type { DateRange } from '../../lib/calc/period'
 import type { ExportSection } from '../../lib/export/report'
 import type { Database } from '../../types/database'
 
 type Trip = Database['public']['Tables']['trips']['Row']
+type ExpenseRow = Database['public']['Tables']['expenses']['Row']
+
+function todayStr() {
+  return new Date().toISOString().slice(0, 10)
+}
 
 const COL_SPAN = 9
 
@@ -139,12 +145,31 @@ export function TripRecordsTable() {
   const { data: projects } = useProjects()
   const { data: subHeads } = useExpenseSubHeads()
   const deleteTrip = useDeleteTrip()
+  const deleteExpense = useDeleteExpense()
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [range, setRange] = useState<DateRange | null>(null)
   const [showPeriodFilter, setShowPeriodFilter] = useState(false)
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null)
   const [deleteError, setDeleteError] = useState<Record<string, string>>({})
   const [deleteBusyId, setDeleteBusyId] = useState<string | null>(null)
+  const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null)
+  const [showAddExpense, setShowAddExpense] = useState(false)
+  const [entryDate, setEntryDate] = useState(todayStr())
+
+  // Reset the add-expense panel and its date whenever a different trip
+  // expands — otherwise a date picked for one trip would carry over to
+  // the next, and a stale form would stay open.
+  useEffect(() => {
+    setShowAddExpense(false)
+    const trip = trips?.find((t) => t.id === expandedId)
+    setEntryDate(trip ? trip.end_date ?? trip.start_date : todayStr())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expandedId])
+
+  function handleDeleteExpense(e: ExpenseRow) {
+    if (!window.confirm(`Delete this entry of ${fmt(e.amount)} dated ${fmtDate(e.date)}? This cannot be undone.`)) return
+    deleteExpense.mutate(e.id)
+  }
 
   async function handleDeleteTrip(t: Trip) {
     if (!window.confirm(`Delete trip "${t.name}"? This cannot be undone, and will fail if any expenses are still logged against it.`)) return
@@ -293,6 +318,41 @@ export function TripRecordsTable() {
                   {isExpanded && (
                     <tr className="pay-form-row">
                       <td colSpan={COL_SPAN}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
+                          <div className="note" style={{ margin: 0, fontWeight: 600 }}>
+                            Entries on this trip
+                          </div>
+                          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                            {showAddExpense && (
+                              <input
+                                type="date"
+                                value={entryDate}
+                                onChange={(ev) => setEntryDate(ev.target.value)}
+                                style={{ fontSize: 12, padding: '4px 6px', width: 130 }}
+                              />
+                            )}
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              style={{ fontSize: 12, padding: '5px 12px' }}
+                              onClick={() => setShowAddExpense((v) => !v)}
+                            >
+                              {showAddExpense ? 'Close' : 'Add expense'}
+                            </Button>
+                          </div>
+                        </div>
+                        {showAddExpense && (
+                          <div style={{ marginBottom: 12 }}>
+                            <ExpenseForm
+                              editingExpense={null}
+                              onDoneEditing={() => {}}
+                              tripId={t.id}
+                              tripDate={entryDate}
+                              fixedCostCenter={t.cost_center}
+                              fixedProjectId={t.project_id}
+                            />
+                          </div>
+                        )}
                         {tripExpenses.length === 0 ? (
                           <div className="note">No entries on this trip.</div>
                         ) : (
@@ -303,16 +363,50 @@ export function TripRecordsTable() {
                                 <th>Description</th>
                                 <th>Sub-head</th>
                                 <th style={{ textAlign: 'right' }}>Amount</th>
+                                <th></th>
                               </tr>
                             </thead>
                             <tbody>
                               {tripExpenses.map((e) => (
-                                <tr key={e.id}>
-                                  <td>{fmtDate(e.date)}</td>
-                                  <td>{e.description}</td>
-                                  <td>{subHeadName(e.sub_head_id)}</td>
-                                  <td className="amt">{fmt(e.amount)}</td>
-                                </tr>
+                                <Fragment key={e.id}>
+                                  <tr>
+                                    <td>{fmtDate(e.date)}</td>
+                                    <td>{e.description}</td>
+                                    <td>{subHeadName(e.sub_head_id)}</td>
+                                    <td className="amt">{fmt(e.amount)}</td>
+                                    <td>
+                                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                        <Button
+                                          type="button"
+                                          variant="secondary"
+                                          className="icon-btn-sq"
+                                          onClick={() => setEditingExpenseId(editingExpenseId === e.id ? null : e.id)}
+                                          title="Edit"
+                                          aria-label="Edit"
+                                        >
+                                          ✎
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          variant="secondary"
+                                          className="icon-btn-sq"
+                                          onClick={() => handleDeleteExpense(e)}
+                                          title="Delete"
+                                          aria-label="Delete"
+                                        >
+                                          🗑
+                                        </Button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                  {editingExpenseId === e.id && (
+                                    <tr className="pay-form-row">
+                                      <td colSpan={5}>
+                                        <ExpenseForm editingExpense={e} onDoneEditing={() => setEditingExpenseId(null)} />
+                                      </td>
+                                    </tr>
+                                  )}
+                                </Fragment>
                               ))}
                             </tbody>
                           </table>
