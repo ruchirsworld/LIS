@@ -163,8 +163,14 @@ export function ExpenseForm({
   const [showCalc, setShowCalc] = useState(false)
   const [addGst, setAddGst] = useState(false)
   const [gstPct, setGstPct] = useState(0)
+  // Whether the value the user typed already has GST baked in (so the base
+  // gets backed out of it) or is pre-tax (so GST adds on top) — the user
+  // picks explicitly every time via the pills in the GST popup, rather than
+  // this being inferred from which cost center/field layout is active.
+  const [gstInclusive, setGstInclusive] = useState(true)
   const [showGstModal, setShowGstModal] = useState(false)
   const [gstPctDraft, setGstPctDraft] = useState('18')
+  const [gstInclusiveDraft, setGstInclusiveDraft] = useState(true)
   const [description, setDescription] = useState('')
   const [date, setDate] = useState(todayStr())
   // A trip entry's date comes from the Trips header's date picker instead of
@@ -230,14 +236,13 @@ export function ExpenseForm({
   // always "Trips"); everywhere else it follows the Project cost center.
   const hasProject = tripId ? !!effectiveProjectId : isProjectCostCenter
   const projectTotal = (Number(qty) || 0) * parseINR(rate) + parseINR(additionalAmount)
-  // A Qty×Rate subtotal is pre-tax unit pricing, so GST still adds on top of
-  // it. A plain typed Amount is the receipt's total actually paid — once GST
-  // is added, that typed figure is treated as GST-inclusive and the base is
-  // backed out of it, rather than GST being added on top and inflating it.
   const enteredAmount = showQtyRateFields ? projectTotal : parseINR(amount)
-  const baseAmount = addGst && !showQtyRateFields ? enteredAmount / (1 + gstPct / 100) : enteredAmount
-  const gstAmount = addGst ? (showQtyRateFields ? (baseAmount * gstPct) / 100 : enteredAmount - baseAmount) : 0
-  const displayAmount = showQtyRateFields ? baseAmount + gstAmount : enteredAmount
+  // Inclusive: the typed figure already has GST baked in (a receipt total),
+  // so the base is backed out of it. Exclusive: the typed figure is pre-tax
+  // (unit pricing), so GST adds on top and inflates the total shown below.
+  const baseAmount = addGst && gstInclusive ? enteredAmount / (1 + gstPct / 100) : enteredAmount
+  const gstAmount = addGst ? (gstInclusive ? enteredAmount - baseAmount : (baseAmount * gstPct) / 100) : 0
+  const displayAmount = baseAmount + gstAmount
 
   // Major Head / Sub-Head (Chart of Accounts) — feeds the manual dropdown
   // pair below, which shows on the Project section (Employee & Labour,
@@ -276,6 +281,10 @@ export function ExpenseForm({
     setAdditionalAmount(editingExpense.additional_amount != null ? String(editingExpense.additional_amount) : '0')
     setAddGst((editingExpense.gst_pct ?? 0) > 0)
     setGstPct(editingExpense.gst_pct ?? 0)
+    // The stored amount is already the ex-GST base, not what was originally
+    // typed — treating it as Exclusive here (base unchanged, GST re-added on
+    // top for display) avoids silently re-extracting GST a second time.
+    setGstInclusive(false)
     setDescription(editingExpense.description)
     setDate(editingExpense.date)
     setRemarks(editingExpense.remarks ?? '')
@@ -384,6 +393,7 @@ export function ExpenseForm({
     setAdditionalAmount('0')
     setAddGst(false)
     setGstPct(0)
+    setGstInclusive(true)
     setDescription('')
     // projectId deliberately not reset — it stays the default for the rest
     // of the day (see loadStoredProject), across repeated entries.
@@ -496,10 +506,11 @@ export function ExpenseForm({
             e.preventDefault()
             e.stopPropagation()
             setGstPctDraft(String(gstPct > 0 ? gstPct : 18))
+            setGstInclusiveDraft(addGst ? gstInclusive : !showQtyRateFields)
             setShowGstModal(true)
           }}
         >
-          {addGst ? `GST ${gstPct}% — ${fmt(gstAmount)}` : 'Add GST'}
+          {addGst ? `GST ${gstPct}% — ${fmt(gstAmount)}` : 'GST'}
         </button>
       </summary>
 
@@ -801,12 +812,12 @@ export function ExpenseForm({
                   <CalculatorIcon />
                 </Button>
               </div>
-              {addGst && (
-                <div className="note" style={{ margin: '4px 0 0' }}>
-                  Excl. GST: {fmt(baseAmount)} · GST ({gstPct}%): {fmt(gstAmount)}
-                </div>
-              )}
             </div>
+          </div>
+        )}
+        {addGst && (
+          <div className="note" style={{ margin: '-6px 0 0', gridColumn: '1 / -1' }}>
+            {gstInclusive ? 'Incl.' : 'Excl.'} GST — Excl. GST: {fmt(baseAmount)} · GST ({gstPct}%): {fmt(gstAmount)} · Total: {fmt(displayAmount)}
           </div>
         )}
         {showCalc && !showQtyRateFields && (
@@ -819,8 +830,27 @@ export function ExpenseForm({
         )}
 
         {showGstModal && (
-          <Modal title="GST rate" onClose={() => setShowGstModal(false)}>
-            <div className="pill-tabs">
+          <Modal title="GST" onClose={() => setShowGstModal(false)}>
+            <div className="field">
+              <label>Is the entered value inclusive or exclusive of GST?</label>
+              <div className="pill-tabs">
+                <button
+                  type="button"
+                  className={gstInclusiveDraft ? 'pill active' : 'pill'}
+                  onClick={() => setGstInclusiveDraft(true)}
+                >
+                  Inclusive — adjust it out
+                </button>
+                <button
+                  type="button"
+                  className={!gstInclusiveDraft ? 'pill active' : 'pill'}
+                  onClick={() => setGstInclusiveDraft(false)}
+                >
+                  Exclusive — add it on top
+                </button>
+              </div>
+            </div>
+            <div className="pill-tabs" style={{ marginTop: 12 }}>
               {GST_RATES.map((r) => (
                 <button
                   key={r}
@@ -843,15 +873,15 @@ export function ExpenseForm({
               />
             </div>
             <div className="note" style={{ marginTop: 8 }}>
-              {showQtyRateFields
+              {gstInclusiveDraft
                 ? (() => {
-                    const pct = Number(gstPctDraft) || 0
-                    return `${fmt(enteredAmount)} + ${pct}% GST = ${fmt(enteredAmount + (enteredAmount * pct) / 100)}`
-                  })()
-                : (() => {
                     const pct = Number(gstPctDraft) || 0
                     const base = enteredAmount / (1 + pct / 100)
                     return `${fmt(enteredAmount)} incl. ${pct}% GST = ${fmt(base)} excl. GST + ${fmt(enteredAmount - base)} GST`
+                  })()
+                : (() => {
+                    const pct = Number(gstPctDraft) || 0
+                    return `${fmt(enteredAmount)} + ${pct}% GST = ${fmt(enteredAmount + (enteredAmount * pct) / 100)}`
                   })()}
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
@@ -860,6 +890,7 @@ export function ExpenseForm({
                 onClick={() => {
                   setAddGst(true)
                   setGstPct(Number(gstPctDraft) || 0)
+                  setGstInclusive(gstInclusiveDraft)
                   setShowGstModal(false)
                 }}
               >
