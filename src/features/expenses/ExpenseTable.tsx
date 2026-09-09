@@ -60,6 +60,12 @@ export function ExpenseTable({
   groupByDate?: boolean
 } = {}) {
   const { profile } = useAuth()
+  // This table only ever renders inside Admin/CXO-only sections, so both
+  // already reach it — canEdit just makes that explicit. Deleting is
+  // heavier (un-does the record entirely) and restricted to Admin only,
+  // matching the same precedent used for Imprest transactions and Trips.
+  const canEdit = profile?.role === 'admin' || profile?.role === 'cxo'
+  const canDelete = profile?.role === 'admin'
   const [range, setRange] = useState<DateRange | null>(null)
   const [showPeriodFilter, setShowPeriodFilter] = useState(false)
   const [userFilter, setUserFilter] = useState('')
@@ -282,21 +288,27 @@ export function ExpenseTable({
           }}
         >
           <strong style={{ fontSize: 13 }}>{selectedIds.size} selected</strong>
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            <CostCenterPicker value={bulkCostCenter} onChange={setBulkCostCenter} costCenters={costCenters} />
-            <Button type="button" variant="secondary" disabled={!bulkCostCenter} onClick={applyBulkCostCenter}>
-              Set cost center
+          {canEdit && (
+            <>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <CostCenterPicker value={bulkCostCenter} onChange={setBulkCostCenter} costCenters={costCenters} />
+                <Button type="button" variant="secondary" disabled={!bulkCostCenter} onClick={applyBulkCostCenter}>
+                  Set cost center
+                </Button>
+              </div>
+              <Button type="button" variant="secondary" onClick={() => applyBulkReimbursable(true)}>
+                Mark reimbursable
+              </Button>
+              <Button type="button" variant="secondary" onClick={() => applyBulkReimbursable(false)}>
+                Mark not reimbursable
+              </Button>
+            </>
+          )}
+          {canDelete && (
+            <Button type="button" className="danger-link" onClick={removeSelected}>
+              Remove selected
             </Button>
-          </div>
-          <Button type="button" variant="secondary" onClick={() => applyBulkReimbursable(true)}>
-            Mark reimbursable
-          </Button>
-          <Button type="button" variant="secondary" onClick={() => applyBulkReimbursable(false)}>
-            Mark not reimbursable
-          </Button>
-          <Button type="button" className="danger-link" onClick={removeSelected}>
-            Remove selected
-          </Button>
+          )}
           <Button type="button" variant="secondary" onClick={clearSelection}>
             Clear
           </Button>
@@ -505,12 +517,16 @@ export function ExpenseTable({
                           </div>
                         )}
                         <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
-                          <button type="button" className="pay-btn" onClick={() => setEditingId(e.id)}>
-                            Edit
-                          </button>
-                          <button type="button" className="btn danger-link" onClick={() => deleteExpense.mutate(e.id)}>
-                            Remove
-                          </button>
+                          {canEdit && (
+                            <button type="button" className="pay-btn" onClick={() => setEditingId(e.id)}>
+                              Edit
+                            </button>
+                          )}
+                          {canDelete && (
+                            <button type="button" className="btn danger-link" onClick={() => deleteExpense.mutate(e.id)}>
+                              Remove
+                            </button>
+                          )}
                           <button
                             type="button"
                             className="pay-btn"
