@@ -170,6 +170,7 @@ export function ExpenseForm({
   const [gstInclusive, setGstInclusive] = useState(true)
   const [showGstModal, setShowGstModal] = useState(false)
   const [gstPctDraft, setGstPctDraft] = useState('18')
+  const [gstAmountDraft, setGstAmountDraft] = useState('0')
   const [gstInclusiveDraft, setGstInclusiveDraft] = useState(true)
   const [description, setDescription] = useState('')
   const [date, setDate] = useState(todayStr())
@@ -243,6 +244,24 @@ export function ExpenseForm({
   const baseAmount = addGst && gstInclusive ? enteredAmount / (1 + gstPct / 100) : enteredAmount
   const gstAmount = addGst ? (gstInclusive ? enteredAmount - baseAmount : (baseAmount * gstPct) / 100) : 0
   const displayAmount = baseAmount + gstAmount
+
+  // The GST popup lets either field drive the other — pick a rate and the
+  // rupee amount fills in, or type the rupee amount and the rate is backed
+  // out of it — both against whatever's typed in Amount (or Qty×Rate) and
+  // whichever Inclusive/Exclusive pill is picked there.
+  function gstAmountForPct(pct: number, inclusive: boolean): number {
+    if (inclusive) {
+      const base = enteredAmount / (1 + pct / 100)
+      return enteredAmount - base
+    }
+    return (enteredAmount * pct) / 100
+  }
+  function gstPctForAmount(amt: number, inclusive: boolean): number {
+    if (amt <= 0) return 0
+    const base = inclusive ? enteredAmount - amt : enteredAmount
+    if (base <= 0) return 0
+    return (amt / base) * 100
+  }
 
   // Major Head / Sub-Head (Chart of Accounts) — feeds the manual dropdown
   // pair below, which shows on the Project section (Employee & Labour,
@@ -505,8 +524,11 @@ export function ExpenseForm({
             // also collapsing the form every time it's tapped.
             e.preventDefault()
             e.stopPropagation()
-            setGstPctDraft(String(gstPct > 0 ? gstPct : 18))
-            setGstInclusiveDraft(addGst ? gstInclusive : !showQtyRateFields)
+            const initialPct = gstPct > 0 ? gstPct : 18
+            const initialInclusive = addGst ? gstInclusive : !showQtyRateFields
+            setGstPctDraft(String(initialPct))
+            setGstAmountDraft(String(Math.round(gstAmountForPct(initialPct, initialInclusive) * 100) / 100))
+            setGstInclusiveDraft(initialInclusive)
             setShowGstModal(true)
           }}
         >
@@ -837,14 +859,22 @@ export function ExpenseForm({
                 <button
                   type="button"
                   className={gstInclusiveDraft ? 'pill active' : 'pill'}
-                  onClick={() => setGstInclusiveDraft(true)}
+                  onClick={() => {
+                    setGstInclusiveDraft(true)
+                    const pct = Number(gstPctDraft) || 0
+                    setGstAmountDraft(String(Math.round(gstAmountForPct(pct, true) * 100) / 100))
+                  }}
                 >
                   Inclusive — adjust it out
                 </button>
                 <button
                   type="button"
                   className={!gstInclusiveDraft ? 'pill active' : 'pill'}
-                  onClick={() => setGstInclusiveDraft(false)}
+                  onClick={() => {
+                    setGstInclusiveDraft(false)
+                    const pct = Number(gstPctDraft) || 0
+                    setGstAmountDraft(String(Math.round(gstAmountForPct(pct, false) * 100) / 100))
+                  }}
                 >
                   Exclusive — add it on top
                 </button>
@@ -856,21 +886,41 @@ export function ExpenseForm({
                   key={r}
                   type="button"
                   className={Number(gstPctDraft) === r ? 'pill active' : 'pill'}
-                  onClick={() => setGstPctDraft(String(r))}
+                  onClick={() => {
+                    setGstPctDraft(String(r))
+                    setGstAmountDraft(String(Math.round(gstAmountForPct(r, gstInclusiveDraft) * 100) / 100))
+                  }}
                 >
                   {r}%
                 </button>
               ))}
             </div>
-            <div className="field" style={{ marginTop: 12 }}>
-              <label>Custom rate (%)</label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={gstPctDraft}
-                onChange={(e) => setGstPctDraft(e.target.value)}
-              />
+            <div className="field-row" style={{ marginTop: 12 }}>
+              <div className="field">
+                <label>Rate (%)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={gstPctDraft}
+                  onChange={(e) => {
+                    setGstPctDraft(e.target.value)
+                    const pct = Number(e.target.value) || 0
+                    setGstAmountDraft(String(Math.round(gstAmountForPct(pct, gstInclusiveDraft) * 100) / 100))
+                  }}
+                />
+              </div>
+              <div className="field">
+                <label>GST amount (₹)</label>
+                <CurrencyInput
+                  value={gstAmountDraft}
+                  onValueChange={(v) => {
+                    setGstAmountDraft(v)
+                    const pct = gstPctForAmount(parseINR(v), gstInclusiveDraft)
+                    setGstPctDraft(String(Math.round(pct * 100) / 100))
+                  }}
+                />
+              </div>
             </div>
             <div className="note" style={{ marginTop: 8 }}>
               {gstInclusiveDraft
