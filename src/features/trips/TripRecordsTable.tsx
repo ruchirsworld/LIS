@@ -26,9 +26,10 @@ function todayStr() {
 
 const COL_SPAN = 9
 
-/** Popup to edit a trip's own details (name/traveler/project/start
- * date/notes) — status/end date stay controlled by the "End Trip" toggle
- * in TripsSection above, not duplicated here. */
+/** Popup to edit a trip's own details, including its dates — status itself
+ * (open/closed) still stays controlled by the "End Trip" toggle in
+ * TripsSection above, not duplicated here; this only edits the end date's
+ * value for whatever status the trip is already in. */
 function EditTripModal({ trip, onClose }: { trip: Trip; onClose: () => void }) {
   const { data: profiles } = useProfiles()
   const { data: projects } = useProjects()
@@ -38,6 +39,7 @@ function EditTripModal({ trip, onClose }: { trip: Trip; onClose: () => void }) {
   const [travelerId, setTravelerId] = useState(trip.traveler_id)
   const [projectId, setProjectId] = useState(trip.project_id ?? '')
   const [startDate, setStartDate] = useState(trip.start_date)
+  const [endDate, setEndDate] = useState(trip.end_date ?? '')
   const [notes, setNotes] = useState(trip.notes ?? '')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
@@ -53,6 +55,10 @@ function EditTripModal({ trip, onClose }: { trip: Trip; onClose: () => void }) {
       setFormError('Pick who is traveling.')
       return
     }
+    if (endDate && endDate < startDate) {
+      setFormError('End date can\'t be before the start date.')
+      return
+    }
     setSubmitting(true)
     try {
       await updateTrip.mutateAsync({
@@ -62,6 +68,7 @@ function EditTripModal({ trip, onClose }: { trip: Trip; onClose: () => void }) {
           traveler_id: travelerId,
           project_id: projectId || null,
           start_date: startDate,
+          end_date: endDate || null,
           notes: notes.trim() || null,
         },
       })
@@ -105,6 +112,10 @@ function EditTripModal({ trip, onClose }: { trip: Trip; onClose: () => void }) {
         <div className="field">
           <label>Start date</label>
           <input type="date" required value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>End date{trip.status === 'open' ? ' (optional)' : ''}</label>
+          <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
         </div>
         <div className="field full">
           <label>Notes</label>
