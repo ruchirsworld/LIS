@@ -1,7 +1,7 @@
 {
   "name": "lis",
   "private": true,
-  "version": "2.0.35",
+  "version": "2.0.40",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -16,6 +16,7 @@
     "@supabase/supabase-js": "^2.110.8",
     "@tanstack/react-query": "^5.101.4",
     "exceljs": "^4.4.0",
+    "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
     "react": "^19.2.7",

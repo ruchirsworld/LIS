@@ -1,4 +1,6 @@
-import { Fragment, useState, type FormEvent } from 'react'
+import { Fragment, useRef, useState, type FormEvent } from 'react'
+import html2canvas from 'html2canvas'
+import laavinLogo from '../../assets/laavin-logo.jpg'
 import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
 import { useStaff, useBankAccounts } from '../../lib/queries/masters'
@@ -107,6 +109,26 @@ export function SalarySection() {
   const [editAccrualNotes, setEditAccrualNotes] = useState('')
   const [editAccrualError, setEditAccrualError] = useState<string | null>(null)
   const [editAccrualSubmitting, setEditAccrualSubmitting] = useState(false)
+  const [downloadingImage, setDownloadingImage] = useState(false)
+  const payslipRef = useRef<HTMLDivElement>(null)
+
+  async function handleDownloadImage() {
+    if (!payslipRef.current || !viewingStaff) return
+    setDownloadingImage(true)
+    try {
+      const canvas = await html2canvas(payslipRef.current, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        ignoreElements: (el) => el.classList.contains('payslip-no-print') || el.classList.contains('modal-close'),
+      })
+      const link = document.createElement('a')
+      link.download = `Payslip-${viewingStaff.name.replace(/\s+/g, '-')}-${viewingAccrual?.period_end ?? ''}.png`
+      link.href = canvas.toDataURL('image/png')
+      link.click()
+    } finally {
+      setDownloadingImage(false)
+    }
+  }
 
   function openViewAccrual(a: NonNullable<typeof accruals>[number]) {
     setViewingAccrual(a)
@@ -341,6 +363,25 @@ export function SalarySection() {
             .map((a) => a.date)
         )
       : null
+
+  // How much salary advance is still outstanding for this worker right now
+  // — shown on the pay-slip as what this period's pay would clear if fully
+  // adjusted against it. The actual recovery is only confirmed later, when
+  // a payment against this (or another) period is recorded — this is
+  // indicative, not a booked transaction.
+  const viewingAdvanceOutstanding = viewingAccrual
+    ? Math.round(
+        ((salaryAdvances ?? [])
+          .filter((a) => a.staff_id === viewingAccrual.staff_id)
+          .reduce((s, a) => s + Number(a.amount || 0), 0) -
+          (payments ?? [])
+            .filter((p) => p.staff_id === viewingAccrual.staff_id)
+            .reduce((s, p) => s + Number(p.advance_recovered || 0), 0)) *
+          100
+      ) / 100
+    : 0
+  const viewingAdvanceAdjustment = viewingAccrual ? Math.min(viewingAdvanceOutstanding, viewingAccrual.amount) : 0
+  const viewingNetPay = viewingAccrual ? viewingAccrual.amount - viewingAdvanceAdjustment : 0
 
   return (
     <div>
@@ -826,16 +867,27 @@ export function SalarySection() {
 
       {viewingAccrual && viewingStaff && viewingBreakdown && (
         <div className="modal-backdrop" onClick={() => setViewingAccrual(null)}>
-          <div className="modal-panel payslip-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640 }}>
-            <div className="modal-header">
-              <strong>PAY-SLIP — {viewingStaff.name}</strong>
+          <div ref={payslipRef} className="modal-panel payslip-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640 }}>
+            <div className="modal-header" style={{ justifyContent: 'flex-end' }}>
               <button type="button" className="modal-close" onClick={() => setViewingAccrual(null)}>
                 ×
               </button>
             </div>
             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 4 }}>
+                <img src={laavinLogo} alt="Laavin InfraScapes" style={{ height: 28, mixBlendMode: 'multiply' }} />
+                <strong style={{ fontSize: 14 }}>PAYSLIP ({monthLabel(viewingAccrual.period_end.slice(0, 7))})</strong>
+              </div>
               <table className="data table-compact">
                 <tbody>
+                  <tr>
+                    <td>
+                      <Bi en="Staff" hi="कर्मचारी" />
+                    </td>
+                    <td className="amt">
+                      <strong>{viewingStaff.name}</strong>
+                    </td>
+                  </tr>
                   <tr>
                     <td>
                       <Bi en="Period" hi="अवधि" />
@@ -993,13 +1045,44 @@ export function SalarySection() {
                 </tbody>
               </table>
 
+              <table className="data table-compact">
+                <tbody>
+                  {viewingAdvanceAdjustment > 0 && (
+                    <tr>
+                      <td>
+                        <Bi en="Less: Advance recovery" hi="घटाएं: अग्रिम वसूली" />
+                      </td>
+                      <td className="amt" style={{ color: 'var(--red)' }}>
+                        −{fmt(viewingAdvanceAdjustment)}
+                      </td>
+                    </tr>
+                  )}
+                  <tr>
+                    <td>
+                      <strong>
+                        <Bi en="Net Pay" hi="नेट वेतन" />
+                      </strong>
+                    </td>
+                    <td className="amt">
+                      <strong style={{ fontSize: 16 }}>{fmt(viewingNetPay)}</strong>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              {viewingAdvanceAdjustment > 0 && (
+                <div className="note" style={{ margin: 0 }}>
+                  Assumes the full {fmt(viewingAdvanceOutstanding)} outstanding advance is adjusted against this
+                  period — actual recovery is only booked when a payment is recorded, and may differ.
+                </div>
+              )}
+
               {editAccrualError && (
                 <div className="note" style={{ color: 'var(--red)', margin: 0 }}>
                   {editAccrualError}
                 </div>
               )}
 
-              <div style={{ display: 'flex', gap: 8 }}>
+              <div className="payslip-no-print" style={{ display: 'flex', gap: 8 }}>
                 {editingAccrual ? (
                   <>
                     <Button type="button" disabled={editAccrualSubmitting} onClick={handleSaveAccrualEdit}>
@@ -1020,9 +1103,17 @@ export function SalarySection() {
                     </Button>
                   </>
                 ) : (
-                  <Button type="button" variant="secondary" onClick={() => setEditingAccrual(true)}>
-                    Edit
-                  </Button>
+                  <>
+                    <Button type="button" variant="secondary" onClick={() => setEditingAccrual(true)}>
+                      Edit
+                    </Button>
+                    <Button type="button" variant="secondary" onClick={handleDownloadImage} disabled={downloadingImage}>
+                      {downloadingImage ? 'Capturing…' : 'Download screenshot'}
+                    </Button>
+                    <Button type="button" variant="secondary" onClick={() => window.print()}>
+                      Print / Save as PDF
+                    </Button>
+                  </>
                 )}
               </div>
             </div>

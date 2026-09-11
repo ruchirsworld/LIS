@@ -903,6 +903,30 @@ table.data.table-compact td {
 .payslip-modal table.data th {
   white-space: normal;
 }
+/* "Print" on the pay-slip is the easiest reliable way to hand the user a
+   saved copy (print-to-PDF, or a clean full-page screenshot) — hide
+   everything else on the page and let just this modal fill it. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .payslip-modal,
+  .payslip-modal * {
+    visibility: visible;
+  }
+  .payslip-modal {
+    position: absolute;
+    inset: 0;
+    max-width: none;
+    max-height: none;
+    box-shadow: none;
+    border: none;
+  }
+  .payslip-modal .modal-close,
+  .payslip-modal .payslip-no-print {
+    display: none;
+  }
+}
 table.data tr.group-header-row td {
   background: var(--paper-2);
   font-size: 12px;
