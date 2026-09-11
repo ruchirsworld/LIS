@@ -8,6 +8,7 @@ import {
   useHolidays,
   useWageAccruals,
   useCreateWageAccrual,
+  useUpdateWageAccrual,
   useWagePayments,
   useCreateWagePayment,
   useStaffSalaryAdvances,
@@ -16,6 +17,18 @@ import {
 import { computeAccrualBreakdown, nextAccrualStart, todayStr, type AttendanceDayType } from '../../lib/calc/payroll'
 import { fmt, fmtDate, parseINR } from '../../lib/calc/format'
 import { getErrorMessage } from '../../lib/errors'
+
+// The pay-slip is meant for the worker to keep, not just the Admin running
+// payroll — every label on it shows English and Hindi together rather than
+// switching with the viewer's own language (unlike the app's usual i18n,
+// which only ever applies to a Supervisor's own UI).
+function Bi({ en, hi }: { en: string; hi: string }) {
+  return (
+    <>
+      {en} <span style={{ color: 'var(--ink-soft)', fontWeight: 400 }}>/ {hi}</span>
+    </>
+  )
+}
 
 function monthLabel(ym: string): string {
   const [y, m] = ym.split('-').map(Number)
@@ -59,6 +72,7 @@ export function SalarySection() {
   const { data: bankAccounts } = useBankAccounts()
   const { data: salaryAdvances } = useStaffSalaryAdvances()
   const createAccrual = useCreateWageAccrual()
+  const updateAccrual = useUpdateWageAccrual()
   const createPayment = useCreateWagePayment()
   const createSalaryAdvance = useCreateStaffSalaryAdvance()
 
@@ -88,6 +102,42 @@ export function SalarySection() {
   const [advanceSubmitting, setAdvanceSubmitting] = useState(false)
   const [selectedMonth, setSelectedMonth] = useState(todayStr().slice(0, 7))
   const [viewingAccrual, setViewingAccrual] = useState<NonNullable<typeof accruals>[number] | null>(null)
+  const [editingAccrual, setEditingAccrual] = useState(false)
+  const [editAccrualAmount, setEditAccrualAmount] = useState('0')
+  const [editAccrualNotes, setEditAccrualNotes] = useState('')
+  const [editAccrualError, setEditAccrualError] = useState<string | null>(null)
+  const [editAccrualSubmitting, setEditAccrualSubmitting] = useState(false)
+
+  function openViewAccrual(a: NonNullable<typeof accruals>[number]) {
+    setViewingAccrual(a)
+    setEditingAccrual(false)
+    setEditAccrualAmount(String(a.amount))
+    setEditAccrualNotes(a.notes ?? '')
+    setEditAccrualError(null)
+  }
+
+  async function handleSaveAccrualEdit() {
+    if (!viewingAccrual) return
+    const amt = parseINR(editAccrualAmount)
+    if (amt <= 0) {
+      setEditAccrualError('Enter an amount.')
+      return
+    }
+    setEditAccrualSubmitting(true)
+    setEditAccrualError(null)
+    try {
+      const updated = await updateAccrual.mutateAsync({
+        id: viewingAccrual.id,
+        patch: { amount: amt, notes: editAccrualNotes.trim() || null },
+      })
+      setViewingAccrual(updated)
+      setEditingAccrual(false)
+    } catch (err) {
+      setEditAccrualError(getErrorMessage(err, 'Could not save changes.'))
+    } finally {
+      setEditAccrualSubmitting(false)
+    }
+  }
 
   const today = todayStr()
   const periodEnd = monthEndCapped(selectedMonth, today)
@@ -152,7 +202,7 @@ export function SalarySection() {
       if (bonus > 0) extras.push(`Bonus ${fmt(bonus)}`)
       if (incentive > 0) extras.push(`Incentive ${fmt(incentive)}`)
       if (allowance > 0) extras.push(`Allowance ${fmt(allowance)} (${row.breakdown.presentDays} × ${fmt(allowanceRateNum)})`)
-      await createAccrual.mutateAsync({
+      const created = await createAccrual.mutateAsync({
         staff_id: row.staff.id,
         period_start: row.effectiveStart,
         period_end: periodEnd,
@@ -160,6 +210,9 @@ export function SalarySection() {
         notes: extras.length ? `Base ${fmt(row.pendingAccrual)} + ${extras.join(' + ')}` : null,
       })
       setConfirmingRow(null)
+      // Show the same breakdown right away instead of making the user go
+      // find this run in the history table below and click on it.
+      openViewAccrual(created)
     } catch (err) {
       setRunError(getErrorMessage(err, 'Could not run payroll.'))
     } finally {
@@ -540,7 +593,7 @@ export function SalarySection() {
                 <tr key={a.id}>
                   <td>{a.display_id ?? '—'}</td>
                   <td>
-                    <button type="button" className="btn link" onClick={() => setViewingAccrual(a)}>
+                    <button type="button" className="btn link" onClick={() => openViewAccrual(a)}>
                       {staffName(a.staff_id)}
                     </button>
                   </td>
@@ -773,87 +826,205 @@ export function SalarySection() {
 
       {viewingAccrual && viewingStaff && viewingBreakdown && (
         <div className="modal-backdrop" onClick={() => setViewingAccrual(null)}>
-          <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-panel payslip-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640 }}>
             <div className="modal-header">
-              <strong>Payroll run summary</strong>
+              <strong>PAY-SLIP — {viewingStaff.name}</strong>
               <button type="button" className="modal-close" onClick={() => setViewingAccrual(null)}>
                 ×
               </button>
             </div>
-            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <table className="data">
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <table className="data table-compact">
                 <tbody>
                   <tr>
-                    <td>Staff</td>
-                    <td className="amt">{viewingStaff.name}</td>
-                  </tr>
-                  <tr>
-                    <td>Period</td>
+                    <td>
+                      <Bi en="Period" hi="अवधि" />
+                    </td>
                     <td className="amt">
                       {fmtDate(viewingAccrual.period_start)} – {fmtDate(viewingAccrual.period_end)} ({viewingBreakdown.totalDays} days)
                     </td>
                   </tr>
                   <tr>
-                    <td>Daily rate</td>
-                    <td className="amt">{fmt(viewingStaff.daily_rate)}</td>
+                    <td>
+                      <Bi en="Salary" hi="वेतन" />
+                    </td>
+                    <td className="amt">{fmt(viewingStaff.daily_rate * 30)}</td>
                   </tr>
                 </tbody>
               </table>
 
-              <table className="data">
+              <table className="data table-compact">
                 <thead>
                   <tr>
-                    <th colSpan={2}>Days breakdown</th>
+                    <th colSpan={2}>
+                      <Bi en="Days Breakdown" hi="दिनों का विवरण" />
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
-                    <td>Days worked (present)</td>
+                    <td>
+                      <Bi en="Days worked (present)" hi="उपस्थित दिन" />
+                    </td>
                     <td className="amt">{viewingBreakdown.presentDays}</td>
                   </tr>
                   <tr>
-                    <td>Leave — paid</td>
+                    <td>
+                      <Bi en="Leave — paid" hi="अवकाश — सशुल्क" />
+                    </td>
                     <td className="amt">{viewingBreakdown.paidOffDays}</td>
                   </tr>
                   <tr>
-                    <td>Absent — unpaid</td>
+                    <td>
+                      <Bi en="Absent — unpaid" hi="अनुपस्थित — अवैतनिक" />
+                    </td>
                     <td className="amt" style={viewingBreakdown.unpaidOffDays > 0 ? { color: 'var(--red)' } : undefined}>
                       {viewingBreakdown.unpaidOffDays}
                     </td>
                   </tr>
                   <tr>
-                    <td>Half days</td>
+                    <td>
+                      <Bi en="Half days" hi="आधे दिन" />
+                    </td>
                     <td className="amt">{viewingBreakdown.halfDays}</td>
                   </tr>
                   <tr>
-                    <td>Holidays</td>
+                    <td>
+                      <Bi en="Holidays" hi="छुट्टियाँ" />
+                    </td>
                     <td className="amt">{viewingBreakdown.holidayDays}</td>
                   </tr>
                 </tbody>
               </table>
 
-              <table className="data">
+              {(() => {
+                const gross = viewingBreakdown.totalDays * viewingStaff.daily_rate
+                const absentDeduction = viewingBreakdown.unpaidOffDays * viewingStaff.daily_rate
+                const halfDayDeduction = viewingBreakdown.halfDays * viewingStaff.daily_rate * 0.5
+                return (
+                  <table className="data table-compact">
+                    <thead>
+                      <tr>
+                        <th colSpan={2}>
+                          <Bi en="Wage Calculation" hi="वेतन गणना" />
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>
+                          <Bi en="Gross" hi="सकल" /> ({viewingBreakdown.totalDays} days × {fmt(viewingStaff.daily_rate)})
+                        </td>
+                        <td className="amt">{fmt(gross)}</td>
+                      </tr>
+                      {absentDeduction > 0 && (
+                        <tr>
+                          <td>
+                            <Bi en="Less: Absent — unpaid" hi="घटाएं: अनुपस्थित" /> ({viewingBreakdown.unpaidOffDays} ×{' '}
+                            {fmt(viewingStaff.daily_rate)})
+                          </td>
+                          <td className="amt" style={{ color: 'var(--red)' }}>
+                            −{fmt(absentDeduction)}
+                          </td>
+                        </tr>
+                      )}
+                      {halfDayDeduction > 0 && (
+                        <tr>
+                          <td>
+                            <Bi en="Less: Half days" hi="घटाएं: आधे दिन" /> ({viewingBreakdown.halfDays} ×{' '}
+                            {fmt(viewingStaff.daily_rate * 0.5)})
+                          </td>
+                          <td className="amt" style={{ color: 'var(--red)' }}>
+                            −{fmt(halfDayDeduction)}
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                )
+              })()}
+
+              <table className="data table-compact">
                 <tbody>
                   <tr>
-                    <td>Base accrual</td>
+                    <td>
+                      <Bi en="Base accrual" hi="मूल उपार्जन" />
+                    </td>
                     <td className="amt">{fmt(viewingBreakdown.amount)}</td>
                   </tr>
-                  {viewingAccrual.notes && (
+                  {editingAccrual ? (
                     <tr>
-                      <td>Notes</td>
-                      <td className="amt">{viewingAccrual.notes}</td>
+                      <td>
+                        <Bi en="Notes" hi="टिप्पणी" />
+                      </td>
+                      <td className="amt">
+                        <input
+                          type="text"
+                          value={editAccrualNotes}
+                          onChange={(e) => setEditAccrualNotes(e.target.value)}
+                          style={{ width: '100%' }}
+                        />
+                      </td>
                     </tr>
+                  ) : (
+                    viewingAccrual.notes && (
+                      <tr>
+                        <td>
+                          <Bi en="Notes" hi="टिप्पणी" />
+                        </td>
+                        <td className="amt">{viewingAccrual.notes}</td>
+                      </tr>
+                    )
                   )}
                   <tr>
                     <td>
-                      <strong>Amount accrued</strong>
+                      <strong>
+                        <Bi en="Amount accrued" hi="अर्जित राशि" />
+                      </strong>
                     </td>
                     <td className="amt">
-                      <strong style={{ fontSize: 16 }}>{fmt(viewingAccrual.amount)}</strong>
+                      {editingAccrual ? (
+                        <CurrencyInput value={editAccrualAmount} onValueChange={setEditAccrualAmount} />
+                      ) : (
+                        <strong style={{ fontSize: 16 }}>{fmt(viewingAccrual.amount)}</strong>
+                      )}
                     </td>
                   </tr>
                 </tbody>
               </table>
+
+              {editAccrualError && (
+                <div className="note" style={{ color: 'var(--red)', margin: 0 }}>
+                  {editAccrualError}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: 8 }}>
+                {editingAccrual ? (
+                  <>
+                    <Button type="button" disabled={editAccrualSubmitting} onClick={handleSaveAccrualEdit}>
+                      {editAccrualSubmitting ? 'Saving…' : 'Save'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={editAccrualSubmitting}
+                      onClick={() => {
+                        setEditingAccrual(false)
+                        setEditAccrualAmount(String(viewingAccrual.amount))
+                        setEditAccrualNotes(viewingAccrual.notes ?? '')
+                        setEditAccrualError(null)
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </>
+                ) : (
+                  <Button type="button" variant="secondary" onClick={() => setEditingAccrual(true)}>
+                    Edit
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </div>

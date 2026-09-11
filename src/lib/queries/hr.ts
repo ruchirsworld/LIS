@@ -4,6 +4,7 @@ import type { Database } from '../../types/database'
 
 type HolidayInsert = Database['public']['Tables']['holidays']['Insert']
 type WageAccrualInsert = Database['public']['Tables']['wage_accruals']['Insert']
+type WageAccrualUpdate = Database['public']['Tables']['wage_accruals']['Update']
 type WagePaymentInsert = Database['public']['Tables']['wage_payments']['Insert']
 type StaffImprestTransactionInsert = Database['public']['Tables']['staff_imprest_transactions']['Insert']
 type StaffImprestTransactionUpdate = Database['public']['Tables']['staff_imprest_transactions']['Update']
@@ -59,6 +60,18 @@ export function useCreateWageAccrual() {
   return useMutation({
     mutationFn: async (row: WageAccrualInsert) => {
       const { data, error } = await supabase.from('wage_accruals').insert(row).select().single()
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['wage_accruals'] }),
+  })
+}
+
+export function useUpdateWageAccrual() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, patch }: { id: string; patch: WageAccrualUpdate }) => {
+      const { data, error } = await supabase.from('wage_accruals').update(patch).eq('id', id).select().single()
       if (error) throw error
       return data
     },

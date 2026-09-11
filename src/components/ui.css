@@ -896,6 +896,13 @@ table.data.table-compact td {
   padding: 6px 10px;
   font-size: 12.5px;
 }
+/* The pay-slip's bilingual labels (English / Hindi together) run longer
+   than this table style normally allows for — let the label column wrap
+   instead of forcing the modal wider or clipping the Hindi half. */
+.payslip-modal table.data td:first-child,
+.payslip-modal table.data th {
+  white-space: normal;
+}
 table.data tr.group-header-row td {
   background: var(--paper-2);
   font-size: 12px;
