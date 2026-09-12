@@ -15,7 +15,10 @@ import {
   useCreateWagePayment,
   useStaffSalaryAdvances,
   useCreateStaffSalaryAdvance,
+  useUpdateStaffSalaryAdvance,
+  useDeleteStaffSalaryAdvance,
 } from '../../lib/queries/hr'
+import { useAuth } from '../../lib/auth'
 import { computeAccrualBreakdown, nextAccrualStart, todayStr, type AttendanceDayType } from '../../lib/calc/payroll'
 import { fmt, fmtDate, parseINR } from '../../lib/calc/format'
 import { getErrorMessage } from '../../lib/errors'
@@ -64,6 +67,11 @@ function shiftMonth(ym: string, delta: number): string {
 }
 
 export function SalarySection() {
+  const { profile } = useAuth()
+  // Deleting a salary advance un-does it entirely — Admin-only, matching
+  // the same precedent used for Imprest transactions, Trips, and Expenses.
+  // Editing (fixing a typo) stays open to Admin/CXO like everything else here.
+  const canDeleteAdvance = profile?.role === 'admin'
   const { data: staff } = useStaff()
   const { data: profiles } = useProfiles()
   const { data: allLeave } = useAllStaffAttendance()
@@ -77,6 +85,8 @@ export function SalarySection() {
   const updateAccrual = useUpdateWageAccrual()
   const createPayment = useCreateWagePayment()
   const createSalaryAdvance = useCreateStaffSalaryAdvance()
+  const updateSalaryAdvance = useUpdateStaffSalaryAdvance()
+  const deleteSalaryAdvance = useDeleteStaffSalaryAdvance()
 
   const [payFormStaffId, setPayFormStaffId] = useState<string | null>(null)
   const [payDate, setPayDate] = useState(todayStr())
@@ -102,6 +112,10 @@ export function SalarySection() {
   const [advanceRemarks, setAdvanceRemarks] = useState('')
   const [advanceError, setAdvanceError] = useState<string | null>(null)
   const [advanceSubmitting, setAdvanceSubmitting] = useState(false)
+  const [editingAdvanceId, setEditingAdvanceId] = useState<string | null>(null)
+  const [advanceEditDraft, setAdvanceEditDraft] = useState({ date: '', amount: '', bankAccountId: '', remarks: '' })
+  const [advanceEditError, setAdvanceEditError] = useState<Record<string, string>>({})
+  const [advanceEditBusyId, setAdvanceEditBusyId] = useState<string | null>(null)
   const [selectedMonth, setSelectedMonth] = useState(todayStr().slice(0, 7))
   const [viewingAccrual, setViewingAccrual] = useState<NonNullable<typeof accruals>[number] | null>(null)
   const [editingAccrual, setEditingAccrual] = useState(false)
@@ -209,7 +223,18 @@ export function SalarySection() {
     const totalAdvanced = (salaryAdvances ?? []).filter((a) => a.staff_id === s.id).reduce((sum, a) => sum + Number(a.amount || 0), 0)
     const totalRecovered = staffPayments.reduce((sum, p) => sum + Number(p.advance_recovered || 0), 0)
     const advanceOutstanding = Math.round((totalAdvanced - totalRecovered) * 100) / 100
-    return { staff: s, payable, pendingAccrual, nextStart, effectiveStart, advanceOutstanding, breakdown, priorGap, hasPastMonthUnpaid }
+
+    return {
+      staff: s,
+      payable,
+      pendingAccrual,
+      nextStart,
+      effectiveStart,
+      advanceOutstanding,
+      breakdown,
+      priorGap,
+      hasPastMonthUnpaid,
+    }
   })
 
   async function handleRunPayroll(row: (typeof rows)[number]) {
@@ -321,6 +346,56 @@ export function SalarySection() {
       setAdvanceError(getErrorMessage(err, 'Could not record advance.'))
     } finally {
       setAdvanceSubmitting(false)
+    }
+  }
+
+  function startEditAdvance(a: NonNullable<typeof salaryAdvances>[number]) {
+    setEditingAdvanceId(a.id)
+    setAdvanceEditDraft({
+      date: a.date,
+      amount: String(a.amount),
+      bankAccountId: a.bank_account_id ?? '',
+      remarks: a.remarks ?? '',
+    })
+    setAdvanceEditError((m) => ({ ...m, [a.id]: '' }))
+  }
+
+  async function handleSaveAdvanceEdit(id: string) {
+    const amt = parseINR(advanceEditDraft.amount)
+    if (amt <= 0) {
+      setAdvanceEditError((m) => ({ ...m, [id]: 'Enter an amount.' }))
+      return
+    }
+    setAdvanceEditBusyId(id)
+    setAdvanceEditError((m) => ({ ...m, [id]: '' }))
+    try {
+      await updateSalaryAdvance.mutateAsync({
+        id,
+        patch: {
+          date: advanceEditDraft.date,
+          amount: amt,
+          bank_account_id: advanceEditDraft.bankAccountId || null,
+          remarks: advanceEditDraft.remarks.trim() || null,
+        },
+      })
+      setEditingAdvanceId(null)
+    } catch (err) {
+      setAdvanceEditError((m) => ({ ...m, [id]: getErrorMessage(err, 'Could not save changes.') }))
+    } finally {
+      setAdvanceEditBusyId(null)
+    }
+  }
+
+  async function handleDeleteAdvance(a: NonNullable<typeof salaryAdvances>[number]) {
+    if (!window.confirm(`Delete this advance of ${fmt(a.amount)} to ${staffName(a.staff_id)} dated ${fmtDate(a.date)}? This cannot be undone.`)) return
+    setAdvanceEditBusyId(a.id)
+    setAdvanceEditError((m) => ({ ...m, [a.id]: '' }))
+    try {
+      await deleteSalaryAdvance.mutateAsync(a.id)
+    } catch (err) {
+      setAdvanceEditError((m) => ({ ...m, [a.id]: getErrorMessage(err, 'Could not delete this advance.') }))
+    } finally {
+      setAdvanceEditBusyId(null)
     }
   }
 
@@ -697,25 +772,133 @@ export function SalarySection() {
                 <th>Date</th>
                 <th>Account</th>
                 <th style={{ textAlign: 'right' }}>Amount</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
               {(!salaryAdvances || salaryAdvances.length === 0) && (
                 <tr>
-                  <td colSpan={5} className="empty-row">
+                  <td colSpan={6} className="empty-row">
                     No salary advances given yet
                   </td>
                 </tr>
               )}
-              {salaryAdvances?.map((a) => (
-                <tr key={a.id}>
-                  <td>{a.display_id ?? '—'}</td>
-                  <td>{staffName(a.staff_id)}</td>
-                  <td>{fmtDate(a.date)}</td>
-                  <td>{bankAccountName(a.bank_account_id)}</td>
-                  <td className="amt">{fmt(a.amount)}</td>
-                </tr>
-              ))}
+              {salaryAdvances?.map((a) =>
+                editingAdvanceId === a.id ? (
+                  <Fragment key={a.id}>
+                    <tr>
+                      <td>{a.display_id ?? '—'}</td>
+                      <td>{staffName(a.staff_id)}</td>
+                      <td>
+                        <input
+                          type="date"
+                          aria-label="Date"
+                          value={advanceEditDraft.date}
+                          onChange={(e) => setAdvanceEditDraft((d) => ({ ...d, date: e.target.value }))}
+                        />
+                      </td>
+                      <td></td>
+                      <td className="amt">
+                        <CurrencyInput
+                          value={advanceEditDraft.amount}
+                          onValueChange={(v) => setAdvanceEditDraft((d) => ({ ...d, amount: v }))}
+                        />
+                      </td>
+                      <td></td>
+                    </tr>
+                    <tr>
+                      <td colSpan={6}>
+                        <div className="field-row" style={{ marginBottom: 8 }}>
+                          <div className="field">
+                            <label>Account</label>
+                            <select
+                              value={advanceEditDraft.bankAccountId}
+                              onChange={(e) => setAdvanceEditDraft((d) => ({ ...d, bankAccountId: e.target.value }))}
+                            >
+                              <option value="">Cash</option>
+                              {(bankAccounts ?? []).map((acc) => (
+                                <option key={acc.id} value={acc.id}>
+                                  {acc.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="field">
+                            <label>Remarks (optional)</label>
+                            <input
+                              type="text"
+                              value={advanceEditDraft.remarks}
+                              onChange={(e) => setAdvanceEditDraft((d) => ({ ...d, remarks: e.target.value }))}
+                            />
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          <Button
+                            type="button"
+                            disabled={advanceEditBusyId === a.id}
+                            onClick={() => handleSaveAdvanceEdit(a.id)}
+                          >
+                            Save
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            disabled={advanceEditBusyId === a.id}
+                            onClick={() => setEditingAdvanceId(null)}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                        {advanceEditError[a.id] && (
+                          <div className="note" style={{ color: 'var(--red)', marginTop: 4 }}>
+                            {advanceEditError[a.id]}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  </Fragment>
+                ) : (
+                  <tr key={a.id}>
+                    <td>{a.display_id ?? '—'}</td>
+                    <td>{staffName(a.staff_id)}</td>
+                    <td>{fmtDate(a.date)}</td>
+                    <td>{bankAccountName(a.bank_account_id)}</td>
+                    <td className="amt">{fmt(a.amount)}</td>
+                    <td>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          className="icon-btn-sq"
+                          onClick={() => startEditAdvance(a)}
+                          title="Edit"
+                          aria-label="Edit"
+                        >
+                          ✎
+                        </Button>
+                        {canDeleteAdvance && (
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            className="icon-btn-sq"
+                            disabled={advanceEditBusyId === a.id}
+                            onClick={() => handleDeleteAdvance(a)}
+                            title="Delete"
+                            aria-label="Delete"
+                          >
+                            🗑
+                          </Button>
+                        )}
+                      </div>
+                      {advanceEditError[a.id] && (
+                        <div className="note" style={{ color: 'var(--red)', marginTop: 4 }}>
+                          {advanceEditError[a.id]}
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                )
+              )}
             </tbody>
           </table>
         </div>

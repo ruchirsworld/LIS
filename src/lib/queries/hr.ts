@@ -9,6 +9,7 @@ type WagePaymentInsert = Database['public']['Tables']['wage_payments']['Insert']
 type StaffImprestTransactionInsert = Database['public']['Tables']['staff_imprest_transactions']['Insert']
 type StaffImprestTransactionUpdate = Database['public']['Tables']['staff_imprest_transactions']['Update']
 type StaffSalaryAdvanceInsert = Database['public']['Tables']['staff_salary_advances']['Insert']
+type StaffSalaryAdvanceUpdate = Database['public']['Tables']['staff_salary_advances']['Update']
 
 export function useHolidays() {
   return useQuery({
@@ -174,5 +175,34 @@ export function useCreateStaffSalaryAdvance() {
       return data
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['staff_salary_advances'] }),
+  })
+}
+
+export function useUpdateStaffSalaryAdvance() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, patch }: { id: string; patch: StaffSalaryAdvanceUpdate }) => {
+      const { data, error } = await supabase.from('staff_salary_advances').update(patch).eq('id', id).select().single()
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['staff_salary_advances'] })
+      qc.invalidateQueries({ queryKey: ['ledger_lines'] })
+    },
+  })
+}
+
+export function useDeleteStaffSalaryAdvance() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('staff_salary_advances').delete().eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['staff_salary_advances'] })
+      qc.invalidateQueries({ queryKey: ['ledger_lines'] })
+    },
   })
 }
