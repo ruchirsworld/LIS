@@ -456,7 +456,19 @@ export function SalarySection() {
       ) / 100
     : 0
   const viewingAdvanceAdjustment = viewingAccrual ? Math.min(viewingAdvanceOutstanding, viewingAccrual.amount) : 0
-  const viewingNetPay = viewingAccrual ? viewingAccrual.amount - viewingAdvanceAdjustment : 0
+
+  // Wages already paid out to this worker before this run even happened —
+  // e.g. an early/partial payment made ahead of formally running payroll.
+  // That cash still counts against what this period owes, so it comes off
+  // Net Pay too, same as an advance recovery does.
+  const viewingPriorPayments = viewingAccrual
+    ? (payments ?? []).filter((p) => p.staff_id === viewingAccrual.staff_id && p.created_at < viewingAccrual.created_at)
+    : []
+  const viewingPriorPaymentsTotal = Math.round(viewingPriorPayments.reduce((s, p) => s + Number(p.amount || 0), 0) * 100) / 100
+  const viewingPriorPaymentsAdjustment = viewingAccrual
+    ? Math.min(viewingPriorPaymentsTotal, Math.max(0, viewingAccrual.amount - viewingAdvanceAdjustment))
+    : 0
+  const viewingNetPay = viewingAccrual ? viewingAccrual.amount - viewingAdvanceAdjustment - viewingPriorPaymentsAdjustment : 0
 
   return (
     <div>
@@ -1230,6 +1242,16 @@ export function SalarySection() {
 
               <table className="data table-compact">
                 <tbody>
+                  {viewingPriorPaymentsTotal > 0 && (
+                    <tr>
+                      <td>
+                        <Bi en="Less: Already paid" hi="घटाएं: पहले से भुगतान" />
+                      </td>
+                      <td className="amt" style={{ color: 'var(--red)' }}>
+                        −{fmt(viewingPriorPaymentsAdjustment)}
+                      </td>
+                    </tr>
+                  )}
                   {viewingAdvanceAdjustment > 0 && (
                     <tr>
                       <td>
@@ -1252,6 +1274,20 @@ export function SalarySection() {
                   </tr>
                 </tbody>
               </table>
+              {viewingPriorPaymentsTotal > 0 && (
+                <div className="note" style={{ margin: 0 }}>
+                  {viewingPriorPayments.length} payment{viewingPriorPayments.length === 1 ? '' : 's'} totaling{' '}
+                  {fmt(viewingPriorPaymentsTotal)} {viewingPriorPayments.length === 1 ? 'was' : 'were'} recorded for this
+                  worker before this payroll run — applied here against what this period owes.
+                  <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+                    {viewingPriorPayments.map((p) => (
+                      <li key={p.id}>
+                        {fmtDate(p.date)} — {fmt(p.amount)}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               {viewingAdvanceAdjustment > 0 && (
                 <div className="note" style={{ margin: 0 }}>
                   Assumes the full {fmt(viewingAdvanceOutstanding)} outstanding advance is adjusted against this
