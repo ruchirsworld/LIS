@@ -42,6 +42,16 @@ function ApprovalsIcon() {
   )
 }
 
+function SupervisorIcon() {
+  return (
+    <svg {...svgProps}>
+      <circle cx="9" cy="7" r="3.2" />
+      <path d="M3 20v-1a6 6 0 0 1 12 0v1" />
+      <path d="M16 8h5M18.5 5.5v5" />
+    </svg>
+  )
+}
+
 function CalendarIcon() {
   return (
     <svg {...svgProps}>
@@ -166,6 +176,7 @@ const ICONS: Record<TabId, () => ReactElement> = {
   dashboard: DashboardIcon,
   expenses: ExpensesIcon,
   approvals: ApprovalsIcon,
+  supervisor: SupervisorIcon,
   calendar: CalendarIcon,
   records: RecordsIcon,
   purchases: PurchasesIcon,

@@ -9,6 +9,10 @@ export const TABS = [
   // here until an Admin/CXO reviews them — neither becomes a real record
   // until approved. Not a Supervisor concern: they can't approve their own.
   { id: 'approvals', label: 'Approvals', roles: ['admin', 'cxo'] },
+  // Lets an Admin/CXO fill in the exact same Project-claim form a Supervisor
+  // uses, submitting under a chosen supervisor's name — for phoning in
+  // entries on their behalf rather than routing through Approvals.
+  { id: 'supervisor', label: 'Supervisor', roles: ['admin', 'cxo'] },
   // A Supervisor's own team calendar and expense/payment history — Admin/CXO
   // get the same Calendar tab too (picking which supervisor's team to view),
   // but Records is a "what I personally submitted" view specific to a
@@ -43,7 +47,7 @@ export function isTabVisible(tab: { roles: readonly string[] | null }, role: Nav
 // be a long flat list of everything. A Supervisor's sidebar is short enough
 // already (Dashboard, Expenses, Calendar, Records) and keeps all of it
 // inline, so this set is never applied to that role.
-export const HEADER_MENU_TAB_IDS: readonly TabId[] = ['approvals', 'calendar', 'projects', 'reports', 'admin']
+export const HEADER_MENU_TAB_IDS: readonly TabId[] = ['approvals', 'supervisor', 'calendar', 'projects', 'reports', 'admin']
 
 // The Expenses tab's three flows, merged behind one cost-center switcher in
 // its header — was three separate tabs (Admin / Trips / Project) before

@@ -7,7 +7,7 @@ import { ReceiptUploadButton } from '../../components/ReceiptUploadButton'
 import { Modal } from '../../components/Modal'
 import { useClients, useProjects, useCostCenters, useExpenseSubHeads, useExpenseUnits, useBankAccounts } from '../../lib/queries/masters'
 import { useCreateExpense, useUpdateExpense } from '../../lib/queries/expenses'
-import { useCreateExpenseUnit, useProfiles } from '../../lib/queries/admin'
+import { useCreateExpenseUnit } from '../../lib/queries/admin'
 import { useGeolocation } from '../../lib/useGeolocation'
 import { compressImage } from '../../lib/compressImage'
 import { uploadReceipt } from '../../lib/storage'
@@ -124,8 +124,6 @@ export function ExpenseForm({
   const { data: subHeads } = useExpenseSubHeads()
   const { data: units } = useExpenseUnits()
   const { data: bankAccounts } = useBankAccounts()
-  const { data: profiles } = useProfiles()
-  const supervisors = (profiles ?? []).filter((p) => p.role === 'supervisor')
   // Bank accounts first (Kotak, then CBI, then anything else alphabetically),
   // Cash and Reimbursement always last — matches the requested button order.
   const BANK_ORDER = ['Kotak', 'CBI']
@@ -154,12 +152,6 @@ export function ExpenseForm({
   const createUnit = useCreateExpenseUnit()
 
   const [costCenterOverride, setCostCenterOverride] = useState<string | null>(null)
-  // Admin/CXO entering a Project cost straight into a supervisor's own
-  // record — '' means "myself" (the default, unchanged behavior: created_by
-  // falls back to the DB default of auth.uid()). Posts immediately, same as
-  // any other Admin/CXO entry — not routed through Approvals, since an
-  // Admin/CXO is trusted to enter these directly.
-  const [onBehalfOfId, setOnBehalfOfId] = useState('')
   const [projectId, setProjectId] = useState(() => loadStoredProject())
   const [majorHeadFilter, setMajorHeadFilter] = useState<number | ''>('')
   const [subHeadId, setSubHeadId] = useState('')
@@ -299,7 +291,6 @@ export function ExpenseForm({
   useEffect(() => {
     if (!editingExpense) return
     setCostCenterOverride(editingExpense.cost_center ?? null)
-    setOnBehalfOfId(editingExpense.created_by && supervisors.some((s) => s.id === editingExpense.created_by) ? editingExpense.created_by : '')
     setProjectId(editingExpense.project_id ?? '')
     setSubHeadId(editingExpense.sub_head_id ?? '')
     setAmount(String(editingExpense.amount))
@@ -424,9 +415,7 @@ export function ExpenseForm({
     setGstInclusive(true)
     setDescription('')
     // projectId deliberately not reset — it stays the default for the rest
-    // of the day (see loadStoredProject), across repeated entries. Same
-    // idea for onBehalfOfId — an Admin logging several claims for the same
-    // supervisor in a row shouldn't have to re-pick them every time.
+    // of the day (see loadStoredProject), across repeated entries.
     setAccountId('')
     setRemarks('')
     setReceiptBlob(null)
@@ -503,11 +492,6 @@ export function ExpenseForm({
             ? null
             : effectiveAccountId,
         trip_id: tripId ?? editingExpense?.trip_id ?? null,
-        // Omitted entirely when blank — on create that leaves the DB default
-        // (auth.uid(), i.e. whoever's logged in) in place, and on edit it
-        // leaves the existing attribution untouched rather than silently
-        // reassigning it back to whoever happens to be editing.
-        ...(onBehalfOfId ? { created_by: onBehalfOfId } : {}),
       }
       if (editingExpense) {
         await updateExpense.mutateAsync({
@@ -600,23 +584,6 @@ export function ExpenseForm({
               <label>Client</label>
               <input type="text" value={projectId ? clientLabel(selectedProjectClient) : '—'} disabled />
             </div>
-          </div>
-        )}
-
-        {/* Lets an Admin/CXO log this claim directly under a supervisor's own
-            name instead of their own — posts immediately either way, same as
-            any other Admin/CXO entry, not routed through Approvals. */}
-        {lockToProjects && (
-          <div className="field full">
-            <label>On behalf of (optional)</label>
-            <SearchableSelect
-              items={supervisors}
-              value={onBehalfOfId}
-              onChange={setOnBehalfOfId}
-              getId={(p) => p.id}
-              getLabel={(p) => p.name}
-              placeholder="— Myself —"
-            />
           </div>
         )}
 

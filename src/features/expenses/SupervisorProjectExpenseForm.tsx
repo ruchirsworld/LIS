@@ -71,7 +71,15 @@ function categoryField(
 // guard trigger on staff_imprest_transactions forces that for anyone but
 // an Admin/CXO); an Admin still has to approve it (HR → Imprest) before
 // it's a real advance posted to the ledger.
-export function SupervisorProjectExpenseForm() {
+export function SupervisorProjectExpenseForm({
+  actingAsProfileId,
+}: {
+  /** Set by the Admin/CXO "Supervisor" page — when present, every entry
+   * this form creates is tagged to this supervisor's id instead of the
+   * signed-in Admin/CXO, and "my workers"/"my pending requests" below
+   * resolve to that supervisor's own, not the signed-in user's. */
+  actingAsProfileId?: string
+} = {}) {
   const { profile } = useAuth()
   const t = useT()
   const { data: projects } = useProjects()
@@ -82,13 +90,15 @@ export function SupervisorProjectExpenseForm() {
   const createExpense = useCreateExpense()
   const createImprestRequest = useCreateStaffImprestTransaction()
 
+  const targetProfileId = actingAsProfileId ?? profile?.id
+
   const teamExpenseWarningThreshold =
     appSettings?.get(TEAM_EXPENSE_WARNING_THRESHOLD_KEY) ?? TEAM_EXPENSE_WARNING_THRESHOLD_DEFAULT
 
   const activeProjects = projects?.filter((p) => p.status === 'active')
   const categoryByKey = new Map(FIXED_EXPENSE_CATEGORIES.map((c) => [c.key, c]))
   const myWorkers = (staff ?? [])
-    .filter((s) => s.supervisor_id === profile?.id && !s.end_date)
+    .filter((s) => s.supervisor_id === targetProfileId && !s.end_date)
     .sort((a, b) => a.name.localeCompare(b.name))
 
   const [date, setDate] = useState(todayStr())
@@ -105,7 +115,7 @@ export function SupervisorProjectExpenseForm() {
   const [showTeamWarning, setShowTeamWarning] = useState(false)
 
   const myPendingRequests = (imprestTransactions ?? [])
-    .filter((t) => t.profile_id === profile?.id && t.kind === 'advance' && t.status === 'pending')
+    .filter((t) => t.profile_id === targetProfileId && t.kind === 'advance' && t.status === 'pending')
     .sort((a, b) => b.date.localeCompare(a.date))
 
   const laborTotal = (Number(laborQty) || 0) * (Number(laborRate) || 0)
@@ -171,7 +181,7 @@ export function SupervisorProjectExpenseForm() {
   }
 
   async function doSubmit() {
-    if (!profile) return
+    if (!targetProfileId) return
     setShowTeamWarning(false)
     setSubmitting(true)
     try {
@@ -204,6 +214,7 @@ export function SupervisorProjectExpenseForm() {
             date,
             reimbursable: false,
             receipt_path: null,
+            ...(actingAsProfileId ? { created_by: actingAsProfileId } : {}),
           })
         })
       )
@@ -212,7 +223,7 @@ export function SupervisorProjectExpenseForm() {
         await Promise.all(
           filledRequestRows.map((r) =>
             createImprestRequest.mutateAsync({
-              profile_id: profile.id,
+              profile_id: targetProfileId,
               date,
               kind: 'advance',
               amount: Number(r.amount),

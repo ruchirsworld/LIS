@@ -10,6 +10,9 @@ import { requestLocationPing, type LocationPingResult } from './lib/workStore'
 const DashboardPage = lazy(() => import('./features/dashboard/DashboardPage').then((m) => ({ default: m.DashboardPage })))
 const ExpensesPage = lazy(() => import('./features/expenses/ExpensesPage').then((m) => ({ default: m.ExpensesPage })))
 const ApprovalsPage = lazy(() => import('./features/approvals/ApprovalsPage').then((m) => ({ default: m.ApprovalsPage })))
+const SupervisorEntryPage = lazy(() =>
+  import('./features/supervisor/SupervisorEntryPage').then((m) => ({ default: m.SupervisorEntryPage }))
+)
 const CalendarPage = lazy(() => import('./features/calendar/CalendarPage').then((m) => ({ default: m.CalendarPage })))
 const SupervisorRecordsPage = lazy(() =>
   import('./features/records/SupervisorRecordsPage').then((m) => ({ default: m.SupervisorRecordsPage }))
@@ -66,6 +69,7 @@ function AppShellRouter() {
           />
         )}
         {tab === 'approvals' && <ApprovalsPage />}
+        {tab === 'supervisor' && <SupervisorEntryPage />}
         {tab === 'calendar' && <CalendarPage />}
         {tab === 'records' && <SupervisorRecordsPage />}
         {tab === 'purchases' && <PurchasesPage />}
