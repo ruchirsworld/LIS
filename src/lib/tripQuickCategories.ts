@@ -28,6 +28,7 @@ export const TRIP_QUICK_CATEGORIES: QuickCategory[] = [
     label: 'Other',
     options: [
       { label: 'Lodging', subHeadCode: '10.7' },
+      { label: 'PR', subHeadCode: '70.3' },
       { label: 'Misc.', subHeadCode: '100.1' },
     ],
   },
