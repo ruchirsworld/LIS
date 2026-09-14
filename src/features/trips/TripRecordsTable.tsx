@@ -397,16 +397,18 @@ export function TripRecordsTable() {
                                         >
                                           ✎
                                         </Button>
-                                        <Button
-                                          type="button"
-                                          variant="secondary"
-                                          className="icon-btn-sq"
-                                          onClick={() => handleDeleteExpense(e)}
-                                          title="Delete"
-                                          aria-label="Delete"
-                                        >
-                                          🗑
-                                        </Button>
+                                        {canDelete && (
+                                          <Button
+                                            type="button"
+                                            variant="secondary"
+                                            className="icon-btn-sq"
+                                            onClick={() => handleDeleteExpense(e)}
+                                            title="Delete"
+                                            aria-label="Delete"
+                                          >
+                                            🗑
+                                          </Button>
+                                        )}
                                       </div>
                                     </td>
                                   </tr>
