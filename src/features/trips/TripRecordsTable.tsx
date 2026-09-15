@@ -4,7 +4,9 @@ import { Modal } from '../../components/Modal'
 import { SearchableSelect } from '../../components/SearchableSelect'
 import { TableScroll } from '../../components/TableScroll'
 import { PeriodFilter } from '../../components/PeriodFilter'
+import { SortableTh } from '../../components/SortableTh'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
+import { useSort } from '../../lib/useSort'
 import { useTrips, useUpdateTrip, useDeleteTrip } from '../../lib/queries/trips'
 import { useExpenses, useDeleteExpense } from '../../lib/queries/expenses'
 import { useProfiles } from '../../lib/queries/admin'
@@ -206,11 +208,27 @@ export function TripRecordsTable() {
   const projectName = (id: string | null) => (id ? projects?.find((p) => p.id === id)?.name ?? '—' : '—')
   const subHeadName = (id: string | null) => (id ? subHeads?.find((s) => s.id === id)?.name ?? '—' : '—')
 
-  const sortedTrips = [...(trips ?? [])]
-    .filter((t) => (!range?.from || t.start_date >= range.from) && (!range?.to || t.start_date <= range.to))
-    .sort((a, b) => b.start_date.localeCompare(a.start_date))
   const expensesByTrip = (tripId: string) => (expenses ?? []).filter((e) => e.trip_id === tripId)
   const tripTotal = (tripId: string) => expensesByTrip(tripId).reduce((s, e) => s + Number(e.amount || 0), 0)
+
+  const rangeFilteredTrips = (trips ?? []).filter(
+    (t) => (!range?.from || t.start_date >= range.from) && (!range?.to || t.start_date <= range.to)
+  )
+  const { sorted, sortKey, direction, toggleSort } = useSort(
+    rangeFilteredTrips,
+    {
+      name: (t) => t.name,
+      traveler: (t) => travelerName(t.traveler_id),
+      project: (t) => projectName(t.project_id),
+      start: (t) => t.start_date,
+      end: (t) => t.end_date,
+      status: (t) => t.status,
+      total: (t) => tripTotal(t.id),
+    },
+    'start',
+    'desc'
+  )
+  const sortedTrips = sorted ?? []
 
   const exportSections: ExportSection[] = [
     {
@@ -250,13 +268,13 @@ export function TripRecordsTable() {
           <thead>
             <tr>
               <th></th>
-              <th>Trip</th>
-              <th>Traveler</th>
-              <th>Project</th>
-              <th>Start</th>
-              <th>End</th>
-              <th>Status</th>
-              <th style={{ textAlign: 'right' }}>Total</th>
+              <SortableTh label="Trip" sortKey="name" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Traveler" sortKey="traveler" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Project" sortKey="project" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Start" sortKey="start" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="End" sortKey="end" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Status" sortKey="status" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Total" sortKey="total" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
               <th></th>
             </tr>
           </thead>

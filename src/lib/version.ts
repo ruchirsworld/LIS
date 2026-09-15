@@ -1,1 +1,1 @@
-export const APP_VERSION = 'LIS 2.0.49'
+export const APP_VERSION = 'LIS 2.0.50'
