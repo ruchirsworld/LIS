@@ -189,7 +189,14 @@ export function TripRecordsTable() {
     try {
       await deleteTrip.mutateAsync(t.id)
     } catch (err) {
-      setDeleteError((m) => ({ ...m, [t.id]: getErrorMessage(err, 'Could not delete this trip.') }))
+      const message = err instanceof Error ? err.message : String(err)
+      setDeleteError((m) => ({
+        ...m,
+        [t.id]:
+          message.includes('foreign key constraint') || message.includes('violates')
+            ? 'Cannot delete this trip — it still has entries logged against it. Remove those entries first (expand the trip below), then delete it.'
+            : getErrorMessage(err, 'Could not delete this trip.'),
+      }))
     } finally {
       setDeleteBusyId(null)
     }
