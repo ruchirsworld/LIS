@@ -34,8 +34,21 @@ export function useUpdateTrip() {
     mutationFn: async ({ id, patch }: { id: string; patch: TripUpdate }) => {
       const { error } = await supabase.from('trips').update(patch).eq('id', id)
       if (error) throw error
+      // Keep every expense already logged on this trip in sync with its
+      // project — otherwise relinking a trip to a different project leaves
+      // its existing entries silently attributed to the old one (or none).
+      if ('project_id' in patch) {
+        const { error: syncError } = await supabase
+          .from('expenses')
+          .update({ project_id: patch.project_id ?? null })
+          .eq('trip_id', id)
+        if (syncError) throw syncError
+      }
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['trips'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['trips'] })
+      qc.invalidateQueries({ queryKey: ['expenses'] })
+    },
   })
 }
 
