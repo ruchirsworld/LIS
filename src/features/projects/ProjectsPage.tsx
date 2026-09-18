@@ -12,6 +12,7 @@ import { useVendorBills } from '../../lib/queries/purchases'
 import { useInvoices, useInvoicePayments } from '../../lib/queries/invoices'
 import { useAllStaffAttendance, useAllStaffProjectAssignments } from '../../lib/queries/teamTracking'
 import { useHolidays } from '../../lib/queries/hr'
+import { useTrips } from '../../lib/queries/trips'
 import { fmt, fmtDate } from '../../lib/calc/format'
 import { billTotal, billGstAmt } from '../../lib/calc/vendorBills'
 import { clientLabel } from '../../lib/labels'
@@ -41,22 +42,25 @@ export function ProjectsPage() {
   const { data: staffAttendance } = useAllStaffAttendance()
   const { data: staffAssignments } = useAllStaffProjectAssignments()
   const { data: holidays } = useHolidays()
+  const { data: trips } = useTrips()
 
   const [clientFilter, setClientFilter] = useState('')
   const [selectedId, setSelectedId] = useState('')
-  const [breakdown, setBreakdownState] = useState<'purchases' | 'expenses' | 'salaries' | null>(null)
+  const [breakdown, setBreakdownState] = useState<'purchases' | 'directExpenses' | 'tripExpenses' | 'salaries' | null>(null)
   const [purchaseSubHeadId, setPurchaseSubHeadId] = useState<string | null>(null)
-  const [expenseSubHeadId, setExpenseSubHeadId] = useState<string | null>(null)
+  const [directExpenseSubHeadId, setDirectExpenseSubHeadId] = useState<string | null>(null)
+  const [tripExpenseSubHeadId, setTripExpenseSubHeadId] = useState<string | null>(null)
   const [expandedBillId, setExpandedBillId] = useState<string | null>(null)
   const [expandedExpenseId, setExpandedExpenseId] = useState<string | null>(null)
   const [editingBillId, setEditingBillId] = useState<string | null>(null)
   const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null)
   const selected = projects?.find((p) => p.id === selectedId)
 
-  function setBreakdown(next: 'purchases' | 'expenses' | 'salaries' | null) {
+  function setBreakdown(next: 'purchases' | 'directExpenses' | 'tripExpenses' | 'salaries' | null) {
     setBreakdownState(next)
     setPurchaseSubHeadId(null)
-    setExpenseSubHeadId(null)
+    setDirectExpenseSubHeadId(null)
+    setTripExpenseSubHeadId(null)
     setExpandedBillId(null)
     setExpandedExpenseId(null)
     setEditingBillId(null)
@@ -128,11 +132,26 @@ export function ProjectsPage() {
     purchasesBySubHead.set(key, (purchasesBySubHead.get(key) ?? 0) + billTotal(b))
   })
 
+  // Trip entries are always cost_center "Trips", never "Project" — split
+  // out here so a trip-linked cost doesn't get silently mixed in with
+  // directly-entered Project expenses (they still both count toward the
+  // Expenses total/profit above, just shown separately below).
   const projectExpenseRows = selected ? (expenses ?? []).filter((e) => e.project_id === selected.id) : []
-  const expensesBySubHead = new Map<string, number>()
-  projectExpenseRows.forEach((e) => {
+  const directExpenseRows = projectExpenseRows.filter((e) => e.cost_center !== 'Trips')
+  const tripExpenseRows = projectExpenseRows.filter((e) => e.cost_center === 'Trips')
+  const directExpenseTotal = directExpenseRows.reduce((s, e) => s + Number(e.amount || 0), 0)
+  const tripExpenseTotal = tripExpenseRows.reduce((s, e) => s + Number(e.amount || 0), 0)
+  const tripName = (id: string | null) => (id ? trips?.find((t) => t.id === id)?.name ?? '—' : '—')
+
+  const directExpensesBySubHead = new Map<string, number>()
+  directExpenseRows.forEach((e) => {
     const key = e.sub_head_id ?? 'none'
-    expensesBySubHead.set(key, (expensesBySubHead.get(key) ?? 0) + Number(e.amount || 0))
+    directExpensesBySubHead.set(key, (directExpensesBySubHead.get(key) ?? 0) + Number(e.amount || 0))
+  })
+  const tripExpensesBySubHead = new Map<string, number>()
+  tripExpenseRows.forEach((e) => {
+    const key = e.sub_head_id ?? 'none'
+    tripExpensesBySubHead.set(key, (tripExpensesBySubHead.get(key) ?? 0) + Number(e.amount || 0))
   })
 
   // Full breakdown for the selected project — every section below is
@@ -151,7 +170,8 @@ export function ProjectsPage() {
             ['Budget', budget ?? 0],
             [utilizedPct !== null ? `Utilized (${utilizedPct}%)` : 'Utilized', utilizedTotal],
             ['Purchases', vendorBillTotal],
-            ['Expenses', expenseTotal],
+            ['Direct Expenses', directExpenseTotal],
+            ['Trip-linked Expenses', tripExpenseTotal],
             ['Salaries', salaryTotal],
             ['Pending Claims', pendingClaimsTotal],
           ],
@@ -176,17 +196,30 @@ export function ProjectsPage() {
             ]),
         },
         {
-          title: 'Expenses by sub-head',
+          title: 'Direct expenses by sub-head',
           columns: ['Sub-head', 'Amount'],
-          rows: Array.from(expensesBySubHead.entries()).map(([id, amt]) => [subHeadName(id === 'none' ? null : id), amt]),
+          rows: Array.from(directExpensesBySubHead.entries()).map(([id, amt]) => [subHeadName(id === 'none' ? null : id), amt]),
         },
         {
-          title: 'Expense transactions',
+          title: 'Direct expense transactions',
           columns: ['Date', 'Sub-head', 'Description', 'Amount'],
-          rows: projectExpenseRows
+          rows: directExpenseRows
             .slice()
             .sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''))
             .map((e) => [e.date ? fmtDate(e.date) : '—', subHeadName(e.sub_head_id), e.description ?? '—', Number(e.amount || 0)]),
+        },
+        {
+          title: 'Trip-linked expenses by sub-head',
+          columns: ['Sub-head', 'Amount'],
+          rows: Array.from(tripExpensesBySubHead.entries()).map(([id, amt]) => [subHeadName(id === 'none' ? null : id), amt]),
+        },
+        {
+          title: 'Trip-linked expense transactions',
+          columns: ['Date', 'Trip', 'Sub-head', 'Description', 'Amount'],
+          rows: tripExpenseRows
+            .slice()
+            .sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''))
+            .map((e) => [e.date ? fmtDate(e.date) : '—', tripName(e.trip_id), subHeadName(e.sub_head_id), e.description ?? '—', Number(e.amount || 0)]),
         },
         {
           title: 'Salaries by worker',
@@ -259,10 +292,16 @@ export function ProjectsPage() {
                   onClick={() => setBreakdown(breakdown === 'purchases' ? null : 'purchases')}
                 />
                 <KpiCard
-                  label="Expenses"
-                  value={fmt(expenseTotal)}
-                  active={breakdown === 'expenses'}
-                  onClick={() => setBreakdown(breakdown === 'expenses' ? null : 'expenses')}
+                  label="Direct Expenses"
+                  value={fmt(directExpenseTotal)}
+                  active={breakdown === 'directExpenses'}
+                  onClick={() => setBreakdown(breakdown === 'directExpenses' ? null : 'directExpenses')}
+                />
+                <KpiCard
+                  label="Trip-linked Expenses"
+                  value={fmt(tripExpenseTotal)}
+                  active={breakdown === 'tripExpenses'}
+                  onClick={() => setBreakdown(breakdown === 'tripExpenses' ? null : 'tripExpenses')}
                 />
                 <KpiCard
                   label="Salaries"
@@ -406,31 +445,31 @@ export function ProjectsPage() {
                 </div>
               )}
 
-              {breakdown === 'expenses' && (
+              {breakdown === 'directExpenses' && (
                 <div style={{ marginBottom: 18 }}>
                   <div className="note" style={{ marginBottom: 8 }}>
-                    Expenses by sub-head
+                    Direct expenses by sub-head
                   </div>
-                  {expensesBySubHead.size === 0 ? (
-                    <div className="note">No expenses recorded for this project.</div>
+                  {directExpensesBySubHead.size === 0 ? (
+                    <div className="note">No direct expenses recorded for this project.</div>
                   ) : (
                     <div className="kpi-grid-2col">
-                      {Array.from(expensesBySubHead.entries()).map(([id, amt]) => (
+                      {Array.from(directExpensesBySubHead.entries()).map(([id, amt]) => (
                         <KpiCard
                           key={id}
                           label={subHeadName(id === 'none' ? null : id)}
                           value={fmt(amt)}
-                          active={expenseSubHeadId === id}
-                          onClick={() => setExpenseSubHeadId(expenseSubHeadId === id ? null : id)}
+                          active={directExpenseSubHeadId === id}
+                          onClick={() => setDirectExpenseSubHeadId(directExpenseSubHeadId === id ? null : id)}
                         />
                       ))}
                     </div>
                   )}
 
-                  {expenseSubHeadId && (
+                  {directExpenseSubHeadId && (
                     <div style={{ marginTop: 16 }}>
                       <div className="note" style={{ marginBottom: 8 }}>
-                        ▾ {subHeadName(expenseSubHeadId === 'none' ? null : expenseSubHeadId)} — transaction details
+                        ▾ {subHeadName(directExpenseSubHeadId === 'none' ? null : directExpenseSubHeadId)} — transaction details
                       </div>
                       <div className="table-scroll">
                         <table className="data">
@@ -443,8 +482,8 @@ export function ProjectsPage() {
                             </tr>
                           </thead>
                           <tbody>
-                            {projectExpenseRows
-                              .filter((e) => (e.sub_head_id ?? 'none') === expenseSubHeadId)
+                            {directExpenseRows
+                              .filter((e) => (e.sub_head_id ?? 'none') === directExpenseSubHeadId)
                               .map((e) => {
                                 const vendor = e.vendor_id ? vendors?.find((v) => v.id === e.vendor_id) : null
                                 const isExpanded = expandedExpenseId === e.id
@@ -520,6 +559,62 @@ export function ProjectsPage() {
                                   </Fragment>
                                 )
                               })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {breakdown === 'tripExpenses' && (
+                <div style={{ marginBottom: 18 }}>
+                  <div className="note" style={{ marginBottom: 8 }}>
+                    Trip-linked expenses by sub-head — logged under Trips, shown here since they still count toward this
+                    project. Edit or delete them from Trips.
+                  </div>
+                  {tripExpensesBySubHead.size === 0 ? (
+                    <div className="note">No trip-linked expenses recorded for this project.</div>
+                  ) : (
+                    <div className="kpi-grid-2col">
+                      {Array.from(tripExpensesBySubHead.entries()).map(([id, amt]) => (
+                        <KpiCard
+                          key={id}
+                          label={subHeadName(id === 'none' ? null : id)}
+                          value={fmt(amt)}
+                          active={tripExpenseSubHeadId === id}
+                          onClick={() => setTripExpenseSubHeadId(tripExpenseSubHeadId === id ? null : id)}
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  {tripExpenseSubHeadId && (
+                    <div style={{ marginTop: 16 }}>
+                      <div className="note" style={{ marginBottom: 8 }}>
+                        ▾ {subHeadName(tripExpenseSubHeadId === 'none' ? null : tripExpenseSubHeadId)} — transaction details
+                      </div>
+                      <div className="table-scroll">
+                        <table className="data">
+                          <thead>
+                            <tr>
+                              <th>Date</th>
+                              <th>Trip</th>
+                              <th>Description</th>
+                              <th style={{ textAlign: 'right' }}>Amount</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {tripExpenseRows
+                              .filter((e) => (e.sub_head_id ?? 'none') === tripExpenseSubHeadId)
+                              .map((e) => (
+                                <tr key={e.id}>
+                                  <td>{e.date ? fmtDate(e.date) : '—'}</td>
+                                  <td>{tripName(e.trip_id)}</td>
+                                  <td>{e.description ?? '—'}</td>
+                                  <td className="amt">{fmt(e.amount)}</td>
+                                </tr>
+                              ))}
                           </tbody>
                         </table>
                       </div>
