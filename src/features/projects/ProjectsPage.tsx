@@ -4,6 +4,8 @@ import { SearchableSelect } from '../../components/SearchableSelect'
 import { ReceiptLink } from '../../components/ReceiptLink'
 import { ExpenseForm } from '../expenses/ExpenseForm'
 import { VendorBillForm } from '../purchases/VendorBillForm'
+import { ReportExportButtons } from '../reports/ReportExportButtons'
+import type { ExportSection } from '../../lib/export/report'
 import { useProjects, useClients, useVendors, useExpenseSubHeads, useStaff } from '../../lib/queries/masters'
 import { useExpenses } from '../../lib/queries/expenses'
 import { useVendorBills } from '../../lib/queries/purchases'
@@ -133,6 +135,67 @@ export function ProjectsPage() {
     expensesBySubHead.set(key, (expensesBySubHead.get(key) ?? 0) + Number(e.amount || 0))
   })
 
+  // Full breakdown for the selected project — every section below is
+  // life-to-date (no period filter here), regardless of which sub-head, if
+  // any, happens to be expanded on screen right now.
+  const exportSections: ExportSection[] = selected
+    ? [
+        {
+          title: 'Summary',
+          columns: ['Metric', 'Amount'],
+          rows: [
+            ['Project value', selected.value_ex_gst ?? 0],
+            ['Profit', profit],
+            ['Invoiced', invoicedRevenue],
+            ['Due', balanceDue],
+            ['Budget', budget ?? 0],
+            [utilizedPct !== null ? `Utilized (${utilizedPct}%)` : 'Utilized', utilizedTotal],
+            ['Purchases', vendorBillTotal],
+            ['Expenses', expenseTotal],
+            ['Salaries', salaryTotal],
+            ['Pending Claims', pendingClaimsTotal],
+          ],
+        },
+        {
+          title: 'Purchases by sub-head',
+          columns: ['Sub-head', 'Amount'],
+          rows: Array.from(purchasesBySubHead.entries()).map(([id, amt]) => [subHeadName(id === 'none' ? null : id), amt]),
+        },
+        {
+          title: 'Purchase transactions',
+          columns: ['Date', 'Vendor', 'Sub-head', 'Description', 'Amount'],
+          rows: projectBillRows
+            .slice()
+            .sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''))
+            .map((b) => [
+              b.date ? fmtDate(b.date) : '—',
+              vendors?.find((v) => v.id === b.vendor_id)?.name ?? '—',
+              subHeadName(b.sub_head_id),
+              b.description ?? '—',
+              billTotal(b),
+            ]),
+        },
+        {
+          title: 'Expenses by sub-head',
+          columns: ['Sub-head', 'Amount'],
+          rows: Array.from(expensesBySubHead.entries()).map(([id, amt]) => [subHeadName(id === 'none' ? null : id), amt]),
+        },
+        {
+          title: 'Expense transactions',
+          columns: ['Date', 'Sub-head', 'Description', 'Amount'],
+          rows: projectExpenseRows
+            .slice()
+            .sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''))
+            .map((e) => [e.date ? fmtDate(e.date) : '—', subHeadName(e.sub_head_id), e.description ?? '—', Number(e.amount || 0)]),
+        },
+        {
+          title: 'Salaries by worker',
+          columns: ['Worker', 'Amount'],
+          rows: salaryByWorker.map((row) => [row.name, row.amount]),
+        },
+      ]
+    : []
+
   return (
     <div>
       <ModuleHeader>Projects</ModuleHeader>
@@ -169,10 +232,16 @@ export function ProjectsPage() {
           {selected && (
             <details className="toggle-section" open>
               <summary>{selected.name}</summary>
-              <div className="note" style={{ marginTop: 16, marginBottom: 12 }}>
-                {clientLabel(client)} · {selected.project_location ?? '—'} · {selected.code ?? '—'} · Started{' '}
-                {selected.start_date ? fmtDate(selected.start_date) : '—'}
-                {selected.end_date ? ` · Completed ${fmtDate(selected.end_date)}` : ''}
+              <div
+                className="note"
+                style={{ marginTop: 16, marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}
+              >
+                <span>
+                  {clientLabel(client)} · {selected.project_location ?? '—'} · {selected.code ?? '—'} · Started{' '}
+                  {selected.start_date ? fmtDate(selected.start_date) : '—'}
+                  {selected.end_date ? ` · Completed ${fmtDate(selected.end_date)}` : ''}
+                </span>
+                <ReportExportButtons title={selected.name} sections={exportSections} range={null} iconOnly />
               </div>
 
               <div className="kpi-grid-2col">
