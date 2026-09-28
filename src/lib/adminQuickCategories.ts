@@ -1,6 +1,6 @@
 // Description options for Admin (no cost center) expenses — same two-tap
 // pattern as Trips (see tripQuickCategories.ts): pick a Description group,
-// then a Sub Head option under it. Covers Major Heads 50/70/80/90/100 —
+// then a Sub Head option under it. Covers Major Heads 40/50/70/80/90/100 —
 // Project- and Trip-linked spend have their own separate flows. Each
 // option's own subHeadCode carries its real accounting classification,
 // independent of which group it's surfaced under (e.g. Fees is Major Head
@@ -16,6 +16,17 @@ export const ADMIN_QUICK_CATEGORIES: QuickCategory[] = [
       { label: 'Snacks', subHeadCode: '50.5' },
       { label: 'Consumables', subHeadCode: '20.2' },
       { label: 'Misc.', subHeadCode: '100.1' },
+    ],
+  },
+  {
+    // Vehicle costs that aren't on a trip (Trips has its own Fuel/Repairs
+    // options under Transport). Classified under Major Head 40 regardless
+    // of the group it's surfaced under here.
+    label: 'Vehicle',
+    options: [
+      { label: 'Fuel', subHeadCode: '40.5' },
+      { label: 'Repairs', subHeadCode: '40.6' },
+      { label: 'Running', subHeadCode: '40.3' },
     ],
   },
   {
