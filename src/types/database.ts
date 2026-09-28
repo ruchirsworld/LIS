@@ -2255,6 +2255,7 @@ export type Database = {
           display_id: string | null;
           gstpan: string | null;
           id: string;
+          is_one_time: boolean;
           name: string;
           phone: string | null;
         };
@@ -2267,6 +2268,7 @@ export type Database = {
           display_id?: string | null;
           gstpan?: string | null;
           id?: string;
+          is_one_time?: boolean;
           name: string;
           phone?: string | null;
         };
@@ -2279,6 +2281,7 @@ export type Database = {
           display_id?: string | null;
           gstpan?: string | null;
           id?: string;
+          is_one_time?: boolean;
           name?: string;
           phone?: string | null;
         };

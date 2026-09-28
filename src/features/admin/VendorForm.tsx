@@ -35,6 +35,7 @@ export function VendorForm({
   const [phone, setPhone] = useState(editingVendor?.phone ?? '')
   const [gstpan, setGstpan] = useState(editingVendor?.gstpan ?? '')
   const [address, setAddress] = useState(editingVendor?.address ?? '')
+  const [isOneTime, setIsOneTime] = useState(editingVendor?.is_one_time ?? false)
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -71,7 +72,9 @@ export function VendorForm({
         address: address.trim() || null,
       }
       if (editingVendor) {
-        await updateVendor.mutateAsync({ id: editingVendor.id, patch })
+        // Only editable here, not on create — unticking it is how a one-time
+        // vendor gets promoted into the regular vendor list.
+        await updateVendor.mutateAsync({ id: editingVendor.id, patch: { ...patch, is_one_time: isOneTime } })
         onDoneEditing()
       } else {
         await createVendor.mutateAsync(patch)
@@ -129,6 +132,12 @@ export function VendorForm({
           <label>Address</label>
           <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} />
         </div>
+        {editingVendor && (
+          <div className="field full row-inline">
+            <input type="checkbox" id="vf-one-time" checked={isOneTime} onChange={(e) => setIsOneTime(e.target.checked)} />
+            <label htmlFor="vf-one-time">One-time vendor — keep out of the vendor list (untick to make permanent)</label>
+          </div>
+        )}
 
         <div className="field full" style={{ display: 'flex', gap: 8 }}>
           <Button type="submit" disabled={submitting}>

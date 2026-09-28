@@ -7,8 +7,16 @@ type Vendor = Database['public']['Tables']['vendors']['Row']
  * for the Purchase forms (Expenses' Purchase category, Vendor bills, Record
  * payments) — one category selection per form, resetting whatever vendor
  * was already picked since it may not belong to the newly selected type. */
-export function useVendorCategoryFilter(vendors: Vendor[] | undefined, onCategoryChange: () => void) {
+export function useVendorCategoryFilter(
+  allVendors: Vendor[] | undefined,
+  onCategoryChange: () => void,
+  /** The vendor currently picked on the form — a one-time vendor stays
+   * pickable only while it's the selected one (just created, or the bill
+   * being edited), and drops out of the list for every other bill. */
+  selectedVendorId?: string
+) {
   const [category, setCategoryState] = useState<string | null>(null)
+  const vendors = allVendors?.filter((v) => !v.is_one_time || v.id === selectedVendorId)
   const categories = Array.from(new Set(vendors?.map((v) => v.category).filter((c): c is string => !!c))).sort()
   const filteredVendors = category ? vendors?.filter((v) => v.category === category) : vendors
 

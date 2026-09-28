@@ -18,6 +18,10 @@ export function VendorPage() {
 
   const [vendorId, setVendorId] = useState('')
   const [showAddPayment, setShowAddPayment] = useState(false)
+  const [showOneTime, setShowOneTime] = useState(false)
+  // A one-time vendor stays visible while it's the selected one, so
+  // unticking the toggle never blanks out the vendor you're looking at.
+  const visibleVendors = vendors?.filter((v) => showOneTime || !v.is_one_time || v.id === vendorId)
 
   const vendorBills = bills?.filter((b) => b.vendor_id === vendorId) ?? []
   const vendorExpenses = expenses?.filter((e) => e.vendor_id === vendorId) ?? []
@@ -39,7 +43,7 @@ export function VendorPage() {
       <div className="field full" style={{ maxWidth: 320 }}>
         <label>Select vendor</label>
         <SearchableSelect
-          items={vendors}
+          items={visibleVendors}
           value={vendorId}
           onChange={setVendorId}
           getId={(v) => v.id}
@@ -47,6 +51,12 @@ export function VendorPage() {
           getSearchValue={(v) => `${v.name} ${v.phone ?? ''}`}
           placeholder="— Select vendor —"
         />
+        {vendors?.some((v) => v.is_one_time) && (
+          <label style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 6, fontSize: 12, fontWeight: 400 }}>
+            <input type="checkbox" checked={showOneTime} onChange={(e) => setShowOneTime(e.target.checked)} />
+            Show one-time vendors
+          </label>
+        )}
       </div>
 
       {vendorId && (

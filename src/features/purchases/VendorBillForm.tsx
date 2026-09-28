@@ -70,7 +70,7 @@ export function VendorBillForm({
   const [vendorId, setVendorId] = useState('')
   const [showAddVendor, setShowAddVendor] = useState(false)
   const { categories: vendorCategories, category: vendorCategory, setCategory: setVendorCategory, filteredVendors } =
-    useVendorCategoryFilter(vendors, () => setVendorId(''))
+    useVendorCategoryFilter(vendors, () => setVendorId(''), vendorId)
   const [subHeadId, setSubHeadId] = useState('')
   const [description, setDescription] = useState('')
   const [remarks, setRemarks] = useState('')

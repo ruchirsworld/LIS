@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useVendors } from '../../lib/queries/masters'
 import { useDeleteVendor } from '../../lib/queries/admin'
 import { useAuth } from '../../lib/auth'
@@ -15,8 +16,10 @@ type Vendor = Database['public']['Tables']['vendors']['Row']
 export function VendorTable({ onEdit }: { onEdit: (vendor: Vendor) => void }) {
   const { profile } = useAuth()
   const canManage = profile?.role === 'admin'
-  const { data: vendors, isLoading } = useVendors()
+  const { data: allVendors, isLoading } = useVendors()
   const deleteVendor = useDeleteVendor()
+  const [showOneTime, setShowOneTime] = useState(false)
+  const vendors = allVendors?.filter((v) => showOneTime || !v.is_one_time)
 
   const { sorted: sortedVendors, sortKey, direction, toggleSort } = useSort(vendors, {
     id: (v) => v.display_id,
@@ -48,6 +51,12 @@ export function VendorTable({ onEdit }: { onEdit: (vendor: Vendor) => void }) {
   return (
     <>
       <ReportExportButtons title="Vendors" sections={exportSections} range={null} />
+      {allVendors?.some((v) => v.is_one_time) && (
+        <label style={{ display: 'flex', gap: 6, alignItems: 'center', margin: '8px 0', fontSize: 12, fontWeight: 400 }}>
+          <input type="checkbox" checked={showOneTime} onChange={(e) => setShowOneTime(e.target.checked)} />
+          Show one-time vendors
+        </label>
+      )}
       <TableScroll>
       <table className="data">
         <thead>

@@ -32,6 +32,7 @@ export function AddVendorModal({
   const [phone, setPhone] = useState('')
   const [gstpan, setGstpan] = useState('')
   const [address, setAddress] = useState('')
+  const [isOneTime, setIsOneTime] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -56,6 +57,7 @@ export function AddVendorModal({
         phone: phone.trim() || null,
         gstpan: gstpan.trim() || null,
         address: address.trim() || null,
+        is_one_time: isOneTime,
       })
       onCreated(created)
     } catch (err) {
@@ -105,6 +107,12 @@ export function AddVendorModal({
         <div className="field full">
           <label>Address</label>
           <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} />
+        </div>
+        <div className="field full row-inline">
+          <input type="checkbox" id="av-one-time" checked={isOneTime} onChange={(e) => setIsOneTime(e.target.checked)} />
+          <label htmlFor="av-one-time">
+            One-time vendor — use for this bill only and keep out of the vendor list
+          </label>
         </div>
 
         <div className="field full" style={{ display: 'flex', gap: 8 }}>
