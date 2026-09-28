@@ -1,14 +1,10 @@
-import { Fragment, useState } from 'react'
-import { useExpenses, useExpenseReimbursements } from '../../lib/queries/expenses'
-import { useProfiles } from '../../lib/queries/admin'
-import { expenseDue } from '../../lib/calc/expenses'
+import { useState } from 'react'
+import { useExpenses } from '../../lib/queries/expenses'
 import { fmt, fmtDate } from '../../lib/calc/format'
 import type { DateRange } from '../../lib/calc/reportPeriod'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
-import { SettleReimbursementForm } from './SettleReimbursementForm'
 
-const UNKNOWN_USER = 'Unknown'
 const UNASSIGNED_CC = 'Unassigned'
 
 interface DetailRow {
@@ -21,38 +17,7 @@ interface DetailRow {
 
 export function ExpenseSummary({ range }: { range: DateRange | null }) {
   const { data: expenses } = useExpenses(range)
-  // Independent of the period filter — "amount still to claim" is a running
-  // total, not scoped to whatever date range is currently selected.
-  const { data: allExpenses } = useExpenses(null)
-  const { data: profiles } = useProfiles()
-  const { data: reimbursements } = useExpenseReimbursements()
   const [selectedCostCenter, setSelectedCostCenter] = useState<string | null>(null)
-  const [settlingUserId, setSettlingUserId] = useState<string>('')
-
-  interface DueUserRow {
-    userId: string | null
-    name: string
-    due: number
-    outstanding: { id: string; due: number; date: string }[]
-  }
-  const dueByUserId = new Map<string, DueUserRow>()
-  ;(allExpenses ?? []).forEach((e) => {
-    if (!e.reimbursable) return
-    const due = expenseDue(e.amount, (reimbursements ?? []).filter((r) => r.expense_id === e.id))
-    if (due <= 0) return
-    const key = e.created_by ?? 'unknown'
-    const name = (e.created_by && profiles?.find((p) => p.id === e.created_by)?.name) || UNKNOWN_USER
-    const existing = dueByUserId.get(key)
-    if (existing) {
-      existing.due += due
-      existing.outstanding.push({ id: e.id, due, date: e.date })
-    } else {
-      dueByUserId.set(key, { userId: e.created_by, name, due, outstanding: [{ id: e.id, due, date: e.date }] })
-    }
-  })
-  dueByUserId.forEach((row) => row.outstanding.sort((a, b) => a.date.localeCompare(b.date)))
-  const dueByUserRows = Array.from(dueByUserId.values()).sort((a, b) => b.due - a.due)
-  const totalDue = dueByUserRows.reduce((s, r) => s + r.due, 0)
 
   const byCostCenter = new Map<string, number>()
   ;(expenses ?? []).forEach((e) => {
@@ -85,11 +50,6 @@ export function ExpenseSummary({ range }: { range: DateRange | null }) {
       title: 'Expense details',
       columns: ['ID', 'Date', 'Description', 'Remarks', 'Amount'],
       rows: rows.map((r) => [r.id, fmtDate(r.date), r.description, r.remarks, r.amount]),
-    },
-    {
-      title: 'Reimbursement due by user',
-      columns: ['User', 'Amount due'],
-      rows: dueByUserRows.map((r) => [r.name, r.due]),
     },
   ]
 
@@ -155,56 +115,6 @@ export function ExpenseSummary({ range }: { range: DateRange | null }) {
           </tbody>
         </table>
       </div>
-
-      {dueByUserRows.length > 0 && (
-        <>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-soft)', marginTop: 16, marginBottom: 8 }}>
-            Reimbursement due by user — total {fmt(totalDue)}
-          </div>
-          <div className="table-scroll">
-            <table className="data">
-              <thead>
-                <tr>
-                  <th>User</th>
-                  <th style={{ textAlign: 'right' }}>Amount due</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {dueByUserRows.map((r) => {
-                  const rowKey = r.userId ?? 'unknown'
-                  return (
-                    <Fragment key={rowKey}>
-                      <tr>
-                        <td>{r.name}</td>
-                        <td className="amt">{fmt(r.due)}</td>
-                        <td>
-                          <button
-                            type="button"
-                            className="pay-btn"
-                            disabled={!r.userId}
-                            onClick={() => setSettlingUserId(settlingUserId === rowKey ? '' : rowKey)}
-                          >
-                            Settle
-                          </button>
-                        </td>
-                      </tr>
-                      {settlingUserId === rowKey && (
-                        <SettleReimbursementForm
-                          due={r.due}
-                          outstandingExpenses={r.outstanding}
-                          colSpan={3}
-                          onClose={() => setSettlingUserId('')}
-                        />
-                      )}
-                    </Fragment>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
     </details>
   )
 }

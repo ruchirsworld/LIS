@@ -16,6 +16,7 @@ import { ReportPeriodFilter } from '../reports/ReportPeriodFilter'
 import { FinancialSummaryReport } from '../reports/FinancialSummaryReport'
 import { GstSummaryReport } from '../reports/GstSummaryReport'
 import { ExpenseSummary } from './ExpenseSummary'
+import { ReimbursementDue } from './ReimbursementDue'
 import { SupervisorDashboardPage } from './SupervisorDashboardPage'
 import { useAuth } from '../../lib/auth'
 import { reportPeriodToRange } from '../../lib/calc/reportPeriod'
@@ -284,6 +285,7 @@ export function DashboardPage() {
 
       <FinancialSummaryReport range={range} />
       <GstSummaryReport range={range} />
+      <ReimbursementDue />
       <ExpenseSummary range={range} />
     </div>
   )
