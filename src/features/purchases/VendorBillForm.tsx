@@ -3,6 +3,12 @@ import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
 import { ReceiptUploadButton } from '../../components/ReceiptUploadButton'
 import { SearchableSelect } from '../../components/SearchableSelect'
+import {
+  PaymentAccountPicker,
+  bankAccountIdOf,
+  paymentModeOf,
+  REIMBURSE_ACCOUNT as REIMBURSE,
+} from '../../components/PaymentAccountPicker'
 import { useAuth } from '../../lib/auth'
 import { useClients, useProjects, useVendors, useExpenseSubHeads } from '../../lib/queries/masters'
 import { useProfiles } from '../../lib/queries/admin'
@@ -19,12 +25,6 @@ import { useVendorCategoryFilter, VendorCategoryPills } from './VendorCategoryFi
 import type { Database } from '../../types/database'
 
 type VendorBill = Database['public']['Tables']['vendor_bills']['Row']
-type PaymentMode = 'UPI' | 'NEFT' | 'Cash' | 'Reimbursement'
-
-// Reimbursement = an employee paid the vendor out of pocket, so no cash or
-// bank moves and the firm owes that employee instead.
-const PAYMENT_MODES: PaymentMode[] = ['UPI', 'NEFT', 'Cash', 'Reimbursement']
-
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
 }
@@ -93,7 +93,7 @@ export function VendorBillForm({
   const [showQuickPay, setShowQuickPay] = useState(false)
   const [payDate, setPayDate] = useState(todayStr())
   const [payAmount, setPayAmount] = useState('0')
-  const [payMode, setPayMode] = useState<PaymentMode>('UPI')
+  const [payAccountId, setPayAccountId] = useState('')
   const [payPaidBy, setPayPaidBy] = useState('')
   const [payError, setPayError] = useState<string | null>(null)
   const [payDone, setPayDone] = useState(false)
@@ -190,7 +190,7 @@ export function VendorBillForm({
     setShowQuickPay(false)
     setPayDate(todayStr())
     setPayAmount('0')
-    setPayMode('UPI')
+    setPayAccountId('')
     setPayPaidBy('')
     setPayError(null)
     setPayDone(false)
@@ -204,7 +204,7 @@ export function VendorBillForm({
       setPayError('Enter a payment amount.')
       return
     }
-    if (payMode === 'Reimbursement' && !payPaidBy) {
+    if (payAccountId === REIMBURSE && !payPaidBy) {
       setPayError('Pick who paid, so they can be reimbursed.')
       return
     }
@@ -215,8 +215,9 @@ export function VendorBillForm({
         bill_id: lastCreatedBill.id,
         date: payDate,
         amount: amt,
-        payment_mode: payMode,
-        paid_by: payMode === 'Reimbursement' ? payPaidBy : null,
+        payment_mode: paymentModeOf(payAccountId),
+        bank_account_id: bankAccountIdOf(payAccountId),
+        paid_by: payAccountId === REIMBURSE ? payPaidBy : null,
       })
       setPayDone(true)
     } catch (err) {
@@ -507,22 +508,9 @@ export function VendorBillForm({
                   <CurrencyInput value={payAmount} onValueChange={setPayAmount} required />
                 </div>
               </div>
-              <div className="field full">
-                <label>Mode of payment</label>
-                <div className="pill-tabs">
-                  {PAYMENT_MODES.map((m) => (
-                    <button
-                      key={m}
-                      type="button"
-                      className={payMode === m ? 'pill active' : 'pill'}
-                      onClick={() => setPayMode(m)}
-                    >
-                      {m}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {payMode === 'Reimbursement' && (
+              <PaymentAccountPicker className="full" value={payAccountId} onChange={setPayAccountId} allowReimbursement />
+
+              {payAccountId === REIMBURSE && (
                 <div className="field full">
                   <label>Paid by (to be reimbursed)</label>
                   <SearchableSelect

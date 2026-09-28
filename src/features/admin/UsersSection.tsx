@@ -199,7 +199,7 @@ export function UsersSection() {
             >
               Which project(s) this supervisor is responsible for — can be more than one.
             </div>
-            {projectOptions.length === 0 && <div className="note">No active projects yet.</div>}
+            {projectOptions.length === 0 && <div className="empty-state">No active projects yet.</div>}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
               {projectOptions.map((p) => (
                 <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 400 }}>

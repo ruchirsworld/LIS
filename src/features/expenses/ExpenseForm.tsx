@@ -3,9 +3,16 @@ import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
 import { InlineCalculator } from '../../components/InlineCalculator'
 import { SearchableSelect } from '../../components/SearchableSelect'
+import {
+  PaymentAccountPicker,
+  usePaymentAccountOptions,
+  CASH_ACCOUNT as CASH,
+  REIMBURSE_ACCOUNT as REIMBURSE,
+  IMPREST_ACCOUNT as IMPREST,
+} from '../../components/PaymentAccountPicker'
 import { ReceiptUploadButton } from '../../components/ReceiptUploadButton'
 import { Modal } from '../../components/Modal'
-import { useClients, useProjects, useCostCenters, useExpenseSubHeads, useExpenseUnits, useBankAccounts } from '../../lib/queries/masters'
+import { useClients, useProjects, useCostCenters, useExpenseSubHeads, useExpenseUnits } from '../../lib/queries/masters'
 import { useCreateExpense, useUpdateExpense } from '../../lib/queries/expenses'
 import { useCreateExpenseUnit } from '../../lib/queries/admin'
 import { useGeolocation } from '../../lib/useGeolocation'
@@ -23,16 +30,6 @@ type ExpenseRow = Database['public']['Tables']['expenses']['Row']
 
 const PROJECT_STORAGE_KEY = 'lis.expenses.lastProject'
 const GST_RATES = [0, 5, 12, 18, 28]
-const CASH = 'cash'
-// Not a real account — picking this means the employee paid out of pocket
-// and the firm owes it back, so no cash/bank actually moves yet.
-const REIMBURSE = 'reimburse'
-// Also not a real account — set automatically when a Supervisor's own
-// Project claim is approved (see handleApproveSupervisor in
-// PendingClaimApprovals.tsx), never picked here. Shown read-only so
-// editing one of these doesn't misrepresent it as Cash and doesn't silently
-// clear paid_from_imprest on save.
-const IMPREST = 'imprest'
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
@@ -123,27 +120,11 @@ export function ExpenseForm({
   const { data: costCenters } = useCostCenters()
   const { data: subHeads } = useExpenseSubHeads()
   const { data: units } = useExpenseUnits()
-  const { data: bankAccounts } = useBankAccounts()
-  // Bank accounts first (Kotak, then CBI, then anything else alphabetically),
-  // Cash and Reimbursement always last — matches the requested button order.
-  const BANK_ORDER = ['Kotak', 'CBI']
-  const sortedBankAccounts = [...(bankAccounts ?? [])].sort((a, b) => {
-    const ai = BANK_ORDER.indexOf(a.name)
-    const bi = BANK_ORDER.indexOf(b.name)
-    if (ai === -1 && bi === -1) return a.name.localeCompare(b.name)
-    if (ai === -1) return 1
-    if (bi === -1) return -1
-    return ai - bi
-  })
-  // Imprest is only ever shown, never offered, and only when the record
-  // being edited already has it — see the IMPREST constant above.
-  const accountOptions = [
-    ...sortedBankAccounts,
-    { id: CASH, name: 'Cash' },
-    { id: REIMBURSE, name: 'Reimburse' },
-    ...(editingExpense?.paid_from_imprest ? [{ id: IMPREST, name: 'Imprest (Site float)' }] : []),
-  ]
-  const defaultAccountId = accountOptions.find((a) => a.name === 'Kotak')?.id ?? CASH
+  const { defaultId: defaultAccountId } = usePaymentAccountOptions()
+  // Imprest is only ever shown, never offered, and only when the record being
+  // edited already has it — it's set when a Supervisor's Project claim is
+  // approved (see handleApproveSupervisor in PendingClaimApprovals.tsx).
+  const imprestOption = editingExpense?.paid_from_imprest ? [{ id: IMPREST, name: 'Imprest (Site float)' }] : []
   // No visible GPS UI — still silently captured on mount and submitted with the transaction.
   const { geo } = useGeolocation()
 
@@ -986,34 +967,14 @@ export function ExpenseForm({
           </div>
         )}
         <div className="field-row exp-footer-row" style={{ alignItems: 'center' }}>
-          <div className="field exp-account" style={{ flex: '1 1 auto', minWidth: 0 }}>
-            <label>Account</label>
-            {/* Pills stay usable up to a handful of accounts; beyond that a
-                searchable dropdown scales better than a wall of buttons. */}
-            {accountOptions.length <= 5 ? (
-              <div className="pill-tabs">
-                {accountOptions.map((a) => (
-                  <button
-                    key={a.id}
-                    type="button"
-                    className={effectiveAccountId === a.id ? 'pill active' : 'pill'}
-                    onClick={() => setAccountId(a.id)}
-                  >
-                    {a.name}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <SearchableSelect
-                items={accountOptions}
-                value={effectiveAccountId}
-                onChange={setAccountId}
-                getId={(a) => a.id}
-                getLabel={(a) => a.name}
-                placeholder="— Select account —"
-              />
-            )}
-          </div>
+          <PaymentAccountPicker
+            className="exp-account"
+            style={{ flex: '1 1 auto', minWidth: 0 }}
+            value={effectiveAccountId}
+            onChange={setAccountId}
+            allowReimbursement
+            extra={imprestOption}
+          />
           {!tripId && (
             <div className="field exp-receipt" style={{ flex: '0 0 auto' }}>
               <ReceiptUploadButton

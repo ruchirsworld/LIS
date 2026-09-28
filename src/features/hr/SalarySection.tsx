@@ -19,6 +19,7 @@ import {
   useDeleteStaffSalaryAdvance,
 } from '../../lib/queries/hr'
 import { useAuth } from '../../lib/auth'
+import { PaymentAccountPicker, bankAccountIdOf, CASH_ACCOUNT } from '../../components/PaymentAccountPicker'
 import { computeAccrualBreakdown, nextAccrualStart, todayStr, type AttendanceDayType } from '../../lib/calc/payroll'
 import { fmt, fmtDate, parseINR } from '../../lib/calc/format'
 import { getErrorMessage } from '../../lib/errors'
@@ -302,7 +303,7 @@ export function SalarySection() {
         staff_id: payFormStaffId,
         date: payDate,
         amount: amt,
-        bank_account_id: payBankAccountId || null,
+        bank_account_id: bankAccountIdOf(payBankAccountId),
         advance_recovered: recovered,
         notes: payNotes.trim() || null,
       })
@@ -338,7 +339,7 @@ export function SalarySection() {
         staff_id: advanceFormStaffId,
         date: advanceDate,
         amount: amt,
-        bank_account_id: advanceBankAccountId || null,
+        bank_account_id: bankAccountIdOf(advanceBankAccountId),
         remarks: advanceRemarks.trim() || null,
       })
       setAdvanceFormStaffId(null)
@@ -354,7 +355,7 @@ export function SalarySection() {
     setAdvanceEditDraft({
       date: a.date,
       amount: String(a.amount),
-      bankAccountId: a.bank_account_id ?? '',
+      bankAccountId: a.bank_account_id ?? CASH_ACCOUNT,
       remarks: a.remarks ?? '',
     })
     setAdvanceEditError((m) => ({ ...m, [a.id]: '' }))
@@ -374,7 +375,7 @@ export function SalarySection() {
         patch: {
           date: advanceEditDraft.date,
           amount: amt,
-          bank_account_id: advanceEditDraft.bankAccountId || null,
+          bank_account_id: bankAccountIdOf(advanceEditDraft.bankAccountId),
           remarks: advanceEditDraft.remarks.trim() || null,
         },
       })
@@ -605,17 +606,8 @@ export function SalarySection() {
                             <label>Amount (₹)</label>
                             <CurrencyInput value={payAmount} onValueChange={setPayAmount} required />
                           </div>
-                          <div className="field">
-                            <label>Account</label>
-                            <select value={payBankAccountId} onChange={(e) => setPayBankAccountId(e.target.value)}>
-                              <option value="">Cash</option>
-                              {(bankAccounts ?? []).map((a) => (
-                                <option key={a.id} value={a.id}>
-                                  {a.name}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
+                          <PaymentAccountPicker style={{ flexBasis: '100%' }} value={payBankAccountId} onChange={setPayBankAccountId} />
+
                           {r.advanceOutstanding > 0 && (
                             <div className="field">
                               <label>Recover from advance (₹) — {fmt(r.advanceOutstanding)} outstanding</label>
@@ -653,17 +645,8 @@ export function SalarySection() {
                             <label>Amount (₹)</label>
                             <CurrencyInput value={advanceAmount} onValueChange={setAdvanceAmount} required />
                           </div>
-                          <div className="field">
-                            <label>Account</label>
-                            <select value={advanceBankAccountId} onChange={(e) => setAdvanceBankAccountId(e.target.value)}>
-                              <option value="">Cash</option>
-                              {(bankAccounts ?? []).map((a) => (
-                                <option key={a.id} value={a.id}>
-                                  {a.name}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
+                          <PaymentAccountPicker style={{ flexBasis: '100%' }} value={advanceBankAccountId} onChange={setAdvanceBankAccountId} />
+
                           <div className="field">
                             <label>Remarks (optional)</label>
                             <input type="text" value={advanceRemarks} onChange={(e) => setAdvanceRemarks(e.target.value)} />
@@ -821,20 +804,12 @@ export function SalarySection() {
                     <tr>
                       <td colSpan={6}>
                         <div className="field-row" style={{ marginBottom: 8 }}>
-                          <div className="field">
-                            <label>Account</label>
-                            <select
-                              value={advanceEditDraft.bankAccountId}
-                              onChange={(e) => setAdvanceEditDraft((d) => ({ ...d, bankAccountId: e.target.value }))}
-                            >
-                              <option value="">Cash</option>
-                              {(bankAccounts ?? []).map((acc) => (
-                                <option key={acc.id} value={acc.id}>
-                                  {acc.name}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
+                          <PaymentAccountPicker
+                            style={{ flexBasis: '100%' }}
+                            value={advanceEditDraft.bankAccountId}
+                            onChange={(id) => setAdvanceEditDraft((d) => ({ ...d, bankAccountId: id }))}
+                          />
+
                           <div className="field">
                             <label>Remarks (optional)</label>
                             <input

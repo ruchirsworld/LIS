@@ -11,6 +11,7 @@ import { useExpenseSubHeads } from '../../lib/queries/masters'
 import { fmt, fmtDate } from '../../lib/calc/format'
 import { getErrorMessage } from '../../lib/errors'
 import { ExpenseForm } from '../expenses/ExpenseForm'
+import { ReimbursementRecordsTable } from '../expenses/ReimbursementRecordsTable'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import { TripRecordsTable } from './TripRecordsTable'
 import type { ExportSection } from '../../lib/export/report'
@@ -128,36 +129,38 @@ export function TripsSection() {
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
-        <h3 style={{ margin: 0, fontSize: 13 }}>{expandedTrip ? expandedTrip.name : 'Trips'}</h3>
-        {expandedTrip ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <input
-              type="date"
-              value={entryDate}
-              onChange={(e) => setEntryDate(e.target.value)}
-              style={{ fontSize: 12, padding: '4px 6px', width: 130 }}
-            />
-            <Button
-              type="button"
-              variant="secondary"
-              style={{ fontSize: 13, padding: '6px 14px' }}
-              onClick={() => {
-                toggleClosed(expandedTrip.id, expandedTrip.status)
-                // Drop the pin on this trip once it's closed — the header
-                // then falls back to "Start trip" instead of lingering on
-                // a trip that's no longer open.
-                setExpandedOverride(undefined)
-              }}
-            >
-              End Trip
+      <div className="card" style={{ padding: '10px 14px', marginBottom: 8 }}>
+        <div className="toolbar" style={{ marginTop: 0, alignItems: 'center' }}>
+          <strong style={{ fontSize: 14 }}>{expandedTrip ? expandedTrip.name : 'No trip in progress'}</strong>
+          {expandedTrip ? (
+            <div className="toolbar-group" style={{ alignItems: 'center' }}>
+              <input
+                type="date"
+                value={entryDate}
+                onChange={(e) => setEntryDate(e.target.value)}
+                aria-label="Entry date"
+                style={{ fontSize: 13, padding: '6px 8px', width: 140 }}
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  toggleClosed(expandedTrip.id, expandedTrip.status)
+                  // Drop the pin on this trip once it's closed — the header
+                  // then falls back to "Start trip" instead of lingering on
+                  // a trip that's no longer open.
+                  setExpandedOverride(undefined)
+                }}
+              >
+                End Trip
+              </Button>
+            </div>
+          ) : (
+            <Button type="button" onClick={() => setShowStartTrip(true)}>
+              Start trip
             </Button>
-          </div>
-        ) : (
-          <Button type="button" style={{ fontSize: 13, padding: '6px 14px' }} onClick={() => setShowStartTrip(true)}>
-            Start trip
-          </Button>
-        )}
+          )}
+        </div>
       </div>
 
       {showStartTrip && (
@@ -218,29 +221,30 @@ export function TripsSection() {
       )}
 
       {expandedTrip && (
-        <div className="card" style={{ padding: 8, marginBottom: 8 }}>
+        <>
           <ExpenseForm
-              editingExpense={null}
-              onDoneEditing={() => {}}
-              tripId={expandedTrip.id}
-              tripDate={entryDate}
-              fixedCostCenter={expandedTrip.cost_center}
-              fixedProjectId={expandedTrip.project_id}
-            />
+            editingExpense={null}
+            onDoneEditing={() => {}}
+            tripId={expandedTrip.id}
+            tripDate={entryDate}
+            fixedCostCenter={expandedTrip.cost_center}
+            fixedProjectId={expandedTrip.project_id}
+          />
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginTop: 24 }}>
-              <div className="note" style={{ margin: 0, fontWeight: 600 }}>
-                Entries on this trip
-              </div>
+          <details className="toggle-section" open>
+            <summary>Entries on this trip</summary>
+            <div className="toolbar">
+              <div className="toolbar-group" />
               <ReportExportButtons
                 title={`${expandedTrip.name} entries`}
                 sections={tripExportSections}
                 range={{ from: expandedTrip.start_date, to: expandedTrip.end_date }}
+                iconOnly
                 style={{ marginTop: 0 }}
               />
             </div>
             {expandedTripExpenses.length === 0 ? (
-              <div className="note">No entries yet — add one above.</div>
+              <div className="empty-state">No entries yet — add one above.</div>
             ) : (
               <div className="table-scroll">
                 <table className="data">
@@ -275,16 +279,16 @@ export function TripsSection() {
                 </table>
               </div>
             )}
-        </div>
+          </details>
+        </>
       )}
 
       {!expandedTrip && !showStartTrip && (
-        <div className="note" style={{ marginTop: 18 }}>
-          No trip in progress — tap "Start trip" above to begin one.
-        </div>
+        <div className="empty-state">No trip in progress — tap "Start trip" above to begin one.</div>
       )}
 
       <TripRecordsTable />
+      <ReimbursementRecordsTable costCenter="Trips" />
     </div>
   )
 }

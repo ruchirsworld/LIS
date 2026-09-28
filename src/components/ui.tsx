@@ -10,8 +10,18 @@ export function Button({
   return <button className={[cls, className].filter(Boolean).join(' ')} {...rest} />
 }
 
-export function ModuleHeader({ children }: { children: ReactNode }) {
-  return <div className="module-header">{children}</div>
+/** The green page title band. `actions` puts controls (a section switcher,
+ * a mode toggle) on its right — the same layout on every page that has one. */
+export function ModuleHeader({ children, actions }: { children: ReactNode; actions?: ReactNode }) {
+  if (!actions) return <div className="module-header">{children}</div>
+  return (
+    <div className="module-header">
+      <div className="module-header-row">
+        <span className="module-header-title">{children}</span>
+        <div className="module-header-actions">{actions}</div>
+      </div>
+    </div>
+  )
 }
 
 export function KpiCard({

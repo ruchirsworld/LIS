@@ -13,9 +13,8 @@ export function HRPage() {
 
   return (
     <div className="hr-page">
-      <ModuleHeader>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'nowrap' }}>
-          <span style={{ fontSize: 13, flexShrink: 0 }}>HR</span>
+      <ModuleHeader
+        actions={
           <div className="cc-switch">
             {HR_SECTIONS.map((s) => (
               <button
@@ -28,7 +27,9 @@ export function HRPage() {
               </button>
             ))}
           </div>
-        </div>
+        }
+      >
+        HR
       </ModuleHeader>
 
       {section === 'Attendance' && <AttendanceSection />}

@@ -81,3 +81,86 @@
     pointer-events: none;
   }
 }
+
+/* ── Split view: two pages side by side (wide screens, Admin/CXO) ───────── */
+.app-main.split .wrap {
+  max-width: none;
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+.split-panes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+/* Each pane scrolls on its own, so reading a long list in one doesn't move
+   the other. */
+.split-pane {
+  min-width: 0;
+  max-height: calc(100vh - 150px);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.split-pane-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.split-pane-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.split-pane-pick > span {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.split-pane-pick select {
+  font-family: inherit;
+  font-size: 13px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--ink);
+  min-width: 160px;
+}
+
+.split-toggle.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.split-close {
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px 4px;
+}
+
+.split-close:hover {
+  text-decoration: underline;
+}

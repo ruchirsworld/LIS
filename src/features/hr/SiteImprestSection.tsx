@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState, type FormEvent } from 'react'
+import { Fragment, useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
 import { SearchableSelect } from '../../components/SearchableSelect'
@@ -18,6 +18,12 @@ import { ImportFileBlock } from '../admin/DataImportSection'
 import { downloadImprestImportTemplate } from '../../lib/import/imprestTemplate'
 import { parseImprestImport, commitImprestImport } from '../../lib/import/runImprestImport'
 import { useAuth } from '../../lib/auth'
+import {
+  PaymentAccountPicker,
+  bankAccountIdOf,
+  CASH_ACCOUNT,
+  REIMBURSE_ACCOUNT as REIMBURSE_ID,
+} from '../../components/PaymentAccountPicker'
 import type { ExportSection } from '../../lib/export/report'
 import type { DateRange } from '../../lib/calc/reportPeriod'
 import { fmt, fmtDate, parseINR } from '../../lib/calc/format'
@@ -73,38 +79,6 @@ export function SiteImprestSection() {
   const [date, setDate] = useState(todayStr())
   const [amount, setAmount] = useState('0')
   const [bankAccountId, setBankAccountId] = useState('')
-  // Bank accounts first (Kotak, then CBI, then anything else alphabetically),
-  // Cash next, Reimbursement always last — same order and pill-button
-  // treatment as Expenses.
-  const BANK_ORDER = ['Kotak', 'CBI']
-  const sortedBankAccounts = [...(bankAccounts ?? [])].sort((a, b) => {
-    const ai = BANK_ORDER.indexOf(a.name)
-    const bi = BANK_ORDER.indexOf(b.name)
-    if (ai === -1 && bi === -1) return a.name.localeCompare(b.name)
-    if (ai === -1) return 1
-    if (bi === -1) return -1
-    return ai - bi
-  })
-  const CASH_ID = ''
-  // Not a real account — picking this means the Admin/CXO paid this advance
-  // out of their own pocket rather than from a company account, so no
-  // cash/bank actually moves and the firm owes it back to them. Only
-  // meaningful for an advance (money going out), never a return.
-  const REIMBURSE_ID = 'reimburse'
-  const accountOptions = [...sortedBankAccounts, { id: CASH_ID, name: 'Cash' }, { id: REIMBURSE_ID, name: 'Reimbursement' }]
-  const visibleAccountOptions = (k: 'advance' | 'return') =>
-    k === 'return' ? accountOptions.filter((a) => a.id !== REIMBURSE_ID) : accountOptions
-  const kotakAccountId = sortedBankAccounts.find((a) => a.name.trim().toLowerCase() === 'kotak')?.id ?? ''
-  // Defaults the new-transaction form's Account to Kotak once the bank
-  // accounts list loads — only ever once, so it doesn't fight a deliberate
-  // choice of Cash (which is also represented by '' internally) made after
-  // this first applies.
-  const defaultedAccountRef = useRef(false)
-  useEffect(() => {
-    if (defaultedAccountRef.current || !kotakAccountId) return
-    defaultedAccountRef.current = true
-    setBankAccountId(kotakAccountId)
-  }, [kotakAccountId])
   const [remarks, setRemarks] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
@@ -248,7 +222,7 @@ export function SiteImprestSection() {
       date: t.date,
       kind: t.kind as 'advance' | 'return',
       amount: String(t.amount),
-      bankAccountId: t.reimbursable ? REIMBURSE_ID : t.bank_account_id ?? '',
+      bankAccountId: t.reimbursable ? REIMBURSE_ID : t.bank_account_id ?? CASH_ACCOUNT,
     })
     setTxnError((m) => ({ ...m, [t.id]: '' }))
   }
@@ -272,7 +246,7 @@ export function SiteImprestSection() {
           date: txnDraft.date,
           kind: txnDraft.kind,
           amount: amt,
-          bank_account_id: txnDraft.bankAccountId === REIMBURSE_ID ? null : txnDraft.bankAccountId || null,
+          bank_account_id: bankAccountIdOf(txnDraft.bankAccountId),
           reimbursable: txnDraft.bankAccountId === REIMBURSE_ID,
         },
       })
@@ -315,7 +289,7 @@ export function SiteImprestSection() {
     setKind('advance')
     setDate(todayStr())
     setAmount('0')
-    setBankAccountId(kotakAccountId)
+    setBankAccountId('')
     setRemarks('')
     setFormError(null)
   }
@@ -339,7 +313,7 @@ export function SiteImprestSection() {
         date,
         kind,
         amount: amt,
-        bank_account_id: bankAccountId === REIMBURSE_ID ? null : bankAccountId || null,
+        bank_account_id: bankAccountIdOf(bankAccountId),
         reimbursable: bankAccountId === REIMBURSE_ID,
         remarks: remarks.trim() || null,
       })
@@ -539,7 +513,7 @@ export function SiteImprestSection() {
                     className={kind === 'return' ? 'pill active' : 'pill'}
                     onClick={() => {
                       setKind('return')
-                      setBankAccountId((id) => (id === REIMBURSE_ID ? kotakAccountId : id))
+                      setBankAccountId((id) => (id === REIMBURSE_ID ? '' : id))
                     }}
                   >
                     Record return
@@ -555,25 +529,20 @@ export function SiteImprestSection() {
                 <CurrencyInput value={amount} onValueChange={setAmount} required />
               </div>
               <div className="field full">
-                <label>Account</label>
-                <div className="pill-tabs">
-                  {visibleAccountOptions(kind).map((a) => (
-                    <button
-                      key={a.id}
-                      type="button"
-                      className={bankAccountId === a.id ? 'pill active' : 'pill'}
-                      onClick={() => setBankAccountId(a.id)}
-                    >
-                      {a.name}
-                    </button>
-                  ))}
-                </div>
+                <PaymentAccountPicker
+                  style={{ padding: 0 }}
+                  label={kind === 'return' ? 'Receiving account' : 'Payment account'}
+                  value={bankAccountId}
+                  onChange={setBankAccountId}
+                  allowReimbursement={kind === 'advance'}
+                />
                 {bankAccountId === REIMBURSE_ID && (
                   <div className="note" style={{ marginTop: 4 }}>
                     Paid by the Admin/CXO out of pocket — no cash/bank moves; the firm owes it back to them.
                   </div>
                 )}
               </div>
+
               <div className="field full">
                 <label>Remarks (optional)</label>
                 <input type="text" value={remarks} onChange={(e) => setRemarks(e.target.value)} />
@@ -662,7 +631,7 @@ export function SiteImprestSection() {
                                 setTxnDraft((d) => ({
                                   ...d,
                                   kind: k,
-                                  bankAccountId: k === 'return' && d.bankAccountId === REIMBURSE_ID ? kotakAccountId : d.bankAccountId,
+                                  bankAccountId: k === 'return' && d.bankAccountId === REIMBURSE_ID ? '' : d.bankAccountId,
                                 }))
                               }}
                             >
@@ -680,21 +649,14 @@ export function SiteImprestSection() {
                         </tr>
                         <tr>
                           <td colSpan={5}>
-                            <div className="field full" style={{ marginBottom: 8 }}>
-                              <label>Account</label>
-                              <div className="pill-tabs">
-                                {visibleAccountOptions(txnDraft.kind).map((a) => (
-                                  <button
-                                    key={a.id}
-                                    type="button"
-                                    className={txnDraft.bankAccountId === a.id ? 'pill active' : 'pill'}
-                                    onClick={() => setTxnDraft((d) => ({ ...d, bankAccountId: a.id }))}
-                                  >
-                                    {a.name}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
+                            <PaymentAccountPicker
+                              style={{ marginBottom: 8 }}
+                              label={txnDraft.kind === 'return' ? 'Receiving account' : 'Payment account'}
+                              value={txnDraft.bankAccountId}
+                              onChange={(id) => setTxnDraft((d) => ({ ...d, bankAccountId: id }))}
+                              allowReimbursement={txnDraft.kind === 'advance'}
+                            />
+
                             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                               <Button type="button" disabled={txnBusyId === t.id} onClick={() => handleSaveTxn(t.id)}>
                                 Save

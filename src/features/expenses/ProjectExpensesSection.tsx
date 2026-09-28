@@ -2,6 +2,7 @@ import { useAuth } from '../../lib/auth'
 import { ExpenseForm } from './ExpenseForm'
 import { ExpenseTable } from './ExpenseTable'
 import { TripLinkedProjectExpenses } from './TripLinkedProjectExpenses'
+import { ReimbursementRecordsTable } from './ReimbursementRecordsTable'
 import { SupervisorProjectExpenseForm } from './SupervisorProjectExpenseForm'
 import { ImportFileBlock } from '../admin/DataImportSection'
 import { downloadSupervisorExpenseImportTemplate } from '../../lib/import/supervisorExpenseTemplate'
@@ -21,6 +22,7 @@ export function ProjectExpensesSection() {
           <ExpenseForm editingExpense={null} onDoneEditing={() => {}} lockToProjects />
           <ExpenseTable costCenterFilter="Project" groupByDate />
           <TripLinkedProjectExpenses />
+          <ReimbursementRecordsTable costCenter="Project" />
         </>
       )}
 

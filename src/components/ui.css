@@ -1457,3 +1457,123 @@ table.data tr.group-header-row td {
   border-radius: 50%;
   flex-shrink: 0;
 }
+
+/* ── Shared page building blocks ─────────────────────────────────────────
+   Use these instead of one-off inline styles so every page's header,
+   filter row, section titles and empty messages look and wrap the same. */
+
+/* Title plus controls on the right (a section switcher, a mode toggle…) —
+   ModuleHeader renders this when given `actions`. */
+.module-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.module-header-title {
+  flex-shrink: 0;
+}
+
+.module-header-actions {
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .module-header-row .module-header-title {
+    font-size: 13px;
+  }
+}
+
+/* Filter/search fields on the left, export/action buttons on the right,
+   wrapping onto a second line on narrow screens. */
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.toolbar-group {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* Small grey heading above a block of cards or a table. */
+.section-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  margin-top: 20px;
+  margin-bottom: 8px;
+}
+
+/* "Nothing here yet" message outside a table. */
+.empty-state {
+  padding: 20px 14px;
+  text-align: center;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+/* ── Touch devices ───────────────────────────────────────────────────────
+   Keyed on the pointer, not the screen width, so it also covers tablets
+   and a phone held sideways. Two problems this fixes: iOS zooms the whole
+   page when a text field under 16px is focused, and most buttons and
+   checkboxes were well under a comfortable finger-sized target. */
+@media (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='file']),
+  select,
+  textarea {
+    font-size: 16px !important;
+    min-height: 42px;
+  }
+
+  input[type='checkbox'],
+  input[type='radio'] {
+    width: 20px;
+    height: 20px;
+  }
+
+  .btn,
+  .pay-btn,
+  .icon-btn,
+  .icon-btn-sq,
+  .pill,
+  .cc-switch-btn,
+  .row-menu-btn,
+  .context-reset,
+  .report-back-btn,
+  .modal-close,
+  .module-header-actions > button {
+    min-height: 40px;
+  }
+
+  .icon-btn,
+  .icon-btn-sq,
+  .row-menu-btn,
+  .modal-close {
+    min-width: 40px;
+  }
+
+  .pay-btn {
+    padding: 8px 12px;
+    min-width: 40px;
+  }
+
+  .row-expand-btn {
+    width: 36px;
+    height: 36px;
+  }
+
+  /* A label that wraps a checkbox is the tap target for it. */
+  label:has(> input[type='checkbox']),
+  .field.row-inline {
+    min-height: 40px;
+    align-items: center;
+  }
+}

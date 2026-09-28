@@ -58,7 +58,7 @@ export function ExpenseSummary({ range }: { range: DateRange | null }) {
       <summary>Expense summary</summary>
       <ReportExportButtons title="Expense summary" sections={sections} range={range} />
 
-      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-soft)', marginTop: 16, marginBottom: 8 }}>
+      <div className="section-label">
         By cost center
       </div>
       <div className="dash-grid">
@@ -81,7 +81,7 @@ export function ExpenseSummary({ range }: { range: DateRange | null }) {
         ))}
       </div>
 
-      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-soft)', marginTop: 16, marginBottom: 8 }}>
+      <div className="section-label">
         Expense details{selectedCostCenter ? ` — ${selectedCostCenter}` : ''}
       </div>
       <div className="table-scroll">

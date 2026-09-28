@@ -20,13 +20,24 @@ function SignOutIcon() {
   )
 }
 
+export interface SplitControl {
+  /** Wide enough (and the right role) for two pages side by side. */
+  canSplit: boolean
+  /** The second pane is currently showing. */
+  isOpen: boolean
+  onToggle: () => void
+  tab: TabId | null
+}
+
 export function Shell({
   active,
   onChange,
+  split,
   children,
 }: {
   active: TabId
   onChange: (tab: TabId) => void
+  split?: SplitControl
   children: ReactNode
 }) {
   const { signOut, profile } = useAuth()
@@ -73,7 +84,7 @@ export function Shell({
         approvalsBadge={pendingApprovalsCount}
       />
 
-      <div className="app-main">
+      <div className={split?.isOpen ? 'app-main split' : 'app-main'}>
         <div className="wrap">
           <div className={headerHidden ? 'shell-header hide-on-scroll' : 'shell-header'}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -86,6 +97,16 @@ export function Shell({
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              {split?.canSplit && (
+                <button
+                  type="button"
+                  className={split.isOpen ? 'pay-btn split-toggle active' : 'pay-btn split-toggle'}
+                  onClick={split.onToggle}
+                  title="Show a second page next to this one"
+                >
+                  {split.isOpen ? 'Close split' : 'Split view'}
+                </button>
+              )}
               {isSupervisor && (
                 <button
                   type="button"

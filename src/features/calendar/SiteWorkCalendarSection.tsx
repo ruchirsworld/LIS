@@ -148,7 +148,7 @@ export function SiteWorkCalendarSection({
               </button>
             </div>
             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {selectedWork.size === 0 && <div className="note">No site recorded for this date.</div>}
+              {selectedWork.size === 0 && <div className="empty-state">No site recorded for this date.</div>}
               {[...selectedWork.entries()].map(([projectId, sups]) => {
                 const p = projectById.get(projectId)
                 return (

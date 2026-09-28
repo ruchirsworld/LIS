@@ -56,7 +56,7 @@ export function TransferTable() {
     <details className="toggle-section" open>
       <summary>Transfer records</summary>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 12, marginTop: 16 }}>
+      <div className="toolbar">
         <PeriodFilter onChange={setRange} allowCustom style={{ marginBottom: 0 }} />
         <ReportExportButtons title="Transfer records" sections={exportSections} range={range} style={{ marginTop: 0 }} />
       </div>

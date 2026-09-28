@@ -2,7 +2,13 @@ import { useState } from 'react'
 import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
 import { SearchableSelect } from '../../components/SearchableSelect'
-import { useBankAccounts } from '../../lib/queries/masters'
+import {
+  PaymentAccountPicker,
+  bankAccountIdOf,
+  paymentModeOf,
+  CASH_ACCOUNT as CASH,
+  REIMBURSE_ACCOUNT as REIMBURSE,
+} from '../../components/PaymentAccountPicker'
 import { useProfiles } from '../../lib/queries/admin'
 import { useCreateVendorBillPayment, useUpdateVendorBillPayment } from '../../lib/queries/purchases'
 import { fmtPlain, parseINR } from '../../lib/calc/format'
@@ -10,11 +16,6 @@ import { getErrorMessage } from '../../lib/errors'
 import type { Database } from '../../types/database'
 
 type VendorBillPayment = Database['public']['Tables']['vendor_bill_payments']['Row']
-
-const CASH = 'cash'
-// Not a real account — an employee paid the vendor out of pocket, so no
-// cash/bank moves and the firm owes that employee instead.
-const REIMBURSE = 'reimbursement'
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
@@ -35,16 +36,14 @@ export function VendorBillPaymentForm({
 }) {
   const createPayment = useCreateVendorBillPayment()
   const updatePayment = useUpdateVendorBillPayment()
-  const { data: bankAccounts } = useBankAccounts()
   const { data: profiles } = useProfiles()
-  const accountOptions = [{ id: CASH, name: 'Cash' }, ...(bankAccounts ?? []), { id: REIMBURSE, name: 'Reimbursement' }]
   const [date, setDate] = useState(editingPayment?.date ?? todayStr())
   const [amount, setAmount] = useState(
     fmtPlain(editingPayment ? editingPayment.amount : due).replace(/,/g, ''),
   )
   const [reference, setReference] = useState(editingPayment?.reference ?? '')
   const [accountId, setAccountId] = useState(
-    editingPayment?.payment_mode === 'Reimbursement' ? REIMBURSE : editingPayment?.bank_account_id ?? CASH,
+    editingPayment ? (editingPayment.payment_mode === 'Reimbursement' ? REIMBURSE : editingPayment.bank_account_id ?? CASH) : '',
   )
   const [paidBy, setPaidBy] = useState(editingPayment?.paid_by ?? '')
   const [saving, setSaving] = useState(false)
@@ -54,7 +53,7 @@ export function VendorBillPaymentForm({
     const amt = parseINR(amount)
     if (!date || amt <= 0) return
     if (!accountId) {
-      setError('Pick an account.')
+      setError('Pick a payment account.')
       return
     }
     if (accountId === REIMBURSE && !paidBy) {
@@ -63,8 +62,8 @@ export function VendorBillPaymentForm({
     }
     setSaving(true)
     setError(null)
-    const bankAccountId = accountId === CASH || accountId === REIMBURSE ? null : accountId
-    const paymentMode = accountId === REIMBURSE ? 'Reimbursement' : accountId === CASH ? 'Cash' : 'Bank'
+    const bankAccountId = bankAccountIdOf(accountId)
+    const paymentMode = paymentModeOf(accountId)
     const paidById = accountId === REIMBURSE ? paidBy : null
     try {
       if (editingPayment) {
@@ -110,17 +109,8 @@ export function VendorBillPaymentForm({
             <label>Amount (₹)</label>
             <CurrencyInput value={amount} onValueChange={setAmount} />
           </div>
-          <div className="field">
-            <label>Account</label>
-            <SearchableSelect
-              items={accountOptions}
-              value={accountId}
-              onChange={setAccountId}
-              getId={(a) => a.id}
-              getLabel={(a) => a.name}
-              placeholder="— Select account —"
-            />
-          </div>
+          <PaymentAccountPicker style={{ flexBasis: '100%' }} value={accountId} onChange={setAccountId} allowReimbursement />
+
           {accountId === REIMBURSE && (
             <div className="field">
               <label>Paid by</label>

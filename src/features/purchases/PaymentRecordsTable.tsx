@@ -66,7 +66,7 @@ export function PaymentRecordsTable() {
     <details className="toggle-section">
       <summary>Payment records</summary>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 12, marginTop: 16 }}>
+      <div className="toolbar">
         <div className="field" style={{ maxWidth: 260, marginBottom: 0 }}>
           <label>Search vendor</label>
           <SearchableSelect

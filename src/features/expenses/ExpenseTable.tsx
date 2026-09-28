@@ -1,12 +1,13 @@
 import { Fragment, useState } from 'react'
 import { Button } from '../../components/ui'
-import { PeriodFilter } from '../../components/PeriodFilter'
 import { SearchableSelect } from '../../components/SearchableSelect'
 import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
 import { TableScroll } from '../../components/TableScroll'
 import { CostCenterPicker } from '../../components/CostCenterPicker'
 import { useSort } from '../../lib/useSort'
+import { PeriodFilterToggle } from '../../components/PeriodFilterToggle'
+import type { DateRange } from '../../lib/calc/period'
 import { usePagination } from '../../lib/usePagination'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
@@ -24,7 +25,6 @@ import { useProfiles } from '../../lib/queries/admin'
 import { useAuth } from '../../lib/auth'
 import { fmt, fmtDate } from '../../lib/calc/format'
 import { expenseReimbursed, expenseDue } from '../../lib/calc/expenses'
-import type { DateRange } from '../../lib/calc/period'
 import { ReceiptLink } from '../../components/ReceiptLink'
 import { clientLabel, clientFullName } from '../../lib/labels'
 import { ExpenseReimbursementForm } from './ExpenseReimbursementForm'
@@ -34,15 +34,6 @@ import type { Database } from '../../types/database'
 type ExpenseReimbursement = Database['public']['Tables']['expense_reimbursements']['Row']
 
 const COL_SPAN = 7
-
-function CalendarIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="4" width="18" height="17" rx="2" />
-      <path d="M3 9h18M8 2v4M16 2v4" />
-    </svg>
-  )
-}
 
 export function ExpenseTable({
   costCenterFilter,
@@ -67,7 +58,6 @@ export function ExpenseTable({
   const canEdit = profile?.role === 'admin' || profile?.role === 'cxo'
   const canDelete = profile?.role === 'admin'
   const [range, setRange] = useState<DateRange | null>(null)
-  const [showPeriodFilter, setShowPeriodFilter] = useState(false)
   const [userFilter, setUserFilter] = useState('')
   const { data: rawExpenses, isLoading } = useExpenses(range)
   const expenses = costCenterFilter ? rawExpenses?.filter((e) => e.cost_center === costCenterFilter) : rawExpenses
@@ -240,37 +230,22 @@ export function ExpenseTable({
     <details className="toggle-section" open>
       <summary>{title}</summary>
 
-      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginTop: 16 }}>
-        <button
-          type="button"
-          className={range ? 'icon-btn active' : 'icon-btn'}
-          onClick={() => setShowPeriodFilter((v) => !v)}
-          title="Filter by date"
-          aria-label="Filter by date"
-        >
-          <CalendarIcon />
-        </button>
-        <div className="field" style={{ maxWidth: 130, marginBottom: 0 }}>
-          <label>By user</label>
-          <SearchableSelect
-            items={profiles}
-            value={userFilter}
-            onChange={setUserFilter}
-            getId={(p) => p.id}
-            getLabel={(p) => p.name}
-            placeholder="— All users —"
-          />
+      <div className="toolbar">
+        <div className="toolbar-group">
+          <PeriodFilterToggle range={range} onChange={setRange} />
+          <div className="field" style={{ maxWidth: 160 }}>
+            <label>By user</label>
+            <SearchableSelect
+              items={profiles}
+              value={userFilter}
+              onChange={setUserFilter}
+              getId={(p) => p.id}
+              getLabel={(p) => p.name}
+              placeholder="— All users —"
+            />
+          </div>
         </div>
-        <ReportExportButtons
-          title={title}
-          sections={exportSections}
-          range={range}
-          iconOnly
-          style={{ marginTop: 0, marginLeft: 'auto', alignSelf: 'center' }}
-        />
-        <div style={{ display: showPeriodFilter ? 'block' : 'none', width: '100%' }}>
-          <PeriodFilter onChange={setRange} allowCustom style={{ marginBottom: 0 }} />
-        </div>
+        <ReportExportButtons title={title} sections={exportSections} range={range} iconOnly style={{ marginTop: 0 }} />
       </div>
 
       {selectedIds.size > 0 && (

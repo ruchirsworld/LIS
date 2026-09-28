@@ -37,10 +37,9 @@ export function AdminPage() {
 
   return (
     <div>
-      <ModuleHeader>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <span>{effectiveView === 'general' ? 'Settings' : 'Additional Settings'}</span>
-          {isAdmin && (
+      <ModuleHeader
+        actions={
+          isAdmin && (
             <button
               type="button"
               onClick={() => setView(effectiveView === 'general' ? 'additional' : 'general')}
@@ -48,8 +47,10 @@ export function AdminPage() {
             >
               {effectiveView === 'general' ? 'Additional Settings' : '← Back to Settings'}
             </button>
-          )}
-        </div>
+          )
+        }
+      >
+        {effectiveView === 'general' ? 'Settings' : 'Additional Settings'}
       </ModuleHeader>
 
       {effectiveView === 'general' ? (

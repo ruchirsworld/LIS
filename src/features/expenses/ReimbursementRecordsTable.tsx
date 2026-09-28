@@ -22,7 +22,10 @@ import type { Database } from '../../types/database'
 
 type ExpenseReimbursement = Database['public']['Tables']['expense_reimbursements']['Row']
 
-export function ReimbursementRecordsTable() {
+/** `costCenter` narrows the list to reimbursements against that cost center's
+ * expenses, so each Expenses tab shows only its own. Payments an employee made
+ * to a vendor aren't tied to a cost center and show under Admin. */
+export function ReimbursementRecordsTable({ costCenter }: { costCenter?: string } = {}) {
   const { profile } = useAuth()
   const { data: reimbursements, isLoading } = useExpenseReimbursements()
   const { data: expenses } = useExpenses(null)
@@ -48,7 +51,11 @@ export function ReimbursementRecordsTable() {
   }
   const approverOf = (r: ExpenseReimbursement) => (r.approved_by ? profiles?.find((p) => p.id === r.approved_by) : undefined)
 
-  const userFiltered = userId ? (reimbursements ?? []).filter((r) => userOf(r)?.id === userId) : reimbursements
+  const inScope = (r: ExpenseReimbursement) => {
+    const expense = expenseOf(r)
+    return !costCenter || (expense ? expense.cost_center === costCenter : costCenter === 'Admin')
+  }
+  const userFiltered = (reimbursements ?? []).filter((r) => inScope(r) && (!userId || userOf(r)?.id === userId))
 
   const { sorted: sortedReimbursements, sortKey, direction, toggleSort } = useSort(
     userFiltered,
@@ -84,7 +91,7 @@ export function ReimbursementRecordsTable() {
     <details className="toggle-section">
       <summary>Reimbursement records</summary>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 12, marginTop: 16 }}>
+      <div className="toolbar">
         <div className="pill-tabs" style={{ flexWrap: 'wrap' }}>
           <button type="button" className={userId === '' ? 'pill active' : 'pill'} onClick={() => setUserId('')}>
             All
@@ -100,7 +107,7 @@ export function ReimbursementRecordsTable() {
             </button>
           ))}
         </div>
-        <ReportExportButtons title="Reimbursement records" sections={exportSections} range={null} style={{ marginTop: 0 }} />
+        <ReportExportButtons title="Reimbursement records" sections={exportSections} range={null} iconOnly style={{ marginTop: 0 }} />
       </div>
 
       <TableScroll>

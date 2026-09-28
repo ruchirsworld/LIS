@@ -1,7 +1,7 @@
 {
   "name": "lis",
   "private": true,
-  "version": "2.0.61",
+  "version": "2.0.65",
   "type": "module",
   "scripts": {
     "dev": "vite",

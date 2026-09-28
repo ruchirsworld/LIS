@@ -117,7 +117,7 @@ export function SubHeadsSection() {
             <div className="note" style={{ fontWeight: 600, color: 'var(--ink, inherit)', marginBottom: 8 }}>
               {head.code} — {head.name}
             </div>
-            {items.length === 0 && <div className="note">No sub-heads yet</div>}
+            {items.length === 0 && <div className="empty-state">No sub-heads yet</div>}
             {items.map((s) => {
               return (
                 <div key={s.id} className="card" style={{ marginTop: 8, padding: 12 }}>

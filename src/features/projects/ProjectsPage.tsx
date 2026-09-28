@@ -234,7 +234,7 @@ export function ProjectsPage() {
       <ModuleHeader>Projects</ModuleHeader>
 
       {!projects || projects.length === 0 ? (
-        <div className="note">No projects yet — add one under Admin → Projects.</div>
+        <div className="empty-state">No projects yet — add one under Admin → Projects.</div>
       ) : (
         <>
           <div className="form-row">

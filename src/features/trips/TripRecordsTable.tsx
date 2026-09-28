@@ -3,10 +3,11 @@ import { Button } from '../../components/ui'
 import { Modal } from '../../components/Modal'
 import { SearchableSelect } from '../../components/SearchableSelect'
 import { TableScroll } from '../../components/TableScroll'
-import { PeriodFilter } from '../../components/PeriodFilter'
+import { Pagination } from '../../components/Pagination'
 import { SortableTh } from '../../components/SortableTh'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import { useSort } from '../../lib/useSort'
+import { usePagination } from '../../lib/usePagination'
 import { useTrips, useUpdateTrip, useDeleteTrip } from '../../lib/queries/trips'
 import { useExpenses, useDeleteExpense } from '../../lib/queries/expenses'
 import { useProfiles } from '../../lib/queries/admin'
@@ -15,6 +16,7 @@ import { useAuth } from '../../lib/auth'
 import { fmt, fmtDate } from '../../lib/calc/format'
 import { getErrorMessage } from '../../lib/errors'
 import { ExpenseForm } from '../expenses/ExpenseForm'
+import { PeriodFilterToggle } from '../../components/PeriodFilterToggle'
 import type { DateRange } from '../../lib/calc/period'
 import type { ExportSection } from '../../lib/export/report'
 import type { Database } from '../../types/database'
@@ -161,7 +163,6 @@ export function TripRecordsTable() {
   const deleteExpense = useDeleteExpense()
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [range, setRange] = useState<DateRange | null>(null)
-  const [showPeriodFilter, setShowPeriodFilter] = useState(false)
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null)
   const [deleteError, setDeleteError] = useState<Record<string, string>>({})
   const [deleteBusyId, setDeleteBusyId] = useState<string | null>(null)
@@ -229,6 +230,7 @@ export function TripRecordsTable() {
     'desc'
   )
   const sortedTrips = sorted ?? []
+  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedTrips)
 
   const exportSections: ExportSection[] = [
     {
@@ -247,22 +249,16 @@ export function TripRecordsTable() {
   ]
 
   return (
-    <div className="card" style={{ padding: 16, marginTop: 24 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
-        <h3 style={{ margin: 0, fontSize: 13 }}>Trip records</h3>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <Button
-            type="button"
-            variant="secondary"
-            style={{ fontSize: 12, padding: '5px 12px' }}
-            onClick={() => setShowPeriodFilter((v) => !v)}
-          >
-            Filter by date
-          </Button>
-          <ReportExportButtons title="Trip records" sections={exportSections} range={range} iconOnly />
+    <details className="toggle-section" open>
+      <summary>Trip records</summary>
+
+      <div className="toolbar">
+        <div className="toolbar-group">
+          <PeriodFilterToggle range={range} onChange={setRange} />
         </div>
+        <ReportExportButtons title="Trip records" sections={exportSections} range={range} iconOnly style={{ marginTop: 0 }} />
       </div>
-      {showPeriodFilter && <PeriodFilter onChange={setRange} allowCustom />}
+
       <TableScroll>
         <table className="data">
           <thead>
@@ -282,11 +278,11 @@ export function TripRecordsTable() {
             {sortedTrips.length === 0 && (
               <tr>
                 <td colSpan={COL_SPAN} className="empty-row">
-                  No trips recorded yet
+                  No trips in this period
                 </td>
               </tr>
             )}
-            {sortedTrips.map((t) => {
+            {pageRows?.map((t) => {
               const isExpanded = expandedId === t.id
               const tripExpenses = expensesByTrip(t.id)
               return (
@@ -390,7 +386,7 @@ export function TripRecordsTable() {
                           </div>
                         )}
                         {tripExpenses.length === 0 ? (
-                          <div className="note">No entries on this trip.</div>
+                          <div className="empty-state">No entries on this trip.</div>
                         ) : (
                           <table className="data">
                             <thead>
@@ -458,8 +454,9 @@ export function TripRecordsTable() {
           </tbody>
         </table>
       </TableScroll>
+      <Pagination page={page} totalPages={totalPages} totalCount={totalCount} onChange={setPage} />
 
       {editingTrip && <EditTripModal trip={editingTrip} onClose={() => setEditingTrip(null)} />}
-    </div>
+    </details>
   )
 }

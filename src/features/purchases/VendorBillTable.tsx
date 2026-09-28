@@ -126,8 +126,8 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
     <details className="toggle-section" open>
       <summary>Bill records</summary>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 12, marginTop: 16 }}>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+      <div className="toolbar">
+        <div className="toolbar-group">
           <PeriodFilter onChange={setRange} allowCustom style={{ marginBottom: 0 }} />
           <div className="field" style={{ maxWidth: 220, marginBottom: 0 }}>
             <label>Search vendor</label>

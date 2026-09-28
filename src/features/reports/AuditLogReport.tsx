@@ -119,7 +119,7 @@ export function AuditLogReport() {
                             Deleted record: {r.old_data ? JSON.stringify(r.old_data) : '—'}
                           </div>
                         ) : diffs.length === 0 ? (
-                          <div className="note">No field-level changes detected.</div>
+                          <div className="empty-state">No field-level changes detected.</div>
                         ) : (
                           <table className="data" style={{ marginTop: 0 }}>
                             <thead>

@@ -1,14 +1,11 @@
 import { useState } from 'react'
 import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
+import { PaymentAccountPicker, bankAccountIdOf, paymentModeOf } from '../../components/PaymentAccountPicker'
 import { useCreateExpenseReimbursement } from '../../lib/queries/expenses'
 import { allocateSettlement, type OutstandingExpense } from '../../lib/calc/expenses'
 import { fmtPlain, parseINR } from '../../lib/calc/format'
 import { getErrorMessage } from '../../lib/errors'
-
-type PaymentMode = 'UPI' | 'Cash' | 'Bank'
-
-const PAYMENT_MODES: PaymentMode[] = ['UPI', 'Cash', 'Bank']
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
@@ -33,7 +30,7 @@ export function SettleReimbursementForm({
   const [date, setDate] = useState(todayStr())
   const [amount, setAmount] = useState(fmtPlain(due).replace(/,/g, ''))
   const [reference, setReference] = useState('')
-  const [paymentMode, setPaymentMode] = useState<PaymentMode>('UPI')
+  const [accountId, setAccountId] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -56,7 +53,8 @@ export function SettleReimbursementForm({
           date,
           amount: alloc.amount,
           reference: reference.trim() || null,
-          payment_mode: paymentMode,
+          payment_mode: paymentModeOf(accountId),
+          bank_account_id: bankAccountIdOf(accountId),
         })
       }
       onClose()
@@ -79,21 +77,8 @@ export function SettleReimbursementForm({
             <label>Amount to settle (₹)</label>
             <CurrencyInput value={amount} onValueChange={setAmount} />
           </div>
-          <div className="field">
-            <label>Mode of payment</label>
-            <div className="pill-tabs">
-              {PAYMENT_MODES.map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  className={paymentMode === m ? 'pill active' : 'pill'}
-                  onClick={() => setPaymentMode(m)}
-                >
-                  {m}
-                </button>
-              ))}
-            </div>
-          </div>
+          <PaymentAccountPicker style={{ flexBasis: '100%' }} value={accountId} onChange={setAccountId} />
+
           <div className="field">
             <label>Reference</label>
             <input type="text" value={reference} onChange={(e) => setReference(e.target.value)} />

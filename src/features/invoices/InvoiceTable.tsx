@@ -166,8 +166,8 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
     <details className="toggle-section" open>
       <summary>Ledger</summary>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 12, marginTop: 16 }}>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+      <div className="toolbar">
+        <div className="toolbar-group">
           <PeriodFilter onChange={setRange} allowCustom style={{ marginBottom: 0 }} />
           <div className="field" style={{ maxWidth: 200 }}>
             <label>Client</label>

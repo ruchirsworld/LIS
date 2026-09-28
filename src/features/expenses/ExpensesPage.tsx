@@ -27,10 +27,9 @@ export function ExpensesPage({
 
   return (
     <div className="expenses-page">
-      <ModuleHeader>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'nowrap' }}>
-          <span style={{ fontSize: 13, flexShrink: 0 }}>{isSupervisor ? t('Claims & Advances') : 'Expenses'}</span>
-          {costCenters.length > 1 && (
+      <ModuleHeader
+        actions={
+          costCenters.length > 1 && (
             <div className="cc-switch">
               {costCenters.map((cc) => (
                 <button
@@ -43,8 +42,10 @@ export function ExpensesPage({
                 </button>
               ))}
             </div>
-          )}
-        </div>
+          )
+        }
+      >
+        {isSupervisor ? t('Claims & Advances') : 'Expenses'}
       </ModuleHeader>
 
       {costCenter === 'Admin' && <AdminExpensesSection />}
