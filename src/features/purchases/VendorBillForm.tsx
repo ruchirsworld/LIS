@@ -120,11 +120,25 @@ export function VendorBillForm({
   // for a fresh (non-editing) form — never again after that, so a
   // Supervisor freely browsing other sub-heads doesn't get snapped back.
   const defaultApplied = useRef(false)
+  // Once the user picks a sub-head themselves, choosing a vendor no longer
+  // changes it for them.
+  const subHeadTouched = useRef(false)
   useEffect(() => {
     if (editingBill || defaultApplied.current || !defaultSubHead) return
     defaultApplied.current = true
     setSubHeadId(defaultSubHead.id)
   }, [defaultSubHead, editingBill])
+
+  // A contractor's bill is Sub-Contract, not the Project Materials default —
+  // suggest it as soon as such a vendor is picked, unless a sub-head was
+  // already chosen by hand or an existing bill is being edited.
+  function handleVendorChange(id: string, category?: string | null) {
+    setVendorId(id)
+    if (editingBill || subHeadTouched.current) return
+    const vendorCategory = category !== undefined ? category : vendors?.find((v) => v.id === id)?.category
+    const suggested = subHeadOptions.find((s) => s.code === (vendorCategory === 'Contractor' ? '20.6' : '20.1'))
+    if (suggested) setSubHeadId(suggested.id)
+  }
 
   useEffect(() => {
     if (!editingBill) return
@@ -145,6 +159,7 @@ export function VendorBillForm({
   }, [editingBill])
 
   function resetForm() {
+    subHeadTouched.current = false
     setVendorId('')
     setVendorCategory(null)
     setSubHeadId(defaultSubHead?.id ?? '')
@@ -325,7 +340,7 @@ export function VendorBillForm({
         {/* Row 3: Vendor */}
         <div className="field full">
           <label>Vendor</label>
-          <VendorCombobox vendors={filteredVendors} value={vendorId} onChange={setVendorId} />
+          <VendorCombobox vendors={filteredVendors} value={vendorId} onChange={(id) => handleVendorChange(id)} />
           {canAddVendor && (
             <label style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 6, fontSize: 12, fontWeight: 400 }}>
               <input type="checkbox" checked={showAddVendor} onChange={(e) => setShowAddVendor(e.target.checked)} />
@@ -341,7 +356,10 @@ export function VendorBillForm({
           <SearchableSelect
             items={subHeadOptions}
             value={subHeadId}
-            onChange={setSubHeadId}
+            onChange={(id) => {
+              subHeadTouched.current = true
+              setSubHeadId(id)
+            }}
             getId={(s) => s.id}
             getLabel={(s) => s.name}
             placeholder="— Select sub-head —"
@@ -465,7 +483,7 @@ export function VendorBillForm({
             // doesn't match the newly created vendor would hide it right
             // after picking it.
             setVendorCategory(null)
-            setVendorId(v.id)
+            handleVendorChange(v.id, v.category)
             setShowAddVendor(false)
           }}
         />
