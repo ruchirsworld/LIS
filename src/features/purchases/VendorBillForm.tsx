@@ -5,6 +5,7 @@ import { ReceiptUploadButton } from '../../components/ReceiptUploadButton'
 import { SearchableSelect } from '../../components/SearchableSelect'
 import { useAuth } from '../../lib/auth'
 import { useClients, useProjects, useVendors, useExpenseSubHeads } from '../../lib/queries/masters'
+import { useProfiles } from '../../lib/queries/admin'
 import { useCreateVendorBill, useUpdateVendorBill, useCreateVendorBillPayment } from '../../lib/queries/purchases'
 import { fmt, fmtDate, parseINR } from '../../lib/calc/format'
 import { billTotal } from '../../lib/calc/vendorBills'
@@ -18,9 +19,11 @@ import { useVendorCategoryFilter, VendorCategoryPills } from './VendorCategoryFi
 import type { Database } from '../../types/database'
 
 type VendorBill = Database['public']['Tables']['vendor_bills']['Row']
-type PaymentMode = 'UPI' | 'NEFT' | 'Cash'
+type PaymentMode = 'UPI' | 'NEFT' | 'Cash' | 'Reimbursement'
 
-const PAYMENT_MODES: PaymentMode[] = ['UPI', 'NEFT', 'Cash']
+// Reimbursement = an employee paid the vendor out of pocket, so no cash or
+// bank moves and the firm owes that employee instead.
+const PAYMENT_MODES: PaymentMode[] = ['UPI', 'NEFT', 'Cash', 'Reimbursement']
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
@@ -60,6 +63,7 @@ export function VendorBillForm({
   const { profile } = useAuth()
   const canAddVendor = profile?.role === 'admin' || profile?.role === 'cxo'
   const { data: vendors } = useVendors()
+  const { data: profiles } = useProfiles()
   const { data: clients } = useClients()
   const { data: projects } = useProjects()
   const { data: subHeads } = useExpenseSubHeads()
@@ -90,6 +94,7 @@ export function VendorBillForm({
   const [payDate, setPayDate] = useState(todayStr())
   const [payAmount, setPayAmount] = useState('0')
   const [payMode, setPayMode] = useState<PaymentMode>('UPI')
+  const [payPaidBy, setPayPaidBy] = useState('')
   const [payError, setPayError] = useState<string | null>(null)
   const [payDone, setPayDone] = useState(false)
   const [paySubmitting, setPaySubmitting] = useState(false)
@@ -171,6 +176,7 @@ export function VendorBillForm({
     setPayDate(todayStr())
     setPayAmount('0')
     setPayMode('UPI')
+    setPayPaidBy('')
     setPayError(null)
     setPayDone(false)
   }
@@ -183,6 +189,10 @@ export function VendorBillForm({
       setPayError('Enter a payment amount.')
       return
     }
+    if (payMode === 'Reimbursement' && !payPaidBy) {
+      setPayError('Pick who paid, so they can be reimbursed.')
+      return
+    }
     setPaySubmitting(true)
     setPayError(null)
     try {
@@ -191,6 +201,7 @@ export function VendorBillForm({
         date: payDate,
         amount: amt,
         payment_mode: payMode,
+        paid_by: payMode === 'Reimbursement' ? payPaidBy : null,
       })
       setPayDone(true)
     } catch (err) {
@@ -493,6 +504,19 @@ export function VendorBillForm({
                   ))}
                 </div>
               </div>
+              {payMode === 'Reimbursement' && (
+                <div className="field full">
+                  <label>Paid by (to be reimbursed)</label>
+                  <SearchableSelect
+                    items={profiles}
+                    value={payPaidBy}
+                    onChange={setPayPaidBy}
+                    getId={(p) => p.id}
+                    getLabel={(p) => p.name}
+                    placeholder="— Select person —"
+                  />
+                </div>
+              )}
               <div className="field full" style={{ display: 'flex', gap: 8 }}>
                 <Button type="submit" disabled={paySubmitting}>
                   {paySubmitting ? 'Saving…' : 'Add payment'}

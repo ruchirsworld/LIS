@@ -1,7 +1,9 @@
 import { Fragment, useState } from 'react'
 import { useExpenses, useExpenseReimbursements } from '../../lib/queries/expenses'
 import { useProfiles } from '../../lib/queries/admin'
-import { expenseDue, expenseReimbursed } from '../../lib/calc/expenses'
+import { useVendors } from '../../lib/queries/masters'
+import { useVendorBills, useVendorBillPayments } from '../../lib/queries/purchases'
+import { expenseDue, expenseReimbursed, type ReimbursementSource } from '../../lib/calc/expenses'
 import { fmt, fmtDate } from '../../lib/calc/format'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
@@ -23,7 +25,7 @@ interface DueUserRow {
   userId: string | null
   name: string
   due: number
-  outstanding: { id: string; due: number; date: string }[]
+  outstanding: { id: string; due: number; date: string; source: ReimbursementSource }[]
   details: DueDetail[]
 }
 
@@ -34,16 +36,33 @@ export function ReimbursementDue() {
   const { data: allExpenses } = useExpenses(null)
   const { data: profiles } = useProfiles()
   const { data: reimbursements } = useExpenseReimbursements()
+  const { data: vendorPayments } = useVendorBillPayments()
+  const { data: vendorBills } = useVendorBills(null)
+  const { data: vendors } = useVendors()
   const [settlingUserId, setSettlingUserId] = useState<string>('')
   const [detailUserId, setDetailUserId] = useState<string>('')
 
   const dueByUserId = new Map<string, DueUserRow>()
+  function addDue(userId: string | null, source: ReimbursementSource, detail: DueDetail) {
+    const key = userId ?? 'unknown'
+    const outstanding = { id: detail.id, due: detail.due, date: detail.date, source }
+    const existing = dueByUserId.get(key)
+    if (existing) {
+      existing.due += detail.due
+      existing.outstanding.push(outstanding)
+      existing.details.push(detail)
+    } else {
+      const name = (userId && profiles?.find((p) => p.id === userId)?.name) || UNKNOWN_USER
+      dueByUserId.set(key, { userId, name, due: detail.due, outstanding: [outstanding], details: [detail] })
+    }
+  }
+
   ;(allExpenses ?? []).forEach((e) => {
     if (!e.reimbursable) return
     const expenseReimbursements = (reimbursements ?? []).filter((r) => r.expense_id === e.id)
     const due = expenseDue(e.amount, expenseReimbursements)
     if (due <= 0) return
-    const detail: DueDetail = {
+    addDue(e.created_by, 'expense', {
       id: e.id,
       displayId: e.display_id ?? '',
       date: e.date,
@@ -51,23 +70,26 @@ export function ReimbursementDue() {
       amount: Number(e.amount || 0),
       reimbursed: expenseReimbursed(expenseReimbursements),
       due,
-    }
-    const key = e.created_by ?? 'unknown'
-    const name = (e.created_by && profiles?.find((p) => p.id === e.created_by)?.name) || UNKNOWN_USER
-    const existing = dueByUserId.get(key)
-    if (existing) {
-      existing.due += due
-      existing.outstanding.push({ id: e.id, due, date: e.date })
-      existing.details.push(detail)
-    } else {
-      dueByUserId.set(key, {
-        userId: e.created_by,
-        name,
-        due,
-        outstanding: [{ id: e.id, due, date: e.date }],
-        details: [detail],
-      })
-    }
+    })
+  })
+
+  // Vendor payments an employee made out of pocket — owed back the same way.
+  ;(vendorPayments ?? []).forEach((p) => {
+    if (p.payment_mode !== 'Reimbursement') return
+    const paymentReimbursements = (reimbursements ?? []).filter((r) => r.vendor_bill_payment_id === p.id)
+    const due = expenseDue(p.amount, paymentReimbursements)
+    if (due <= 0) return
+    const bill = vendorBills?.find((b) => b.id === p.bill_id)
+    const vendorName = vendors?.find((v) => v.id === bill?.vendor_id)?.name ?? 'Vendor'
+    addDue(p.paid_by, 'vendor_payment', {
+      id: p.id,
+      displayId: p.display_id ?? '',
+      date: p.date,
+      description: `Vendor payment — ${vendorName}${bill?.display_id ? ` (${bill.display_id})` : ''}`,
+      amount: Number(p.amount || 0),
+      reimbursed: expenseReimbursed(paymentReimbursements),
+      due,
+    })
   })
   dueByUserId.forEach((row) => {
     row.outstanding.sort((a, b) => a.date.localeCompare(b.date))

@@ -81,7 +81,7 @@ export function SupervisorRecordsPage() {
   const myExpenseIds = new Set(myExpenses.map((e) => e.id))
   const myExpensesInRange = myExpenses.filter((e) => inRange(e.date)).sort((a, b) => b.date.localeCompare(a.date))
   const myPaymentsInRange = (allReimbursements ?? [])
-    .filter((r) => myExpenseIds.has(r.expense_id) && inRange(r.date))
+    .filter((r) => r.expense_id && myExpenseIds.has(r.expense_id) && inRange(r.date))
     .sort((a, b) => b.date.localeCompare(a.date))
 
   const myPendingInRange = (allPendingExpenses ?? [])

@@ -401,10 +401,11 @@ export type Database = {
           created_by: string | null;
           date: string;
           display_id: string | null;
-          expense_id: string;
+          expense_id: string | null;
           id: string;
           payment_mode: string | null;
           reference: string | null;
+          vendor_bill_payment_id: string | null;
         };
         Insert: {
           amount: number;
@@ -415,10 +416,11 @@ export type Database = {
           created_by?: string | null;
           date: string;
           display_id?: string | null;
-          expense_id: string;
+          expense_id?: string | null;
           id?: string;
           payment_mode?: string | null;
           reference?: string | null;
+          vendor_bill_payment_id?: string | null;
         };
         Update: {
           amount?: number;
@@ -429,10 +431,11 @@ export type Database = {
           created_by?: string | null;
           date?: string;
           display_id?: string | null;
-          expense_id?: string;
+          expense_id?: string | null;
           id?: string;
           payment_mode?: string | null;
           reference?: string | null;
+          vendor_bill_payment_id?: string | null;
         };
         Relationships: [
           {
@@ -2056,6 +2059,7 @@ export type Database = {
           date: string;
           display_id: string | null;
           id: string;
+          paid_by: string | null;
           payment_mode: string | null;
           reference: string | null;
         };
@@ -2068,6 +2072,7 @@ export type Database = {
           date: string;
           display_id?: string | null;
           id?: string;
+          paid_by?: string | null;
           payment_mode?: string | null;
           reference?: string | null;
         };
@@ -2080,6 +2085,7 @@ export type Database = {
           date?: string;
           display_id?: string | null;
           id?: string;
+          paid_by?: string | null;
           payment_mode?: string | null;
           reference?: string | null;
         };

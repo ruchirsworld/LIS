@@ -23,7 +23,9 @@ export function ExpenseReimbursementForm({
   colSpan,
   onClose,
 }: {
-  expenseId: string
+  /** Only needed when creating — an existing reimbursement already knows
+   * what it's against (an expense, or a reimbursed vendor payment). */
+  expenseId?: string
   due: number
   editingReimbursement?: ExpenseReimbursement | null
   colSpan: number

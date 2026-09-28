@@ -50,7 +50,9 @@ export function SettleReimbursementForm({
       const allocations = allocateSettlement(amt, outstandingExpenses)
       for (const alloc of allocations) {
         await createReimbursement.mutateAsync({
-          expense_id: alloc.expenseId,
+          ...(alloc.source === 'vendor_payment'
+            ? { vendor_bill_payment_id: alloc.expenseId }
+            : { expense_id: alloc.expenseId }),
           date,
           amount: alloc.amount,
           reference: reference.trim() || null,

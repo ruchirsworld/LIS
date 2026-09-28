@@ -13,6 +13,7 @@ import {
   useDeleteExpenseReimbursement,
   useApproveExpenseReimbursement,
 } from '../../lib/queries/expenses'
+import { useVendorBillPayments } from '../../lib/queries/purchases'
 import { useProfiles } from '../../lib/queries/admin'
 import { useAuth } from '../../lib/auth'
 import { fmt, fmtDate } from '../../lib/calc/format'
@@ -25,6 +26,7 @@ export function ReimbursementRecordsTable() {
   const { profile } = useAuth()
   const { data: reimbursements, isLoading } = useExpenseReimbursements()
   const { data: expenses } = useExpenses(null)
+  const { data: vendorPayments } = useVendorBillPayments()
   const { data: profiles } = useProfiles()
   const deleteReimbursement = useDeleteExpenseReimbursement()
   const approveReimbursement = useApproveExpenseReimbursement()
@@ -33,9 +35,16 @@ export function ReimbursementRecordsTable() {
   const [editingReimbursement, setEditingReimbursement] = useState<ExpenseReimbursement | null>(null)
 
   const expenseOf = (r: ExpenseReimbursement) => expenses?.find((e) => e.id === r.expense_id)
+  const vendorPaymentOf = (r: ExpenseReimbursement) =>
+    r.vendor_bill_payment_id ? vendorPayments?.find((p) => p.id === r.vendor_bill_payment_id) : undefined
+  // Whoever is owed: the expense's creator, or who paid the vendor.
   const userOf = (r: ExpenseReimbursement) => {
-    const expense = expenseOf(r)
-    return expense?.created_by ? profiles?.find((p) => p.id === expense.created_by) : undefined
+    const ownerId = expenseOf(r)?.created_by ?? vendorPaymentOf(r)?.paid_by
+    return ownerId ? profiles?.find((p) => p.id === ownerId) : undefined
+  }
+  const againstOf = (r: ExpenseReimbursement) => {
+    const vp = vendorPaymentOf(r)
+    return expenseOf(r)?.display_id ?? (vp ? `Vendor payment ${vp.display_id ?? ''}`.trim() : '')
   }
   const approverOf = (r: ExpenseReimbursement) => (r.approved_by ? profiles?.find((p) => p.id === r.approved_by) : undefined)
 
@@ -47,7 +56,7 @@ export function ReimbursementRecordsTable() {
       id: (r) => r.display_id,
       date: (r) => r.date,
       user: (r) => userOf(r)?.name ?? '',
-      expense: (r) => expenseOf(r)?.display_id ?? '',
+      expense: (r) => againstOf(r),
       amount: (r) => r.amount,
     },
     'date'
@@ -62,7 +71,7 @@ export function ReimbursementRecordsTable() {
         r.display_id ?? '',
         fmtDate(r.date),
         userOf(r)?.name ?? '',
-        expenseOf(r)?.display_id ?? '',
+        againstOf(r),
         r.amount,
         r.reference ?? '',
         r.payment_mode ?? '',
@@ -127,6 +136,7 @@ export function ReimbursementRecordsTable() {
             {pageRows?.map((r) => {
               const expense = expenseOf(r)
               const user = userOf(r)
+              const against = againstOf(r)
               const approver = approverOf(r)
               const isApproved = !!r.approved_by
               const canApprove = !isApproved && r.created_by !== profile?.id
@@ -136,7 +146,7 @@ export function ReimbursementRecordsTable() {
                     <td>{r.display_id ?? '—'}</td>
                     <td>{fmtDate(r.date)}</td>
                     <td>{user?.name ?? '—'}</td>
-                    <td>{expense?.display_id ?? '—'}</td>
+                    <td>{against || '—'}</td>
                     <td className="amt">{fmt(r.amount)}</td>
                     <td>{r.reference ?? '—'}</td>
                     <td>{r.payment_mode ?? '—'}</td>
@@ -151,9 +161,9 @@ export function ReimbursementRecordsTable() {
                       />
                     </td>
                   </tr>
-                  {editingReimbursement?.id === r.id && expense && (
+                  {editingReimbursement?.id === r.id && (expense || vendorPaymentOf(r)) && (
                     <ExpenseReimbursementForm
-                      expenseId={expense.id}
+                      expenseId={expense?.id}
                       due={0}
                       editingReimbursement={editingReimbursement}
                       colSpan={9}
