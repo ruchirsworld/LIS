@@ -322,20 +322,6 @@ export function VendorBillForm({
             </label>
           )}
         </div>
-        {showAddVendor && (
-          <AddVendorModal
-            onClose={() => setShowAddVendor(false)}
-            onCreated={(v) => {
-              // Reset the type filter first — otherwise a category that
-              // doesn't match the newly created vendor would hide it right
-              // after picking it.
-              setVendorCategory(null)
-              setVendorId(v.id)
-              setShowAddVendor(false)
-            }}
-          />
-        )}
-
         {/* Row 3b: Sub-head — what this bill is actually for. Major head is
             always Materials & Consumables for Procurement, so it isn't a
             field here. */}
@@ -457,6 +443,22 @@ export function VendorBillForm({
           </div>
         </div>
       </form>
+      {/* Rendered outside the bill form on purpose: the modal has its own
+          <form>, and a form nested inside another makes the browser submit
+          the page (a full reload) instead of just adding the vendor. */}
+      {showAddVendor && (
+        <AddVendorModal
+          onClose={() => setShowAddVendor(false)}
+          onCreated={(v) => {
+            // Reset the type filter first — otherwise a category that
+            // doesn't match the newly created vendor would hide it right
+            // after picking it.
+            setVendorCategory(null)
+            setVendorId(v.id)
+            setShowAddVendor(false)
+          }}
+        />
+      )}
 
       {lastCreatedBill && !payDone && (
         <div style={{ marginTop: 12 }}>
