@@ -36,7 +36,7 @@ function resolveQuickPick(
 export async function parseExpensesImport(file: File): Promise<ParsedRow<ExpenseInsert>[]> {
   const XLSX = await import('xlsx')
   const buf = await file.arrayBuffer()
-  const wb = XLSX.read(buf, { type: 'array', cellDates: true })
+  const wb = XLSX.read(buf, { type: 'array', cellDates: false })
 
   const rows: ParsedRow<ExpenseInsert>[] = []
 

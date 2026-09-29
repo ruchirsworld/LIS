@@ -13,7 +13,7 @@ type ImprestInsert = Database['public']['Tables']['staff_imprest_transactions'][
 export async function parseImprestImport(file: File): Promise<ParsedRow<ImprestInsert>[]> {
   const XLSX = await import('xlsx')
   const buf = await file.arrayBuffer()
-  const wb = XLSX.read(buf, { type: 'array', cellDates: true })
+  const wb = XLSX.read(buf, { type: 'array', cellDates: false })
 
   const rows: ParsedRow<ImprestInsert>[] = []
 

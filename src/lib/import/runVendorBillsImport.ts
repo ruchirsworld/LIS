@@ -13,7 +13,7 @@ type VendorBillInsert = Database['public']['Tables']['vendor_bills']['Insert']
 export async function parseVendorBillsImport(file: File): Promise<ParsedRow<VendorBillInsert>[]> {
   const XLSX = await import('xlsx')
   const buf = await file.arrayBuffer()
-  const wb = XLSX.read(buf, { type: 'array', cellDates: true })
+  const wb = XLSX.read(buf, { type: 'array', cellDates: false })
 
   const rows: ParsedRow<VendorBillInsert>[] = []
 

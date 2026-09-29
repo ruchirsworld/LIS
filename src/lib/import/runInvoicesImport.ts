@@ -14,7 +14,7 @@ type InvoiceInsert = Database['public']['Tables']['invoices']['Insert']
 export async function parseInvoicesImport(file: File): Promise<ParsedRow<InvoiceInsert>[]> {
   const XLSX = await import('xlsx')
   const buf = await file.arrayBuffer()
-  const wb = XLSX.read(buf, { type: 'array', cellDates: true })
+  const wb = XLSX.read(buf, { type: 'array', cellDates: false })
 
   const rows: ParsedRow<InvoiceInsert>[] = []
 
