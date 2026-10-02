@@ -28,6 +28,7 @@ export const EXAMPLE_ROW_EXPENSES = ['Admin', '', '', 'Office', 'Snacks', '05-04
 export const PROJECT_MAJOR_HEADS = [
   { name: 'Employee & Labour Costs', code: 10 },
   { name: 'Materials & Consumables', code: 20 },
+  { name: 'Equipment & Machinery', code: 30 },
   { name: 'Transportation & Logistics', code: 40 },
 ]
 
@@ -39,7 +40,7 @@ export const EXPENSES_INSTRUCTIONS_LINES: string[] = [
   '3. Project only applies to Project rows — pick an existing active project.',
   '4. Trip only applies to Trips rows — pick an existing trip ("Trip name — Traveler"). The trip\'s own project (if any) is used automatically; the Project column is ignored for Trips rows.',
   '5. Pick a Description next — the options depend on the Cost Center. For Admin/Trips this is the same Description group as the app\'s quick-tap picker (e.g. Transport, Office); the Sub Head dropdown then only offers the options under it. Some Admin groups (e.g. Misc) have no Sub Head of their own — leave Sub Head blank for those.',
-  '6. For Project rows, Description is a Major head (Employee & Labour Costs / Materials & Consumables / Transportation & Logistics) and Sub Head is required — pick the actual sub-head under it.',
+  '6. For Project rows, Description is a Major head (Employee & Labour Costs / Materials & Consumables / Equipment & Machinery / Transportation & Logistics) and Sub Head is required — pick the actual sub-head under it.',
   '7. Account must be one of: Kotak, CBI, Cash, or Reimburse. Kotak/CBI must already exist as bank accounts.',
   '8. Cost Center, Description, Amount, Date, and Account are always required.',
   '9. Dates should be in DD-MM-YYYY format, e.g. 01-04-2025.',
