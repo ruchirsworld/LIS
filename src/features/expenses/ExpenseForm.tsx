@@ -19,6 +19,7 @@ import { useGeolocation } from '../../lib/useGeolocation'
 import { compressImage } from '../../lib/compressImage'
 import { uploadReceipt } from '../../lib/storage'
 import { fmt, parseINR } from '../../lib/calc/format'
+import { isProjectSubHeadCode } from '../../lib/projectSubHeads'
 import { getErrorMessage } from '../../lib/errors'
 import { clientLabel } from '../../lib/labels'
 import { TRIP_QUICK_CATEGORIES } from '../../lib/tripQuickCategories'
@@ -245,18 +246,25 @@ export function ExpenseForm({
   }
 
   // Major Head / Sub-Head (Chart of Accounts) — feeds the manual dropdown
-  // pair below, which shows on the Project section (Employee & Labour,
-  // Equipment & Machinery, Site/Project Overheads) and when editing a legacy
-  // T&M expense — the latter needs every major head selectable, not just
-  // Project's own, so the filter only applies when actually on that page.
-  const PROJECT_MAJOR_HEAD_CODES = [10, 30, 60]
-  const majorHeads = Array.from(new Map((subHeads ?? []).map((s) => [s.major_head_code, s.major_head])).entries())
-    .filter(([code]) => (lockToProjects ? PROJECT_MAJOR_HEAD_CODES.includes(code) : true))
+  // pair below, which shows on the Project section and when editing a legacy
+  // T&M expense — the latter needs every major head selectable, so the
+  // Project-only list applies just on the Project page's own entry form
+  // (see lib/projectSubHeads.ts). A record being edited there keeps its own
+  // sub-head visible even if it isn't on that list.
+  const projectListApplies = !!lockToProjects
+  const subHeadAllowed = (s: { id: string; code: string }) =>
+    !projectListApplies || isProjectSubHeadCode(s.code) || s.id === subHeadId
+  const majorHeads = Array.from(
+    new Map((subHeads ?? []).filter(subHeadAllowed).map((s) => [s.major_head_code, s.major_head])).entries()
+  )
     .sort((a, b) => a[0] - b[0])
     .map(([code, name]) => ({ code, name }))
   // Only feeds the manual Major Head / Sub-head pickers below, which trips
   // don't use — Description covers sub-head selection there instead.
-  const subHeadOptions = majorHeadFilter === '' ? [] : (subHeads ?? []).filter((s) => s.major_head_code === majorHeadFilter)
+  const subHeadOptions =
+    majorHeadFilter === ''
+      ? []
+      : (subHeads ?? []).filter((s) => s.major_head_code === majorHeadFilter && subHeadAllowed(s))
   const selectedSubHead = subHeads?.find((s) => s.id === subHeadId)
   const topTags = (selectedSubHead?.tags ?? []).map((t) => `#${t}`)
 

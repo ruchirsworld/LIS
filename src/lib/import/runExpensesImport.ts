@@ -3,6 +3,7 @@ import { ADMIN_QUICK_CATEGORIES } from '../adminQuickCategories'
 import { TRIP_QUICK_CATEGORIES } from '../tripQuickCategories'
 import type { QuickCategory } from '../quickCategories'
 import { fmt } from '../calc/format'
+import { isProjectSubHeadCode } from '../projectSubHeads'
 import { str, num, toDateStr, isBlankRow, sheetRowsOf } from './helpers'
 import { SHEET_EXPENSES, COLUMNS_EXPENSES, PROJECT_MAJOR_HEADS } from './expensesSheet'
 import type { ImportResultRow, ParsedRow } from './types'
@@ -124,7 +125,7 @@ export async function parseExpensesImport(file: File): Promise<ParsedRow<Expense
           throw new Error(`"${description}" isn't a valid Project Description — expected one of: ${PROJECT_MAJOR_HEADS.map((h) => h.name).join(', ')}`)
         }
         if (!subHeadOption) throw new Error('Sub Head is required for a Project row')
-        const sh = (subHeads ?? []).find((s) => s.major_head_code === head.code && s.name.trim().toLowerCase() === subHeadOption.trim().toLowerCase())
+        const sh = (subHeads ?? []).find((s) => s.major_head_code === head.code && isProjectSubHeadCode(s.code) && s.name.trim().toLowerCase() === subHeadOption.trim().toLowerCase())
         if (!sh) throw new Error(`"${subHeadOption}" isn't a Sub Head under "${description}"`)
         subHeadId = sh.id
         finalDescription = sh.name

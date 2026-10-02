@@ -2,6 +2,7 @@ import { supabase } from '../supabase'
 import { ADMIN_QUICK_CATEGORIES } from '../adminQuickCategories'
 import { TRIP_QUICK_CATEGORIES } from '../tripQuickCategories'
 import { SHEET_EXPENSES, COLUMNS_EXPENSES, EXAMPLE_ROW_EXPENSES, EXPENSES_INSTRUCTIONS_LINES, PROJECT_MAJOR_HEADS } from './expensesSheet'
+import { isProjectSubHeadCode } from '../projectSubHeads'
 
 const SHEET_INSTRUCTIONS = 'Instructions'
 const SHEET_LISTS = 'Lists'
@@ -44,7 +45,7 @@ export async function downloadExpensesImportTemplate(): Promise<void> {
   const { data: projects } = await supabase.from('projects').select('id, name').eq('status', 'active').order('name')
   const { data: trips } = await supabase.from('trips').select('id, name, traveler_id').order('start_date', { ascending: false })
   const { data: profiles } = await supabase.from('profiles').select('id, name')
-  const { data: subHeads } = await supabase.from('expense_sub_heads').select('name, major_head_code')
+  const { data: subHeads } = await supabase.from('expense_sub_heads').select('code, name, major_head_code')
 
   const profileNameById = new Map((profiles ?? []).map((p) => [p.id, p.name]))
   const tripLabels = (trips ?? []).map((t) => `${t.name} — ${profileNameById.get(t.traveler_id) ?? 'Unknown'}`)
@@ -64,7 +65,7 @@ export async function downloadExpensesImportTemplate(): Promise<void> {
     list.length ? list : ['(not applicable — leave blank)']
   )
   const projectSubHeadLists = PROJECT_MAJOR_HEADS.map((h) =>
-    (subHeads ?? []).filter((s) => s.major_head_code === h.code).map((s) => s.name)
+    (subHeads ?? []).filter((s) => s.major_head_code === h.code && isProjectSubHeadCode(s.code)).map((s) => s.name)
   )
 
   const wb = new ExcelJS.Workbook()
