@@ -15,6 +15,8 @@ export interface ExportSection {
   highlightRows?: number[]
   /** Column indexes left out of the PDF only (the Excel file keeps them). */
   pdfHiddenColumns?: number[]
+  /** Section appears in the PDF only — skipped in the Excel file. */
+  pdfOnly?: boolean
 }
 
 // Same blue as the on-screen retention highlight (--blue-soft / --blue).
@@ -216,6 +218,8 @@ export async function exportReportExcel(
   // function only ever calls the write-side APIs (book_new/aoa_to_sheet/
   // book_append_sheet/writeFile) against our own trusted report data, so
   // that attack surface doesn't apply here.
+  sections = sections.filter((s) => !s.pdfOnly)
+
   // Plain SheetJS can't colour cells, so a report with highlighted rows goes
   // through exceljs instead (same layout: title, note, period, blank, header,
   // rows).

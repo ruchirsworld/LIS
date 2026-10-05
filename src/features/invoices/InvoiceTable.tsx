@@ -119,6 +119,10 @@ function buildLedgerSections(
       rows.push(['', 'Retention held (included in the balance above)', '', '', '', fmt(held)])
     }
 
+    const retentionInvoices = clientInvoices
+      .filter((inv) => inv.retention_pct)
+      .sort((a, b) => (a.invoice_date as string).localeCompare(b.invoice_date as string))
+
     sections.push({
       title: clientFullName(client),
       columns: ['Date', 'Particulars', 'Vch No.', 'Debit', 'Credit', 'Balance'],
@@ -127,6 +131,37 @@ function buildLedgerSections(
       // Voucher numbers stay in the Excel file but are left off the PDF.
       pdfHiddenColumns: [2],
     })
+
+    // The retention workings, laid out on their own in the PDF: per invoice,
+    // net payable × retention % = retention, how much has been released and
+    // what is still held. (Excel skips this — its ledger already notes it.)
+    if (retentionInvoices.length > 0) {
+      const lines = retentionInvoices.map((inv) => {
+        const retention = retentionAmt(inv)
+        const held = retentionHeld(inv, (allPayments ?? []).filter((p) => p.invoice_id === inv.id))
+        return { inv, retention, held, released: Math.max(0, retention - held) }
+      })
+      const sum = (pick: (l: (typeof lines)[number]) => number) => lines.reduce((s, l) => s + pick(l), 0)
+      sections.push({
+        title: `${clientFullName(client)} — Retention calculation`,
+        columns: ['Invoice', 'Invoice date', 'Net payable', 'Retention %', 'Retention (net × %)', 'Released', 'Still held', 'Release date'],
+        rows: [
+          ...lines.map((l) => [
+            l.inv.invoice_number ?? l.inv.display_id ?? '',
+            fmtDate(l.inv.invoice_date),
+            netPayable(l.inv),
+            `${l.inv.retention_pct}%`,
+            l.retention,
+            l.released,
+            l.held,
+            l.inv.retention_release_date ? fmtDate(l.inv.retention_release_date) : '—',
+          ]),
+          ['Total', '', sum((l) => netPayable(l.inv)), '', sum((l) => l.retention), sum((l) => l.released), sum((l) => l.held), ''],
+        ],
+        highlightRows: [lines.length],
+        pdfOnly: true,
+      })
+    }
   }
 
   return sections
