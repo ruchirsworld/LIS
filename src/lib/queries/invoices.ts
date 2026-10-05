@@ -129,6 +129,8 @@ export function useCreateInvoicePayment() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['invoice_payments'] })
+      // The Dashboard's overdue list reads v_invoice_status.
+      qc.invalidateQueries({ queryKey: ['v_invoice_status'] })
       qc.invalidateQueries({ queryKey: ['dashboard-kpis'] })
     },
   })

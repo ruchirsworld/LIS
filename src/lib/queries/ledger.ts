@@ -146,3 +146,46 @@ export function useCashAndBankLines() {
     },
   })
 }
+
+export interface CashMovement {
+  date: string
+  net: number
+}
+
+/** Net movement in Cash-in-Hand + Bank per day over the last `days` days —
+ * the Dashboard works the Cash & bank sparkline backwards from today's
+ * balance with it, so only that window is fetched, not every line ever. */
+export function useCashMovements(days = 30) {
+  return useQuery({
+    queryKey: ['ledger_lines', 'cash_movements', days],
+    queryFn: async (): Promise<CashMovement[]> => {
+      const { data: accounts, error: accountsError } = await supabase
+        .from('gl_accounts')
+        .select('id')
+        .in('code', ['1010', '1020'])
+      if (accountsError) throw accountsError
+      const accountIds = (accounts ?? []).map((a) => a.id)
+      if (accountIds.length === 0) return []
+
+      const since = new Date()
+      since.setDate(since.getDate() - days)
+      const sinceISO = `${since.getFullYear()}-${String(since.getMonth() + 1).padStart(2, '0')}-${String(since.getDate()).padStart(2, '0')}`
+
+      const { data, error } = await supabase
+        .from('journal_lines')
+        .select('debit, credit, journal_entries!inner(date)')
+        .in('gl_account_id', accountIds)
+        .gte('journal_entries.date', sinceISO)
+      if (error) throw error
+
+      const byDate = new Map<string, number>()
+      for (const row of data ?? []) {
+        const entry = row.journal_entries as unknown as { date: string } | { date: string }[] | null
+        const date = Array.isArray(entry) ? entry[0]?.date : entry?.date
+        if (!date) continue
+        byDate.set(date, (byDate.get(date) ?? 0) + Number(row.debit || 0) - Number(row.credit || 0))
+      }
+      return [...byDate.entries()].map(([date, net]) => ({ date, net }))
+    },
+  })
+}

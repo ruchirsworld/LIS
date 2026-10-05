@@ -1349,6 +1349,120 @@ td.amt-retention {
   font-weight: 600;
 }
 
+/* Dashboard: period filter, section jump links and refresh stay in view
+   while scrolling. Inside a split pane the pane's own header is sticky, so
+   this one just scrolls with the content there. */
+.dash-bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 16px;
+  background: var(--bg);
+  padding: 8px 0 10px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+.dash-bar > div:first-child {
+  margin-bottom: 0 !important;
+}
+.split-pane .dash-bar {
+  position: static;
+}
+.dash-jump {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+.dash-jump-chip {
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink-soft);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 32px;
+}
+.dash-jump-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.dash-jump-chip:focus-visible,
+.dash-section-head:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.dash-refresh {
+  margin-left: auto;
+}
+.dash-section {
+  scroll-margin-top: 110px;
+  margin-bottom: 6px;
+}
+.dash-section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  background: none;
+  border: 0;
+  padding: 10px 0 8px;
+  margin-top: 8px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.dash-section-head:hover .dash-section-chevron {
+  color: var(--accent);
+}
+.dash-section-chevron {
+  width: 14px;
+  color: var(--ink-soft);
+}
+.dash-section-note {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--ink-soft);
+}
+.dash-viewall {
+  padding: 8px 0 4px;
+  text-align: right;
+}
+tr.row-link {
+  cursor: pointer;
+}
+tr.row-link:hover td {
+  background: var(--accent-soft, var(--blue-soft));
+}
+@media (max-width: 640px) {
+  /* Too tall to pin on a phone — it scrolls away with the page instead. */
+  .dash-bar {
+    position: static;
+    gap: 8px;
+  }
+  .dash-section {
+    scroll-margin-top: 12px;
+  }
+  .dash-jump {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    flex-basis: 100%;
+    order: 3;
+  }
+  .dash-jump-chip {
+    white-space: nowrap;
+  }
+}
+
 .dash-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
@@ -1380,11 +1494,330 @@ td.amt-retention {
   border-radius: 10px;
   padding: 16px;
 }
+.dash-card {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
 .dash-card-clickable {
   cursor: pointer;
 }
 .dash-card-clickable:hover {
   border-color: var(--accent);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transform: translateY(-1px);
+}
+.dash-card-clickable:hover .dash-card-caret {
+  color: var(--accent);
+}
+.dash-card-clickable:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+/* Status stripe + value colour: red = act now, amber = take a look, green = all clear. */
+.dash-card-danger {
+  border-left: 4px solid var(--red);
+}
+.dash-card-danger .dash-value {
+  color: var(--red);
+}
+.dash-card-warn {
+  border-left: 4px solid var(--amber);
+}
+.dash-card-warn .dash-value {
+  color: var(--amber);
+}
+.dash-card-good {
+  border-left: 4px solid var(--green);
+}
+.dash-sub {
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin-top: 4px;
+}
+.dash-card-good .dash-sub {
+  color: var(--green);
+}
+.dash-card-danger .dash-sub {
+  color: var(--red);
+}
+.dash-skeleton {
+  display: inline-block;
+  width: 70%;
+  height: 22px;
+  border-radius: 6px;
+  vertical-align: middle;
+  background: linear-gradient(90deg, var(--line) 25%, var(--bg) 50%, var(--line) 75%);
+  background-size: 200% 100%;
+  animation: dash-shimmer 1.2s linear infinite;
+}
+@keyframes dash-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+.dash-extra {
+  margin-top: 8px;
+}
+/* "vs last period" trend line. Colour says whether the change is good, not
+   just whether it went up. */
+.dash-delta {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+.dash-delta-good {
+  color: var(--green);
+}
+.dash-delta-bad {
+  color: var(--red);
+}
+.dash-spark {
+  display: block;
+  width: 100%;
+  height: 34px;
+}
+.dash-spark-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.dash-spark-area {
+  fill: var(--accent);
+  opacity: 0.12;
+}
+.dash-spark-dot {
+  fill: var(--accent);
+}
+.dash-progress {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+}
+.dash-progress > span {
+  display: block;
+  height: 100%;
+  background: var(--amber);
+  border-radius: 999px;
+}
+.dash-progress-label {
+  font-size: 11px;
+  color: var(--ink-soft);
+  margin-top: 4px;
+}
+.dash-spark-dot-el {
+  position: absolute;
+  right: -2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+/* Charts & analysis */
+.dash-insights {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+  align-items: start;
+}
+.dash-panel {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
+  min-width: 0;
+}
+.dash-panel-title {
+  font-size: 13px;
+  font-weight: 700;
+  margin: 0;
+}
+.dash-panel-sub {
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin: 2px 0 12px;
+}
+.dash-hbars {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dash-hbar {
+  display: grid;
+  grid-template-columns: 92px 1fr 56px;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 5px 6px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.dash-hbar:hover {
+  background: var(--bg);
+}
+.dash-hbar.selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.dash-hbar:focus-visible,
+.dash-month:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.dash-hbar-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dash-hbar-track {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+}
+.dash-hbar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+}
+.dash-hbar.tone-warn .dash-hbar-fill {
+  background: var(--amber);
+}
+.dash-hbar.tone-danger .dash-hbar-fill {
+  background: var(--red);
+}
+.dash-hbar-value {
+  font-family: var(--font-mono);
+  text-align: right;
+  white-space: nowrap;
+}
+.dash-months {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+}
+.dash-month {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 6px 2px;
+  font: inherit;
+  cursor: pointer;
+}
+.dash-month:hover {
+  background: var(--bg);
+}
+.dash-month.selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.dash-month-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 110px;
+  width: 100%;
+  justify-content: center;
+}
+.dash-month-bar {
+  display: block;
+  width: 36%;
+  max-width: 16px;
+  border-radius: 3px 3px 0 0;
+}
+.dash-month-bar.in,
+.dash-legend i.in {
+  background: var(--green);
+}
+.dash-month-bar.out,
+.dash-legend i.out {
+  background: var(--amber);
+}
+.dash-month-label {
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+.dash-legend {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--ink-soft);
+  margin-top: 6px;
+}
+.dash-legend i {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  margin-right: 5px;
+}
+.dash-drill {
+  margin-top: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+.dash-drill-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  margin-bottom: 6px;
+}
+.dash-drill table.data {
+  font-size: 12px;
+}
+.dash-row-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  white-space: nowrap;
+}
+.dash-armed {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.dash-updated {
+  font-size: 12px;
+  color: var(--ink-soft);
+  align-self: center;
+}
+.dash-row-error {
+  color: var(--red);
+  font-size: 12px;
+}
+@media (max-width: 640px) {
+  .dash-hbar {
+    grid-template-columns: 78px 1fr 52px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-skeleton {
+    animation: none;
+  }
+  .dash-card {
+    transition: none;
+  }
+  .dash-card-clickable:hover {
+    transform: none;
+  }
 }
 .dash-card-caret {
   float: right;

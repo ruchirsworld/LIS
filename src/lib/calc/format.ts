@@ -49,3 +49,15 @@ export function fmtDate(dateStr: string | null | undefined): string {
   if (!month) return dateStr
   return `${d} ${month} ${y}`
 }
+
+/** Short rupee figure for chart labels where space is tight: ₹1.2Cr, ₹3.4L, ₹56K. */
+export function fmtCompact(n: number | string | null | undefined): string {
+  const num = Number(n || 0)
+  const sign = num < 0 ? '-' : ''
+  const abs = Math.abs(num)
+  const trim = (v: number) => String(Math.round(v * 10) / 10)
+  if (abs >= 1e7) return `${sign}₹${trim(abs / 1e7)}Cr`
+  if (abs >= 1e5) return `${sign}₹${trim(abs / 1e5)}L`
+  if (abs >= 1e3) return `${sign}₹${trim(abs / 1e3)}K`
+  return `${sign}₹${Math.round(abs)}`
+}

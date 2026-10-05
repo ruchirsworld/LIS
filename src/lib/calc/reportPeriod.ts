@@ -84,3 +84,63 @@ export function formatRangeLabel(range: DateRange | null): string {
   if (range.from) return `From ${fmtDate(range.from)}`
   return `Up to ${fmtDate(range.to)}`
 }
+
+function addDaysISO(iso: string, days: number): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  return toISO(new Date(y, m - 1, d + days))
+}
+
+function addMonthsISO(iso: string, months: number): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  const target = new Date(y, m - 1 + months, 1)
+  // Keep the day when it exists in the target month, else clamp to its last day.
+  const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate()
+  target.setDate(Math.min(d, lastDay))
+  return toISO(target)
+}
+
+function daysBetween(fromISO: string, toISO_: string): number {
+  const [fy, fm, fd] = fromISO.split('-').map(Number)
+  const [ty, tm, td] = toISO_.split('-').map(Number)
+  return Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd)) / 86400000)
+}
+
+/** The period immediately before `range`, for "vs last period" comparisons:
+ * the previous month/quarter/year/week/day for a preset, or the same number
+ * of days straight before a custom range. Null when there is nothing to
+ * compare against (all time, or an open-ended custom range). */
+export function previousRange(range: DateRange | null, type: ReportPeriodType): DateRange | null {
+  if (!range?.from || !range.to) return null
+  const { from, to } = range
+  if (type === 'today') return { from: addDaysISO(from, -1), to: addDaysISO(to, -1) }
+  if (type === 'week') return { from: addDaysISO(from, -7), to: addDaysISO(to, -7) }
+  if (type === 'month') {
+    const prevFrom = addMonthsISO(from, -1)
+    return { from: prevFrom, to: addDaysISO(from, -1) }
+  }
+  if (type === 'quarter') return { from: addMonthsISO(from, -3), to: addDaysISO(from, -1) }
+  if (type === 'year') return { from: addMonthsISO(from, -12), to: addDaysISO(from, -1) }
+  if (type === 'custom') {
+    const length = daysBetween(from, to) + 1
+    return { from: addDaysISO(from, -length), to: addDaysISO(from, -1) }
+  }
+  return null
+}
+
+/** Label for the comparison, e.g. "last month". */
+export function previousPeriodLabel(type: ReportPeriodType): string {
+  switch (type) {
+    case 'today':
+      return 'yesterday'
+    case 'week':
+      return 'last week'
+    case 'month':
+      return 'last month'
+    case 'quarter':
+      return 'last quarter'
+    case 'year':
+      return 'last year'
+    default:
+      return 'previous period'
+  }
+}

@@ -21,9 +21,10 @@ export interface ReportSummary {
 /** Wraps the report_summary(p_from, p_to) RPC — a single server-side
  * aggregate covering GST, invoicing, expenses, vendor purchases, loans and
  * capital for an arbitrary date range (null bound = unbounded). */
-export function useReportSummary(range: DateRange | null) {
+export function useReportSummary(range: DateRange | null, enabled = true) {
   return useQuery({
     queryKey: ['report_summary', range],
+    enabled,
     queryFn: async () => {
       const { data, error } = await supabase.rpc('report_summary', {
         p_from: range?.from ?? undefined,

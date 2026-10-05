@@ -14,6 +14,7 @@ import {
   type TabId,
   type ExpenseCostCenter,
 } from './lib/nav'
+import { NavContext, type GoTo } from './lib/navContext'
 import { requestLocationPing, type LocationPingResult } from './lib/workStore'
 
 const DashboardPage = lazy(() => import('./features/dashboard/DashboardPage').then((m) => ({ default: m.DashboardPage })))
@@ -133,6 +134,14 @@ function AppShellRouter() {
     return <LocationGate status={locationPing} onRetry={pingLocation} />
   }
 
+  // Dashboard cards drill through to the page behind them. Always drives the
+  // main pane, even when the dashboard itself is the split pane.
+  const goTo: GoTo = (next, opts) => {
+    if (opts?.costCenter) setExpensesCostCenter(opts.costCenter)
+    setTab(next)
+    window.scrollTo({ top: 0 })
+  }
+
   function changeSplitTab(next: TabId | null) {
     setSplitTab(next)
     saveSplitTab(next)
@@ -146,42 +155,44 @@ function AppShellRouter() {
   const splitTabs = TABS.filter((t) => isTabVisible(t, profile?.role)).map((t) => ({ id: t.id, label: t.label }))
 
   return (
-    <Shell
-      active={tab}
-      onChange={setTab}
-      split={{ canSplit, isOpen: splitOpen, onToggle: toggleSplit, tab: splitTab }}
-    >
-      <Suspense fallback={null}>
-        {splitOpen && splitTab ? (
-          <div className="split-panes">
-            <div className="split-pane">
-              <PageView
-                tab={tab}
-                expensesCostCenter={expensesCostCenter}
-                onExpensesCostCenterChange={setExpensesCostCenter}
-                expenseCostCenters={allowedExpenseCostCenters}
-              />
+    <NavContext.Provider value={goTo}>
+      <Shell
+        active={tab}
+        onChange={setTab}
+        split={{ canSplit, isOpen: splitOpen, onToggle: toggleSplit, tab: splitTab }}
+      >
+        <Suspense fallback={null}>
+          {splitOpen && splitTab ? (
+            <div className="split-panes">
+              <div className="split-pane">
+                <PageView
+                  tab={tab}
+                  expensesCostCenter={expensesCostCenter}
+                  onExpensesCostCenterChange={setExpensesCostCenter}
+                  expenseCostCenters={allowedExpenseCostCenters}
+                />
+              </div>
+              <div className="split-pane">
+                <SplitPaneHead tab={splitTab} tabs={splitTabs} onChange={changeSplitTab} onClose={() => changeSplitTab(null)} />
+                <PageView
+                  tab={splitTab}
+                  expensesCostCenter={splitExpensesCostCenter}
+                  onExpensesCostCenterChange={setSplitExpensesCostCenter}
+                  expenseCostCenters={allowedExpenseCostCenters}
+                />
+              </div>
             </div>
-            <div className="split-pane">
-              <SplitPaneHead tab={splitTab} tabs={splitTabs} onChange={changeSplitTab} onClose={() => changeSplitTab(null)} />
-              <PageView
-                tab={splitTab}
-                expensesCostCenter={splitExpensesCostCenter}
-                onExpensesCostCenterChange={setSplitExpensesCostCenter}
-                expenseCostCenters={allowedExpenseCostCenters}
-              />
-            </div>
-          </div>
-        ) : (
-          <PageView
-            tab={tab}
-            expensesCostCenter={expensesCostCenter}
-            onExpensesCostCenterChange={setExpensesCostCenter}
-            expenseCostCenters={allowedExpenseCostCenters}
-          />
-        )}
-      </Suspense>
-    </Shell>
+          ) : (
+            <PageView
+              tab={tab}
+              expensesCostCenter={expensesCostCenter}
+              onExpensesCostCenterChange={setExpensesCostCenter}
+              expenseCostCenters={allowedExpenseCostCenters}
+            />
+          )}
+        </Suspense>
+      </Shell>
+    </NavContext.Provider>
   )
 }
 
