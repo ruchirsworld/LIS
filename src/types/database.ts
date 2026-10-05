@@ -822,6 +822,7 @@ export type Database = {
           id: string;
           invoice_id: string;
           payment_mode: string | null;
+          is_retention_release: boolean;
           reference: string | null;
         };
         Insert: {
@@ -834,6 +835,7 @@ export type Database = {
           id?: string;
           invoice_id: string;
           payment_mode?: string | null;
+          is_retention_release?: boolean;
           reference?: string | null;
         };
         Update: {
@@ -846,6 +848,7 @@ export type Database = {
           id?: string;
           invoice_id?: string;
           payment_mode?: string | null;
+          is_retention_release?: boolean;
           reference?: string | null;
         };
         Relationships: [

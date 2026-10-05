@@ -1327,6 +1327,13 @@ td.amt-retention {
   color: var(--blue);
   font-weight: 600;
 }
+.check-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  white-space: nowrap;
+}
 .dash-card-retention {
   background: var(--blue-soft);
 }

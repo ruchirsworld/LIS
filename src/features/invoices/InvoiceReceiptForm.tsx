@@ -60,7 +60,8 @@ export function InvoiceReceiptForm() {
       const invPayments = payments?.filter((p) => p.invoice_id === inv.id) ?? []
       // Retention counts as receivable only once its release date has arrived.
       const releasable = isRetentionReleaseDue(inv, invPayments) ? retentionHeld(inv, invPayments) : 0
-      return { invoice: inv, due: dueAmount(inv, invPayments) + releasable }
+      const collectible = dueAmount(inv, invPayments)
+      return { invoice: inv, collectible, releasable, due: collectible + releasable }
     })
     .filter((row) => row.due > 0)
     .sort((a, b) => (a.invoice.invoice_date ?? '9999-99-99').localeCompare(b.invoice.invoice_date ?? '9999-99-99'))
@@ -97,18 +98,33 @@ export function InvoiceReceiptForm() {
       // extra payment, shown in green, to adjust against a future invoice.
       const order = [target, ...clientOpenInvoices.filter((row) => row.invoice.id !== target.invoice.id)]
       let remaining = amt
-      for (let i = 0; i < order.length && remaining > 0.005; i++) {
-        const isLast = i === order.length - 1
-        const share = isLast ? remaining : Math.min(remaining, order[i].due)
-        await createPayment.mutateAsync({
-          invoice_id: order[i].invoice.id,
+      const record = (invoiceId: string, share: number, release: boolean) =>
+        createPayment.mutateAsync({
+          invoice_id: invoiceId,
           date,
           amount: share,
           payment_mode: accountId === CASH ? 'Cash' : 'Bank',
           bank_account_id: accountId === CASH ? null : accountId,
+          is_retention_release: release,
         })
-        remaining -= share
+      for (const row of order) {
+        if (remaining <= 0.005) break
+        // The collectible part first as an ordinary payment, then — once the
+        // release date has arrived — the retention as a recorded release.
+        const ordinary = Math.min(remaining, row.collectible)
+        if (ordinary > 0.005) {
+          await record(row.invoice.id, ordinary, false)
+          remaining -= ordinary
+        }
+        const release = Math.min(remaining, row.releasable)
+        if (release > 0.005) {
+          await record(row.invoice.id, release, true)
+          remaining -= release
+        }
       }
+      // Whatever is left once every open invoice is settled stays on the last
+      // one as an ordinary extra payment, to adjust against a future invoice.
+      if (remaining > 0.005) await record(order[order.length - 1].invoice.id, remaining, false)
       setClientId('')
       setInvoiceId('')
       setDate(todayStr())

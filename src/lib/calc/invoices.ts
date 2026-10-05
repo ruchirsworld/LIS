@@ -17,6 +17,8 @@ export interface InvoiceRow {
 
 export interface InvoicePaymentRow {
   amount: number
+  /** True for a payment recorded as the client releasing held retention. */
+  is_retention_release?: boolean | null
 }
 
 export function gstAmt(inv: InvoiceRow): number {
@@ -49,23 +51,35 @@ export function totalPaid(payments: InvoicePaymentRow[]): number {
   return payments.reduce((s, p) => s + Number(p.amount || 0), 0)
 }
 
-export function dueAmount(inv: InvoiceRow, payments: InvoicePaymentRow[]): number {
-  return Math.max(0, netPayable(inv) - retentionAmt(inv) - totalPaid(payments))
+// Money received against the retention itself — only payments explicitly
+// recorded as a retention release count; retention is never assumed released
+// just because payments ran ahead of the collectible part.
+export function releasedPaid(payments: InvoicePaymentRow[]): number {
+  return totalPaid(payments.filter((p) => p.is_retention_release))
 }
 
-// What the client has paid beyond the full net payable (retention included —
-// money received against a held-back retention is a release, not an
-// overpayment). dueAmount floors at 0, so this is where an excess shows up.
+function regularPaid(payments: InvoicePaymentRow[]): number {
+  return totalPaid(payments) - releasedPaid(payments)
+}
+
+export function dueAmount(inv: InvoiceRow, payments: InvoicePaymentRow[]): number {
+  return Math.max(0, netPayable(inv) - retentionAmt(inv) - regularPaid(payments))
+}
+
+// What the client has paid beyond what the invoice can take: ordinary
+// payments past the collectible part (net payable less retention), plus any
+// retention-release payments past the retention. dueAmount floors at 0, so
+// this is where an excess shows up.
 export function extraPaid(inv: InvoiceRow, payments: InvoicePaymentRow[]): number {
-  const extra = totalPaid(payments) - netPayable(inv)
+  const collectible = netPayable(inv) - retentionAmt(inv)
+  const extra = Math.max(0, regularPaid(payments) - collectible) + Math.max(0, releasedPaid(payments) - retentionAmt(inv))
   return extra > 0.01 ? extra : 0
 }
 
-// Retention still held back: what is outstanding on the invoice beyond the
-// collectible Due. Shrinks as the client releases it (pays past the Due).
+// Retention still held back: the retention less what has been recorded as
+// released.
 export function retentionHeld(inv: InvoiceRow, payments: InvoicePaymentRow[]): number {
-  const outstanding = Math.max(0, netPayable(inv) - totalPaid(payments))
-  const held = outstanding - dueAmount(inv, payments)
+  const held = retentionAmt(inv) - releasedPaid(payments)
   return held > 0.01 ? held : 0
 }
 
@@ -98,10 +112,9 @@ export type EffectiveStatus = 'paid' | 'overdue' | 'draft' | 'sent'
 
 export function effectiveStatus(inv: InvoiceRow, payments: InvoicePaymentRow[]): EffectiveStatus {
   const net = netPayable(inv)
-  const paid = totalPaid(payments)
-  // "Paid" means fully settled — including any retention eventually
-  // released — not just the currently-collectible (non-retained) portion.
-  if (net - paid <= 0.01 && net > 0) return 'paid'
+  // "Paid" means fully settled — the collectible part received and any
+  // retention released — not just the currently-collectible portion.
+  if (net > 0 && dueAmount(inv, payments) <= 0.01 && retentionHeld(inv, payments) <= 0) return 'paid'
   if (isPastDue(inv) && dueAmount(inv, payments) > 0.01) return 'overdue'
   return inv.status
 }

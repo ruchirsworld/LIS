@@ -21,8 +21,8 @@ function todayStr() {
  * (InvoiceTable.tsx), which isn't a table row so doesn't want that wrapper. */
 function InvoicePaymentFields(
   props:
-    | { mode: 'create'; invoiceId: string; due: number; onClose: () => void }
-    | { mode: 'edit'; payment: InvoicePayment; onClose: () => void }
+    | { mode: 'create'; invoiceId: string; due: number; retentionRelease?: boolean; onClose: () => void }
+    | { mode: 'edit'; payment: InvoicePayment; hasRetention?: boolean; onClose: () => void }
 ) {
   const createPayment = useCreateInvoicePayment()
   const updatePayment = useUpdateInvoicePayment()
@@ -45,6 +45,9 @@ function InvoicePaymentFields(
   const [amount, setAmount] = useState(fmtPlain(initial ? initial.amount : props.mode === 'create' ? props.due : 0).replace(/,/g, ''))
   const [reference, setReference] = useState(initial?.reference ?? '')
   const [accountId, setAccountId] = useState(initial?.bank_account_id ?? CASH)
+  const [isRelease, setIsRelease] = useState(
+    props.mode === 'edit' ? !!props.payment.is_retention_release : !!props.retentionRelease
+  )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -76,6 +79,7 @@ function InvoicePaymentFields(
         reference: reference.trim() || null,
         payment_mode: accountId === CASH ? 'Cash' : 'Bank',
         bank_account_id: accountId === CASH ? null : accountId,
+        is_retention_release: isRelease,
       }
       if (props.mode === 'edit') {
         await updatePayment.mutateAsync({ id: props.payment.id, patch })
@@ -119,6 +123,12 @@ function InvoicePaymentFields(
         <label>Reference / receipt no.</label>
         <input type="text" value={reference} onChange={(e) => setReference(e.target.value)} />
       </div>
+      {(props.mode === 'create' ? props.retentionRelease : props.hasRetention) && (
+        <label className="check-inline">
+          <input type="checkbox" checked={isRelease} onChange={(e) => setIsRelease(e.target.checked)} />
+          Retention release
+        </label>
+      )}
       <Button type="button" onClick={save} disabled={saving}>
         {saving ? 'Saving…' : props.mode === 'edit' ? 'Save changes' : 'Save payment'}
       </Button>
@@ -137,21 +147,31 @@ function InvoicePaymentFields(
 export function InvoicePaymentForm({
   invoiceId,
   due,
+  retentionRelease,
   onClose,
 }: {
   invoiceId: string
   due: number
+  retentionRelease?: boolean
   onClose: () => void
 }) {
   return (
     <tr className="pay-form-row">
       <td colSpan={15}>
-        <InvoicePaymentFields mode="create" invoiceId={invoiceId} due={due} onClose={onClose} />
+        <InvoicePaymentFields mode="create" invoiceId={invoiceId} due={due} retentionRelease={retentionRelease} onClose={onClose} />
       </td>
     </tr>
   )
 }
 
-export function EditInvoicePaymentFields({ payment, onClose }: { payment: InvoicePayment; onClose: () => void }) {
-  return <InvoicePaymentFields mode="edit" payment={payment} onClose={onClose} />
+export function EditInvoicePaymentFields({
+  payment,
+  hasRetention,
+  onClose,
+}: {
+  payment: InvoicePayment
+  hasRetention?: boolean
+  onClose: () => void
+}) {
+  return <InvoicePaymentFields mode="edit" payment={payment} hasRetention={hasRetention} onClose={onClose} />
 }

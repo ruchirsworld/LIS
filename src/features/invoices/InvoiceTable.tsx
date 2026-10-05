@@ -73,7 +73,9 @@ function buildLedgerSections(
                 inv.retention_release_date ? ', release ' + fmtDate(inv.retention_release_date) : ''
               }`
             : ''),
-        retention: !!inv.retention_pct,
+        // Only retention that is still held is highlighted — a fully
+        // released one is just noted in the particulars.
+        retention: !!inv.retention_pct && retentionHeld(inv, (allPayments ?? []).filter((p) => p.invoice_id === inv.id)) > 0,
         vch: inv.invoice_number ?? inv.display_id ?? '',
         debit: netPayable(inv),
         credit: 0,
@@ -158,7 +160,7 @@ function buildLedgerSections(
           ]),
           ['Total', '', sum((l) => netPayable(l.inv)), '', sum((l) => l.retention), sum((l) => l.released), sum((l) => l.held), ''],
         ],
-        highlightRows: [lines.length],
+        highlightRows: [...lines.flatMap((l, i) => (l.held > 0 ? [i] : [])), ...(sum((l) => l.held) > 0 ? [lines.length] : [])],
         pdfOnly: true,
       })
     }
@@ -180,6 +182,7 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
   const movePaymentExcess = useMovePaymentExcess()
   const [adjustError, setAdjustError] = useState<string | null>(null)
   const [payFormId, setPayFormId] = useState<string | null>(null)
+  const [payFormRelease, setPayFormRelease] = useState(false)
   const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null)
 
   const clientNameOf = (inv: Invoice) => clientLabel(clients?.find((c) => c.id === inv.client_id))
@@ -205,7 +208,8 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
     setAdjustError(null)
     try {
       await movePaymentExcess.mutateAsync({
-        payments: payments?.filter((p) => p.invoice_id === inv.id) ?? [],
+        // A retention release is never the "extra" — only ordinary payments move.
+        payments: payments?.filter((p) => p.invoice_id === inv.id && !p.is_retention_release) ?? [],
         amount: Math.min(extra, dueOf(target)),
         targetInvoiceId: target.id,
         fromLabel: inv.invoice_number ?? inv.display_id ?? 'earlier invoice',
@@ -352,7 +356,7 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
                       {fmt(tdsAmt(inv))} <span style={{ color: 'var(--ink-soft)', fontSize: 11 }}>({inv.tds_pct || 0}%)</span>
                     </td>
                     <td className="amt">{fmt(netPayable(inv))}</td>
-                    <td className={inv.retention_pct ? 'amt amt-retention' : 'amt'}>
+                    <td className={inv.retention_pct && held > 0 ? 'amt amt-retention' : 'amt'}>
                       {inv.retention_pct ? (
                         <>
                           {fmt(retentionAmt(inv))} <span style={{ fontSize: 11, fontWeight: 400 }}>({inv.retention_pct}%)</span>
@@ -398,12 +402,12 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
                     </td>
                     <td>
                       {due > 0 && (
-                        <button type="button" className="pay-btn" onClick={() => setPayFormId(inv.id)}>
+                        <button type="button" className="pay-btn" onClick={() => { setPayFormRelease(false); setPayFormId(inv.id) }}>
                           Record payment
                         </button>
                       )}
-                      {held > 0 && due <= 0.01 && (
-                        <button type="button" className="pay-btn" onClick={() => setPayFormId(inv.id)}>
+                      {held > 0 && (
+                        <button type="button" className="pay-btn" onClick={() => { setPayFormRelease(true); setPayFormId(inv.id) }}>
                           Release retention
                         </button>
                       )}
@@ -428,11 +432,12 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
                         <div className="pay-history">
                           {invPayments.map((p) =>
                             editingPaymentId === p.id ? (
-                              <EditInvoicePaymentFields key={p.id} payment={p} onClose={() => setEditingPaymentId(null)} />
+                              <EditInvoicePaymentFields key={p.id} payment={p} hasRetention={!!inv.retention_pct} onClose={() => setEditingPaymentId(null)} />
                             ) : (
                               <div key={p.id}>
                                 {p.display_id} — {fmtDate(p.date)} — {fmt(p.amount)}
-                                {p.reference ? ` · ${p.reference}` : ''}{' '}
+                                {p.reference ? ` · ${p.reference}` : ''}
+                                {p.is_retention_release ? ' · retention release' : ''}{' '}
                                 <button type="button" className="btn link" onClick={() => setEditingPaymentId(p.id)}>
                                   Edit
                                 </button>
@@ -444,7 +449,11 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
                     </td>
                   </tr>
                   {payFormId === inv.id && (
-                    <InvoicePaymentForm invoiceId={inv.id} due={due > 0.01 ? due : held} onClose={() => setPayFormId(null)} />
+                    <InvoicePaymentForm
+                      invoiceId={inv.id}
+                      due={payFormRelease ? held : due}
+                      retentionRelease={payFormRelease}
+                      onClose={() => setPayFormId(null)} />
                   )}
                 </Fragment>
               )
