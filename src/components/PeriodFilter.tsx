@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import type { DateRange, PeriodFilterType } from '../lib/calc/period'
 import { periodToRange } from '../lib/calc/period'
 
@@ -6,16 +6,29 @@ interface PeriodFilterProps {
   onChange: (range: DateRange | null) => void
   allowCustom?: boolean
   style?: CSSProperties
+  /** Sets the filter to this custom range whenever `nonce` changes — how a
+   * dashboard drill-through lands on a page already narrowed to a period. */
+  preset?: { from: string; to: string; nonce: number }
 }
 
 /** Month/Quarter/Year/All-time filter, ported from the v1.0 prototype's per-tab filter row. */
-export function PeriodFilter({ onChange, allowCustom = false, style }: PeriodFilterProps) {
+export function PeriodFilter({ onChange, allowCustom = false, style, preset }: PeriodFilterProps) {
   const [type, setType] = useState<PeriodFilterType>('all')
   const [month, setMonth] = useState('')
   const [quarter, setQuarter] = useState(1)
   const [year, setYear] = useState('')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
+
+  const presetNonce = preset?.nonce
+  useEffect(() => {
+    if (!preset) return
+    setType('custom')
+    setFrom(preset.from)
+    setTo(preset.to)
+    onChange({ from: preset.from, to: preset.to })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [presetNonce])
 
   function emit(next: {
     type?: PeriodFilterType

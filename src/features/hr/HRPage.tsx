@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useNavFilter } from '../../lib/navContext'
 import { ModuleHeader } from '../../components/ui'
 import { AttendanceSection } from './AttendanceSection'
 import { SalarySection } from './SalarySection'
@@ -10,6 +11,10 @@ type HrSection = (typeof HR_SECTIONS)[number]
 
 export function HRPage() {
   const [section, setSection] = useState<HrSection>('Attendance')
+  const nav = useNavFilter('hr')
+  useEffect(() => {
+    if (nav?.filter.hrSection) setSection(nav.filter.hrSection)
+  }, [nav])
 
   return (
     <div className="hr-page">

@@ -146,6 +146,7 @@ export function DashboardInsights({
         .sort((a, b) => Number(b.amount) - Number(a.amount))
         .slice(0, 8)
     : []
+  const periodFilter = range?.from && range?.to ? { range: { from: range.from, to: range.to } } : undefined
   const centreTab = (EXPENSE_COST_CENTERS as readonly string[]).includes(centreSel ?? '') ? (centreSel as ExpenseCostCenter) : undefined
 
   return (
@@ -168,7 +169,11 @@ export function DashboardInsights({
               </thead>
               <tbody>
                 {ageDrill.map((r) => (
-                  <tr key={r.inv.id} className={goTo ? 'row-link' : undefined} onClick={goTo ? () => goTo('invoices') : undefined}>
+                  <tr
+                    key={r.inv.id}
+                    className={goTo ? 'row-link' : undefined}
+                    onClick={goTo ? () => goTo('invoices', { filter: { clientId: r.inv.client_id, invoiceView: 'due', focus: 'inv-ledger' } }) : undefined}
+                  >
                     <td>{clientName(r.inv.client_id)}</td>
                     <td>{r.inv.invoice_number ?? r.inv.display_id ?? '—'}</td>
                     <td>{r.dueDate ? fmtDate(r.dueDate) : '—'}</td>
@@ -179,8 +184,8 @@ export function DashboardInsights({
             </table>
             {goTo && (
               <div className="dash-viewall">
-                <Button type="button" variant="link" onClick={() => goTo('invoices')}>
-                  Open Invoices {'→'}
+                <Button type="button" variant="link" onClick={() => goTo('invoices', { filter: { invoiceView: 'due', focus: 'inv-ledger' } })}>
+                  Open dues in Invoices {'→'}
                 </Button>
               </div>
             )}
@@ -247,7 +252,7 @@ export function DashboardInsights({
                   <tr
                     key={e.id}
                     className={goTo ? 'row-link' : undefined}
-                    onClick={goTo ? () => goTo('expenses', centreTab ? { costCenter: centreTab } : undefined) : undefined}
+                    onClick={goTo ? () => goTo('expenses', { costCenter: centreTab, filter: periodFilter }) : undefined}
                   >
                     <td>{fmtDate(e.date)}</td>
                     <td>{e.description || '—'}</td>
@@ -258,7 +263,7 @@ export function DashboardInsights({
             </table>
             {goTo && (
               <div className="dash-viewall">
-                <Button type="button" variant="link" onClick={() => goTo('expenses', centreTab ? { costCenter: centreTab } : undefined)}>
+                <Button type="button" variant="link" onClick={() => goTo('expenses', { costCenter: centreTab, filter: periodFilter })}>
                   Open Expenses {'→'}
                 </Button>
               </div>

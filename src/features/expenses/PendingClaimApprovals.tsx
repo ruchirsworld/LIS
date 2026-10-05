@@ -1,4 +1,5 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
+import { useNavFilter } from '../../lib/navContext'
 import { SearchableSelect } from '../../components/SearchableSelect'
 import { Button } from '../../components/ui'
 import { useProjects, useExpenseSubHeads } from '../../lib/queries/masters'
@@ -31,6 +32,10 @@ export function PendingClaimApprovals() {
   const supervisors = (profiles ?? []).filter((p) => p.role === 'supervisor')
 
   const [supervisorId, setSupervisorId] = useState('')
+  const nav = useNavFilter('approvals')
+  useEffect(() => {
+    if (nav?.filter.supervisorId) setSupervisorId(nav.filter.supervisorId)
+  }, [nav])
   const [busyKey, setBusyKey] = useState<string | null>(null)
   const [rowError, setRowError] = useState<Record<string, string>>({})
 

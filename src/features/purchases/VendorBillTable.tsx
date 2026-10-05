@@ -1,4 +1,5 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
+import { useNavFilter } from '../../lib/navContext'
 import { PeriodFilter } from '../../components/PeriodFilter'
 import { SearchableSelect } from '../../components/SearchableSelect'
 import { SortableTh } from '../../components/SortableTh'
@@ -36,6 +37,11 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
   const [editListId, setEditListId] = useState<string | null>(null)
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
   const [vendorFilter, setVendorFilter] = useState('')
+  const [unpaidOnly, setUnpaidOnly] = useState(false)
+  const nav = useNavFilter('purchases')
+  useEffect(() => {
+    if (nav) setUnpaidOnly(nav.filter.vendorView === 'unpaid')
+  }, [nav])
 
   function closePayForm() {
     setPayFormId(null)
@@ -56,7 +62,7 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
   const categoryFiltered = categoryFilter
     ? bills?.filter((b) => vendors?.find((v) => v.id === b.vendor_id)?.category === categoryFilter)
     : bills
-  const visibleBills = vendorFilter ? categoryFiltered?.filter((b) => b.vendor_id === vendorFilter) : categoryFiltered
+  const vendorFiltered = vendorFilter ? categoryFiltered?.filter((b) => b.vendor_id === vendorFilter) : categoryFiltered
 
   const vendorNameOf = (b: NonNullable<typeof bills>[number]) => vendors?.find((v) => v.id === b.vendor_id)?.name ?? ''
   const subHeadNameOf = (b: NonNullable<typeof bills>[number]) => subHeads?.find((s) => s.id === b.sub_head_id)?.name ?? ''
@@ -77,6 +83,10 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
   // credit that should offset another underpaid bill for the same vendor
   // rather than silently vanishing. See VendorPage for the net.
   const dueOf = (b: NonNullable<typeof bills>[number]) => billDueRaw(b, payments?.filter((p) => p.bill_id === b.id) ?? [])
+
+  // Only bills that still have something to pay (a bill paid in full, or
+  // overpaid, is left out).
+  const visibleBills = unpaidOnly ? vendorFiltered?.filter((b) => dueOf(b) > 0.01) : vendorFiltered
 
   const { sorted: sortedBills, sortKey, direction, toggleSort } = useSort(
     visibleBills,
@@ -123,12 +133,17 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
   ]
 
   return (
-    <details className="toggle-section" open>
+    <details className="toggle-section" open id="bill-records">
       <summary>Bill records</summary>
 
       <div className="toolbar">
         <div className="toolbar-group">
-          <PeriodFilter onChange={setRange} allowCustom style={{ marginBottom: 0 }} />
+          <PeriodFilter
+            onChange={setRange}
+            allowCustom
+            style={{ marginBottom: 0 }}
+            preset={nav?.filter.range ? { ...nav.filter.range, nonce: nav.nonce } : undefined}
+          />
           <div className="field" style={{ maxWidth: 220, marginBottom: 0 }}>
             <label>Search vendor</label>
             <SearchableSelect
@@ -141,6 +156,10 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
               placeholder="— All vendors —"
             />
           </div>
+          <label className="check-inline" style={{ alignSelf: 'flex-end', paddingBottom: 8 }}>
+            <input type="checkbox" checked={unpaidOnly} onChange={(e) => setUnpaidOnly(e.target.checked)} />
+            Unpaid only
+          </label>
         </div>
         <ReportExportButtons title="Bill records" sections={exportSections} range={range} style={{ marginTop: 0 }} />
       </div>

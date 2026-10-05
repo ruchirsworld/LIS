@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { PeriodFilter } from '../../components/PeriodFilter'
 import { SearchableSelect } from '../../components/SearchableSelect'
 import { SortableTh } from '../../components/SortableTh'
@@ -15,6 +15,7 @@ import { gstAmt, tdsAmt, netPayable, retentionAmt, totalPaid, dueAmount, extraPa
 import type { DateRange } from '../../lib/calc/period'
 import { InvoicePaymentForm, EditInvoicePaymentFields } from './InvoicePaymentForm'
 import { clientLabel, clientFullName, clientGstLine } from '../../lib/labels'
+import { useNavFilter, type InvoiceView } from '../../lib/navContext'
 import type { Database } from '../../types/database'
 
 type Invoice = Database['public']['Tables']['invoices']['Row']
@@ -172,6 +173,14 @@ function buildLedgerSections(
 export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void }) {
   const [range, setRange] = useState<DateRange | null>(null)
   const [clientFilter, setClientFilter] = useState('')
+  const [view, setView] = useState<InvoiceView>('all')
+  // Arriving from a dashboard card or table row: narrow to what it counted.
+  const nav = useNavFilter('invoices')
+  useEffect(() => {
+    if (!nav) return
+    setClientFilter(nav.filter.clientId ?? '')
+    setView(nav.filter.invoiceView ?? 'all')
+  }, [nav])
   const { data: invoices, isLoading } = useInvoices(range)
   const { data: allInvoices } = useInvoices(null)
   const { data: payments } = useInvoicePayments()
@@ -219,7 +228,17 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
     }
   }
 
-  const filteredInvoices = clientFilter ? invoices?.filter((inv) => inv.client_id === clientFilter) : invoices
+  const clientFiltered = clientFilter ? invoices?.filter((inv) => inv.client_id === clientFilter) : invoices
+  const filteredInvoices =
+    view === 'all'
+      ? clientFiltered
+      : clientFiltered?.filter((inv) => {
+          const invPayments = payments?.filter((p) => p.invoice_id === inv.id) ?? []
+          if (view === 'due') return inv.status === 'sent' && dueAmount(inv, invPayments) > 0.01
+          if (view === 'overdue') return effectiveStatus(inv, invPayments) === 'overdue'
+          if (view === 'draft') return inv.status === 'draft'
+          return retentionHeld(inv, invPayments) > 0
+        })
 
   const { sorted: sortedInvoices, sortKey, direction, toggleSort } = useSort(
     filteredInvoices,
@@ -254,7 +273,7 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
   const ledgerFileNamePrefix = filterClient ? `${clientLabel(filterClient)}_Ledger` : 'Ledger'
 
   return (
-    <details className="toggle-section" open>
+    <details className="toggle-section" open id="inv-ledger">
       <summary>Ledger</summary>
 
       <div className="toolbar">
@@ -270,6 +289,16 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
               getLabel={(c) => clientLabel(c)}
               placeholder="— All clients —"
             />
+          </div>
+          <div className="field" style={{ maxWidth: 190 }}>
+            <label>Show</label>
+            <select value={view} onChange={(e) => setView(e.target.value as InvoiceView)}>
+              <option value="all">All invoices</option>
+              <option value="due">With a balance due</option>
+              <option value="overdue">Overdue</option>
+              <option value="draft">Drafts to send</option>
+              <option value="retention">Retention held</option>
+            </select>
           </div>
         </div>
         <ReportExportButtons

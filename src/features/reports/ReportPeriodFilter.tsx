@@ -4,14 +4,16 @@ import { reportPeriodToRange } from '../../lib/calc/reportPeriod'
 
 interface ReportPeriodFilterProps {
   onChange: (range: DateRange | null, type: ReportPeriodType) => void
+  /** Opens with this period instead of "This month". */
+  initial?: { type: ReportPeriodType; from: string | null; to: string | null }
 }
 
 /** Today/This week/This month/This quarter/This year (FY)/All time/Custom range
  * filter shared by every section on the Reports tab. */
-export function ReportPeriodFilter({ onChange }: ReportPeriodFilterProps) {
-  const [type, setType] = useState<ReportPeriodType>('month')
-  const [from, setFrom] = useState('')
-  const [to, setTo] = useState('')
+export function ReportPeriodFilter({ onChange, initial }: ReportPeriodFilterProps) {
+  const [type, setType] = useState<ReportPeriodType>(initial?.type ?? 'month')
+  const [from, setFrom] = useState(initial?.from ?? '')
+  const [to, setTo] = useState(initial?.to ?? '')
 
   function emit(next: { type?: ReportPeriodType; from?: string; to?: string }) {
     const t = next.type ?? type

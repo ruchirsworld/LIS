@@ -1,4 +1,5 @@
-import { useState, type ComponentType } from 'react'
+import { useEffect, useState, type ComponentType } from 'react'
+import { useNavFilter } from '../../lib/navContext'
 import { ModuleHeader } from '../../components/ui'
 import { ReportPeriodFilter } from './ReportPeriodFilter'
 import { ExpenseBreakdownReport } from './ExpenseBreakdownReport'
@@ -24,7 +25,7 @@ import {
 import { AuditLogReport } from './AuditLogReport'
 import { SegregationOfDutiesReport } from './SegregationOfDutiesReport'
 import { reportPeriodToRange } from '../../lib/calc/reportPeriod'
-import type { DateRange } from '../../lib/calc/reportPeriod'
+import type { DateRange, ReportPeriodType } from '../../lib/calc/reportPeriod'
 import './Reports.css'
 
 interface ReportDef {
@@ -228,6 +229,17 @@ const ALL_REPORTS = CATEGORIES.flatMap((c) => c.reports)
 export function ReportsPage() {
   const [range, setRange] = useState<DateRange | null>(reportPeriodToRange('month'))
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [period, setPeriod] = useState<{ type: ReportPeriodType; from: string | null; to: string | null }>({ type: 'month', from: null, to: null })
+  const nav = useNavFilter('reports')
+  useEffect(() => {
+    if (!nav) return
+    if (nav.filter.period) {
+      const { type, from, to } = nav.filter.period
+      setPeriod({ type, from, to })
+      setRange(reportPeriodToRange(type, { from: from ?? undefined, to: to ?? undefined }))
+    }
+    if (nav.filter.report) setSelectedId(nav.filter.report)
+  }, [nav])
   const [query, setQuery] = useState('')
 
   const selected = ALL_REPORTS.find((r) => r.id === selectedId) ?? null
@@ -242,7 +254,7 @@ export function ReportsPage() {
           </button>
           <h2 className="report-detail-title">{selected.title}</h2>
         </div>
-        {!selected.periodless && <ReportPeriodFilter onChange={(r) => setRange(r)} />}
+        {!selected.periodless && <ReportPeriodFilter onChange={(r) => setRange(r)} initial={period} />}
         <Component range={range} />
       </div>
     )

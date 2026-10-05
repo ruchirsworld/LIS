@@ -25,7 +25,7 @@ import { DashboardInsights } from './DashboardInsights'
 import { ClaimActions, SendInvoiceAction } from './DashActions'
 import { Delta, ProgressBar, Sparkline } from './dashViz'
 import { useAuth } from '../../lib/auth'
-import { useGoTo } from '../../lib/navContext'
+import { useGoTo, type NavFilter } from '../../lib/navContext'
 import type { TabId } from '../../lib/nav'
 import { previousPeriodLabel, previousRange, reportPeriodToRange } from '../../lib/calc/reportPeriod'
 import { clientFullName } from '../../lib/labels'
@@ -50,7 +50,7 @@ const JUMP_LINKS: { id: DashSectionId; label: string }[] = [
   { id: 'reports', label: 'Reports' },
 ]
 
-type ExpandedKpi = 'approvals' | 'draftInvoices' | 'overdueInvoices' | 'outstanding' | 'retention' | 'imprest' | null
+type ExpandedKpi = 'approvals' | 'draftInvoices' | 'overdueInvoices' | 'outstanding' | 'retention' | 'imprest' | 'gst' | null
 
 function clockTime(ms: number): string {
   return new Date(ms).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })
@@ -101,9 +101,13 @@ export function DashboardPage() {
 
   // A card that opens another page, or a plain card when there is no shell
   // to navigate (nothing to click, so nothing pretends to be clickable).
-  function drill(tab: TabId) {
-    return goTo ? { onClick: () => goTo(tab), go: true as const } : {}
+  function drill(tab: TabId, filter?: NavFilter) {
+    return goTo ? { onClick: () => goTo(tab, filter ? { filter } : undefined), go: true as const } : {}
   }
+
+  // The dashboard's own period, as a preset for a list's date filter (none for
+  // all time or an open-ended range).
+  const periodRange = range?.from && range?.to ? { from: range.from, to: range.to } : undefined
 
   function jumpTo(id: DashSectionId) {
     sections.open(id)
@@ -203,11 +207,11 @@ export function DashboardPage() {
   const updatedAt = dataUpdatedAt ? clockTime(dataUpdatedAt) : null
 
   // Footer link of a peek table — the "see everything" step.
-  function viewAll(tab: TabId, label: string): ReactNode {
+  function viewAll(tab: TabId, label: string, filter?: NavFilter): ReactNode {
     if (!goTo) return null
     return (
       <div className="dash-viewall">
-        <Button type="button" variant="link" onClick={() => goTo(tab)}>
+        <Button type="button" variant="link" onClick={() => goTo(tab, filter ? { filter } : undefined)}>
           {label} {'→'}
         </Button>
       </div>
@@ -245,6 +249,7 @@ export function DashboardPage() {
       </div>
 
       <DashSection id="attention" title="Needs attention" open={sections.isOpen('attention')} onToggle={() => sections.toggle('attention')}>
+        <div className="dash-subhead">Supervisors &amp; site</div>
         <div className="dash-grid">
           <KpiCard
             label="Pending approvals"
@@ -256,23 +261,11 @@ export function DashboardPage() {
             hint="Supervisor claims waiting for you. Click to review them here"
           />
           <KpiCard
-            label="Invoices to send"
-            value={String(draftInvoices.length)}
-            onClick={() => toggleKpi('draftInvoices')}
-            active={expandedKpi === 'draftInvoices'}
-            tone={countTone(draftInvoices.length, false, 'warn')}
-            sub={countSub(draftInvoices.length, false, 'Drafts not sent yet')}
-            hint="Draft invoices not yet sent. Click to send them here"
-          />
-          <KpiCard
-            label="Overdue invoices"
-            value={String(overdueCount)}
-            loading={isLoading}
-            onClick={() => toggleKpi('overdueInvoices')}
-            active={expandedKpi === 'overdueInvoices'}
-            tone={countTone(overdueCount, isLoading, 'danger')}
-            sub={countSub(overdueCount, isLoading, `${fmt(overdueAmount)} past due date`)}
-            hint="Invoices past their due date. Click to record a payment here"
+            label="Site imprest outstanding"
+            value={fmt(totalImprestOutstanding)}
+            onClick={() => toggleKpi('imprest')}
+            active={expandedKpi === 'imprest'}
+            hint="Float held by supervisors. Click for the split by supervisor"
           />
         </div>
 
@@ -295,7 +288,7 @@ export function DashboardPage() {
                 </thead>
                 <tbody>
                   {pendingProjectClaims.map((e) => (
-                    <tr key={e.id} className={goTo ? 'row-link' : undefined} onClick={goTo ? () => goTo('approvals') : undefined}>
+                    <tr key={e.id} className={goTo ? 'row-link' : undefined} onClick={goTo ? () => goTo('approvals', { filter: { supervisorId: e.created_by ?? undefined } }) : undefined}>
                       <td>{supervisorName(e.created_by)}</td>
                       <td>{projectName(e.project_id)}</td>
                       <td>{fmtDate(e.date)}</td>
@@ -310,6 +303,55 @@ export function DashboardPage() {
               {viewAll('approvals', 'Open Approvals')}
             </div>
           ))}
+
+        {expandedKpi === 'imprest' &&
+          (imprestRows.length === 0 ? (
+            <div className="note" style={{ marginTop: 10 }}>
+              No supervisor is currently holding any site imprest float.
+            </div>
+          ) : (
+            <div className="table-scroll" style={{ marginTop: 10 }}>
+              <table className="data">
+                <thead>
+                  <tr>
+                    <th>Supervisor</th>
+                    <th style={{ textAlign: 'right' }}>Float held</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {imprestRows.map((r) => (
+                    <tr key={r.profileId} className={goTo ? 'row-link' : undefined} onClick={goTo ? () => goTo('hr', { filter: { hrSection: 'Imprest' } }) : undefined}>
+                      <td>{r.name}</td>
+                      <td className="amt">{fmt(r.balance)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {viewAll('hr', 'Open Imprest in HR', { hrSection: 'Imprest' })}
+            </div>
+          ))}
+        <div className="dash-subhead">Invoices</div>
+        <div className="dash-grid">
+          <KpiCard
+            label="Invoices to send"
+            value={String(draftInvoices.length)}
+            onClick={() => toggleKpi('draftInvoices')}
+            active={expandedKpi === 'draftInvoices'}
+            tone={countTone(draftInvoices.length, false, 'warn')}
+            sub={countSub(draftInvoices.length, false, 'Drafts not sent yet')}
+            hint="Draft invoices not yet sent. Click to send them here"
+          />
+          <KpiCard
+            label="Overdue invoices"
+            value={String(overdueCount)}
+            loading={isLoading}
+            onClick={() => toggleKpi('overdueInvoices')}
+            active={expandedKpi === 'overdueInvoices'}
+            tone={countTone(overdueCount, isLoading, 'danger')}
+            sub={countSub(overdueCount, isLoading, `${fmt(overdueAmount)} past due date`)}
+            hint="Invoices past their due date. Click to record a payment here"
+          />
+        </div>
 
         {expandedKpi === 'draftInvoices' &&
           (draftInvoices.length === 0 ? (
@@ -329,7 +371,7 @@ export function DashboardPage() {
                 </thead>
                 <tbody>
                   {draftInvoices.map((i) => (
-                    <tr key={i.id} className={goTo ? 'row-link' : undefined} onClick={goTo ? () => goTo('invoices') : undefined}>
+                    <tr key={i.id} className={goTo ? 'row-link' : undefined} onClick={goTo ? () => goTo('invoices', { filter: { invoiceView: 'draft', focus: 'inv-ledger' } }) : undefined}>
                       <td>{clientName(i.client_id)}</td>
                       <td>{i.invoice_date ? fmtDate(i.invoice_date) : '—'}</td>
                       <td className="amt">{fmt(netPayable(i))}</td>
@@ -340,7 +382,7 @@ export function DashboardPage() {
                   ))}
                 </tbody>
               </table>
-              {viewAll('invoices', 'Open Invoices')}
+              {viewAll('invoices', 'Open drafts in Invoices', { invoiceView: 'draft', focus: 'inv-ledger' })}
             </div>
           ))}
 
@@ -363,7 +405,10 @@ export function DashboardPage() {
                 <tbody>
                   {(overdueInvoices ?? []).map((i) => (
                     <Fragment key={i.id}>
-                      <tr className={goTo ? 'row-link' : undefined} onClick={goTo ? () => goTo('invoices') : undefined}>
+                      <tr
+                        className={goTo ? 'row-link' : undefined}
+                        onClick={goTo ? () => goTo('invoices', { filter: { clientId: i.client_id ?? undefined, invoiceView: 'overdue', focus: 'inv-ledger' } }) : undefined}
+                      >
                         <td>{clientName(i.client_id)}</td>
                         <td>{i.effective_due_date ? fmtDate(i.effective_due_date) : '—'}</td>
                         <td className="amt" style={{ color: 'var(--red)' }}>
@@ -393,7 +438,7 @@ export function DashboardPage() {
                   ))}
                 </tbody>
               </table>
-              {viewAll('invoices', 'Open Invoices')}
+              {viewAll('invoices', 'Open overdue in Invoices', { invoiceView: 'overdue', focus: 'inv-ledger' })}
             </div>
           ))}
       </DashSection>
@@ -412,8 +457,8 @@ export function DashboardPage() {
             loading={isLoading}
             extra={cashSeries ? <Sparkline values={cashSeries} label="Cash and bank balance, last 30 days" /> : undefined}
             sub={cashSeries ? 'Last 30 days' : undefined}
-            hint="Open Reports for the cash and bank position"
-            {...drill('reports')}
+            hint="Open the Cash & bank report"
+            {...drill('reports', { report: 'cash-bank' })}
           />
           <KpiCard
             label="Outstanding from clients"
@@ -447,8 +492,8 @@ export function DashboardPage() {
             label="Owed to vendors"
             value={fmt(data?.owed_to_vendors)}
             loading={isLoading}
-            hint="Open Procurements"
-            {...drill('purchases')}
+            hint="Open the bills that are still unpaid"
+            {...drill('purchases', { vendorView: 'unpaid', focus: 'bill-records' })}
           />
           <KpiCard
             label="Loan principal outstanding"
@@ -456,13 +501,6 @@ export function DashboardPage() {
             loading={isLoading}
             hint="Open Loans"
             {...drill('loans')}
-          />
-          <KpiCard
-            label="Site imprest outstanding"
-            value={fmt(totalImprestOutstanding)}
-            onClick={() => toggleKpi('imprest')}
-            active={expandedKpi === 'imprest'}
-            hint="Float held by supervisors. Click for the split by supervisor"
           />
         </div>
 
@@ -488,44 +526,21 @@ export function DashboardPage() {
                   </thead>
                   <tbody>
                     {rows.map((r) => (
-                      <tr key={r.id} className={goTo ? 'row-link' : undefined} onClick={goTo ? () => goTo('invoices') : undefined}>
+                      <tr key={r.id} className={goTo ? 'row-link' : undefined} onClick={goTo ? () => goTo('invoices', { filter: { clientId: r.id, invoiceView: key === 'due' ? 'due' : 'retention', focus: 'inv-ledger' } }) : undefined}>
                         <td>{r.name}</td>
                         <td className={key === 'due' ? 'amt amt-due' : 'amt amt-retention'}>{fmt(r[key])}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-                {viewAll('invoices', 'Open Invoices')}
+                {viewAll('invoices', key === 'due' ? 'Open dues in Invoices' : 'Open retention in Invoices', {
+                  invoiceView: key === 'due' ? 'due' : 'retention',
+                  focus: 'inv-ledger',
+                })}
               </div>
             )
           })()}
 
-        {expandedKpi === 'imprest' &&
-          (imprestRows.length === 0 ? (
-            <div className="note" style={{ marginTop: 10 }}>
-              No supervisor is currently holding any site imprest float.
-            </div>
-          ) : (
-            <div className="table-scroll" style={{ marginTop: 10 }}>
-              <table className="data">
-                <thead>
-                  <tr>
-                    <th>Supervisor</th>
-                    <th style={{ textAlign: 'right' }}>Float held</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {imprestRows.map((r) => (
-                    <tr key={r.profileId} className={goTo ? 'row-link' : undefined} onClick={goTo ? () => goTo('hr') : undefined}>
-                      <td>{r.name}</td>
-                      <td className="amt">{fmt(r.balance)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {viewAll('hr', 'Open HR')}
-            </div>
-          ))}
       </DashSection>
 
       <DashSection
@@ -541,24 +556,24 @@ export function DashboardPage() {
             value={fmt(summary?.total_received)}
             loading={summaryLoading}
             extra={trend(summary?.total_received, prevSummary?.total_received, 'up')}
-            hint="Open Invoices"
-            {...drill('invoices')}
+            hint="Open the receipts for this period"
+            {...drill('invoices', { range: periodRange, focus: 'inv-payments' })}
           />
           <KpiCard
             label="Expenses"
             value={fmt(summary?.total_expenses)}
             loading={summaryLoading}
             extra={trend(summary?.total_expenses, prevSummary?.total_expenses, 'down')}
-            hint="Open Expenses"
-            {...drill('expenses')}
+            hint="Open Expenses for this period"
+            {...drill('expenses', { range: periodRange })}
           />
           <KpiCard
             label="Vendor purchases"
             value={fmt(summary?.vendor_purchases)}
             loading={summaryLoading}
             extra={trend(summary?.vendor_purchases, prevSummary?.vendor_purchases, 'down')}
-            hint="Open Procurements"
-            {...drill('purchases')}
+            hint="Open the bills for this period"
+            {...drill('purchases', { range: periodRange, focus: 'bill-records' })}
           />
           <KpiCard
             label="Net GST payable"
@@ -569,10 +584,53 @@ export function DashboardPage() {
               prevSummary ? (prevSummary.output_gst ?? 0) - (prevSummary.input_gst ?? 0) : undefined,
               'neutral'
             )}
-            hint="Open Reports for the GST summary"
-            {...drill('reports')}
+            hint="Click to see how it is calculated"
+            onClick={() => toggleKpi('gst')}
+            active={expandedKpi === 'gst'}
           />
         </div>
+
+        {expandedKpi === 'gst' &&
+          (() => {
+            const output = summary?.output_gst ?? 0
+            const input = summary?.input_gst ?? 0
+            const net = output - input
+            return (
+              <div className="table-scroll" style={{ marginTop: 10 }}>
+                <table className="data">
+                  <thead>
+                    <tr>
+                      <th>Net GST calculation — {PERIOD_LABEL[periodType]}</th>
+                      <th style={{ textAlign: 'right' }}>Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Output GST — charged on invoices</td>
+                      <td className="amt">{fmt(output)}</td>
+                    </tr>
+                    <tr>
+                      <td>Less: Input GST — paid on vendor bills</td>
+                      <td className="amt">− {fmt(input)}</td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <strong>Net GST payable</strong>
+                      </td>
+                      <td className={net > 0 ? 'amt amt-due' : 'amt amt-extra'}>
+                        <strong>{fmt(net)}</strong>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                {net < 0 && <div className="note">Input GST is more than output GST this period — the difference is a credit.</div>}
+                {viewAll('reports', 'Open the GST summary', {
+                  report: 'gst-summary',
+                  period: { type: periodType, from: range?.from ?? null, to: range?.to ?? null },
+                })}
+              </div>
+            )
+          })()}
       </DashSection>
 
       <DashSection id="projects" title="Projects" open={sections.isOpen('projects')} onToggle={() => sections.toggle('projects')}>

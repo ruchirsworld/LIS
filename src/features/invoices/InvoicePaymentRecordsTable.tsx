@@ -1,4 +1,7 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
+import { PeriodFilter } from '../../components/PeriodFilter'
+import { useNavFilter } from '../../lib/navContext'
+import type { DateRange } from '../../lib/calc/period'
 import { SearchableSelect } from '../../components/SearchableSelect'
 import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
@@ -30,6 +33,14 @@ export function InvoicePaymentRecordsTable() {
   const deletePayment = useDeleteInvoicePayment()
 
   const [clientId, setClientId] = useState('')
+  const [range, setRange] = useState<DateRange | null>(null)
+  const detailsRef = useRef<HTMLDetailsElement>(null)
+  const nav = useNavFilter('invoices')
+  // A "Revenue received" drill-through lands here with the dashboard's period
+  // preset — open the section so it is actually seen.
+  useEffect(() => {
+    if (nav?.filter.range && detailsRef.current) detailsRef.current.open = true
+  }, [nav])
   const [editingPayment, setEditingPayment] = useState<InvoicePayment | null>(null)
 
   const invoiceOf = (p: InvoicePayment) => invoices?.find((i) => i.id === p.invoice_id)
@@ -42,7 +53,9 @@ export function InvoicePaymentRecordsTable() {
     return invoice ? invoice.display_id ?? invoice.invoice_number ?? '—' : '—'
   }
 
-  const clientFiltered = clientId ? (payments ?? []).filter((p) => clientOf(p)?.id === clientId) : payments
+  const clientFiltered = (clientId ? (payments ?? []).filter((p) => clientOf(p)?.id === clientId) : payments)?.filter(
+    (p) => (!range?.from || p.date >= range.from) && (!range?.to || p.date <= range.to)
+  )
 
   const { sorted: sortedPayments, sortKey, direction, toggleSort } = useSort(
     clientFiltered,
@@ -74,22 +87,30 @@ export function InvoicePaymentRecordsTable() {
   ]
 
   return (
-    <details className="toggle-section">
+    <details className="toggle-section" id="inv-payments" ref={detailsRef}>
       <summary>Payment records</summary>
 
       <div className="toolbar">
-        <div className="field" style={{ maxWidth: 260, marginBottom: 0 }}>
-          <label>Search client</label>
-          <SearchableSelect
-            items={clients}
-            value={clientId}
-            onChange={setClientId}
-            getId={(c) => c.id}
-            getLabel={(c) => clientLabel(c)}
-            placeholder="— All clients —"
+        <div className="toolbar-group">
+          <PeriodFilter
+            onChange={setRange}
+            allowCustom
+            style={{ marginBottom: 0 }}
+            preset={nav?.filter.range ? { ...nav.filter.range, nonce: nav.nonce } : undefined}
           />
+          <div className="field" style={{ maxWidth: 260, marginBottom: 0 }}>
+            <label>Search client</label>
+            <SearchableSelect
+              items={clients}
+              value={clientId}
+              onChange={setClientId}
+              getId={(c) => c.id}
+              getLabel={(c) => clientLabel(c)}
+              placeholder="— All clients —"
+            />
+          </div>
         </div>
-        <ReportExportButtons title="Payment records" sections={exportSections} range={null} style={{ marginTop: 0 }} />
+        <ReportExportButtons title="Payment records" sections={exportSections} range={range} style={{ marginTop: 0 }} />
       </div>
 
       <TableScroll>

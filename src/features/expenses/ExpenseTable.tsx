@@ -1,4 +1,5 @@
 import { Fragment, useState } from 'react'
+import { useNavFilter } from '../../lib/navContext'
 import { Button } from '../../components/ui'
 import { SearchableSelect } from '../../components/SearchableSelect'
 import { SortableTh } from '../../components/SortableTh'
@@ -58,6 +59,7 @@ export function ExpenseTable({
   const canEdit = profile?.role === 'admin' || profile?.role === 'cxo'
   const canDelete = profile?.role === 'admin'
   const [range, setRange] = useState<DateRange | null>(null)
+  const nav = useNavFilter('expenses')
   const [userFilter, setUserFilter] = useState('')
   const { data: rawExpenses, isLoading } = useExpenses(range)
   const expenses = costCenterFilter ? rawExpenses?.filter((e) => e.cost_center === costCenterFilter) : rawExpenses
@@ -232,7 +234,11 @@ export function ExpenseTable({
 
       <div className="toolbar">
         <div className="toolbar-group">
-          <PeriodFilterToggle range={range} onChange={setRange} />
+          <PeriodFilterToggle
+            range={range}
+            onChange={setRange}
+            preset={nav?.filter.range ? { ...nav.filter.range, nonce: nav.nonce } : undefined}
+          />
           <div className="field" style={{ maxWidth: 160 }}>
             <label>By user</label>
             <SearchableSelect
