@@ -1321,6 +1321,20 @@ table.data tr.group-header-row td {
   color: var(--green);
   font-weight: 600;
 }
+/* Retention held back by the client — highlighted so it isn't mistaken for Due. */
+td.amt-retention {
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-weight: 600;
+}
+.retention-note {
+  font-size: 11px;
+  font-weight: 400;
+}
+.retention-due {
+  color: var(--red);
+  font-weight: 600;
+}
 
 .dash-grid {
   display: grid;

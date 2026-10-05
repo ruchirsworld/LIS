@@ -8,6 +8,7 @@ export interface InvoiceRow {
   gst_pct: number | null
   tds_pct: number | null
   retention_pct?: number | null
+  retention_release_date?: string | null
   due_date_manual: string | null
   due_days: number | null
   invoice_date: string | null
@@ -58,6 +59,20 @@ export function dueAmount(inv: InvoiceRow, payments: InvoicePaymentRow[]): numbe
 export function extraPaid(inv: InvoiceRow, payments: InvoicePaymentRow[]): number {
   const extra = totalPaid(payments) - netPayable(inv)
   return extra > 0.01 ? extra : 0
+}
+
+// Retention still held back: what is outstanding on the invoice beyond the
+// collectible Due. Shrinks as the client releases it (pays past the Due).
+export function retentionHeld(inv: InvoiceRow, payments: InvoicePaymentRow[]): number {
+  const outstanding = Math.max(0, netPayable(inv) - totalPaid(payments))
+  const held = outstanding - dueAmount(inv, payments)
+  return held > 0.01 ? held : 0
+}
+
+// True once the retention release date has arrived and some is still held.
+export function isRetentionReleaseDue(inv: InvoiceRow, payments: InvoicePaymentRow[]): boolean {
+  if (!inv.retention_release_date) return false
+  return retentionHeld(inv, payments) > 0 && inv.retention_release_date <= new Date().toISOString().slice(0, 10)
 }
 
 function addDays(dateStr: string, days: number): string {

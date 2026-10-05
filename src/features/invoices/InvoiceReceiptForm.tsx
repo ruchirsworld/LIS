@@ -4,7 +4,7 @@ import { CurrencyInput } from '../../components/CurrencyInput'
 import { SearchableSelect } from '../../components/SearchableSelect'
 import { useClients, useBankAccounts } from '../../lib/queries/masters'
 import { useInvoices, useInvoicePayments, useCreateInvoicePayment } from '../../lib/queries/invoices'
-import { dueAmount } from '../../lib/calc/invoices'
+import { dueAmount, retentionHeld, isRetentionReleaseDue } from '../../lib/calc/invoices'
 import { fmt, fmtDate, parseINR } from '../../lib/calc/format'
 import { clientLabel } from '../../lib/labels'
 
@@ -56,7 +56,12 @@ export function InvoiceReceiptForm() {
   // Otherwise, the oldest outstanding invoice for the client absorbs it (FIFO).
   const clientOpenInvoices = (invoices ?? [])
     .filter((inv) => inv.client_id === clientId)
-    .map((inv) => ({ invoice: inv, due: dueAmount(inv, payments?.filter((p) => p.invoice_id === inv.id) ?? []) }))
+    .map((inv) => {
+      const invPayments = payments?.filter((p) => p.invoice_id === inv.id) ?? []
+      // Retention counts as receivable only once its release date has arrived.
+      const releasable = isRetentionReleaseDue(inv, invPayments) ? retentionHeld(inv, invPayments) : 0
+      return { invoice: inv, due: dueAmount(inv, invPayments) + releasable }
+    })
     .filter((row) => row.due > 0)
     .sort((a, b) => (a.invoice.invoice_date ?? '9999-99-99').localeCompare(b.invoice.invoice_date ?? '9999-99-99'))
   const target = invoiceId

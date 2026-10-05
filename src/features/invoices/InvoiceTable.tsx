@@ -11,7 +11,7 @@ import type { ExportSection } from '../../lib/export/report'
 import { useInvoices, useInvoicePayments, useDeleteInvoice, useCycleInvoiceStatus, useMovePaymentExcess } from '../../lib/queries/invoices'
 import { useClients, useProjects } from '../../lib/queries/masters'
 import { fmt, fmtDate } from '../../lib/calc/format'
-import { gstAmt, tdsAmt, netPayable, retentionAmt, totalPaid, dueAmount, extraPaid, effectiveDueDate, effectiveStatus } from '../../lib/calc/invoices'
+import { gstAmt, tdsAmt, netPayable, retentionAmt, totalPaid, dueAmount, extraPaid, retentionHeld, isRetentionReleaseDue, effectiveDueDate, effectiveStatus } from '../../lib/calc/invoices'
 import type { DateRange } from '../../lib/calc/period'
 import { InvoicePaymentForm, EditInvoicePaymentFields } from './InvoicePaymentForm'
 import { clientLabel, clientFullName, clientGstLine } from '../../lib/labels'
@@ -270,6 +270,8 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
               const paid = totalPaid(invPayments)
               const due = dueAmount(inv, invPayments)
               const extra = extraPaid(inv, invPayments)
+              const held = retentionHeld(inv, invPayments)
+              const releaseDue = isRetentionReleaseDue(inv, invPayments)
               const nextInvoice = extra > 0 ? nextOpenInvoiceFor(inv) : undefined
               const status = effectiveStatus(inv, invPayments)
               const dueDateDisplay = effectiveDueDate(inv)
@@ -293,10 +295,18 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
                       {fmt(tdsAmt(inv))} <span style={{ color: 'var(--ink-soft)', fontSize: 11 }}>({inv.tds_pct || 0}%)</span>
                     </td>
                     <td className="amt">{fmt(netPayable(inv))}</td>
-                    <td className="amt">
+                    <td className={inv.retention_pct ? 'amt amt-retention' : 'amt'}>
                       {inv.retention_pct ? (
                         <>
-                          {fmt(retentionAmt(inv))} <span style={{ color: 'var(--ink-soft)', fontSize: 11 }}>({inv.retention_pct}%)</span>
+                          {fmt(retentionAmt(inv))} <span style={{ fontSize: 11, fontWeight: 400 }}>({inv.retention_pct}%)</span>
+                          {inv.retention_release_date && (
+                            <div className="retention-note">Release {fmtDate(inv.retention_release_date)}</div>
+                          )}
+                          {held > 0 && held < retentionAmt(inv) - 0.01 && (
+                            <div className="retention-note">{fmt(held)} still held</div>
+                          )}
+                          {releaseDue && <div className="retention-note retention-due">Release due</div>}
+                          {held === 0 && <div className="retention-note">Released</div>}
                         </>
                       ) : (
                         '—'
@@ -333,6 +343,11 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
                       {due > 0 && (
                         <button type="button" className="pay-btn" onClick={() => setPayFormId(inv.id)}>
                           Record payment
+                        </button>
+                      )}
+                      {held > 0 && due <= 0.01 && (
+                        <button type="button" className="pay-btn" onClick={() => setPayFormId(inv.id)}>
+                          Release retention
                         </button>
                       )}
                       {nextInvoice && (
@@ -372,7 +387,7 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
                     </td>
                   </tr>
                   {payFormId === inv.id && (
-                    <InvoicePaymentForm invoiceId={inv.id} due={due} onClose={() => setPayFormId(null)} />
+                    <InvoicePaymentForm invoiceId={inv.id} due={due > 0.01 ? due : held} onClose={() => setPayFormId(null)} />
                   )}
                 </Fragment>
               )

@@ -910,6 +910,7 @@ export type Database = {
           status: Database["public"]["Enums"]["invoice_status"];
           tds_pct: number;
           retention_pct: number;
+          retention_release_date: string | null;
         };
         Insert: {
           amount: number;
@@ -927,6 +928,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["invoice_status"];
           tds_pct?: number;
           retention_pct?: number;
+          retention_release_date?: string | null;
         };
         Update: {
           amount?: number;
@@ -944,6 +946,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["invoice_status"];
           tds_pct?: number;
           retention_pct?: number;
+          retention_release_date?: string | null;
         };
         Relationships: [
           {

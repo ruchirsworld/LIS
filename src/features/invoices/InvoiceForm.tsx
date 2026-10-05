@@ -34,6 +34,7 @@ export function InvoiceForm({
   const [gstPct, setGstPct] = useState('0')
   const [tdsPct, setTdsPct] = useState('0')
   const [retentionPct, setRetentionPct] = useState('0')
+  const [retentionReleaseDate, setRetentionReleaseDate] = useState('')
   const [dueDays, setDueDays] = useState('')
   const [status, setStatus] = useState<'draft' | 'sent'>('draft')
   const [invoiceDate, setInvoiceDate] = useState('')
@@ -51,6 +52,7 @@ export function InvoiceForm({
     setGstPct(String(editingInvoice.gst_pct ?? 0))
     setTdsPct(String(editingInvoice.tds_pct ?? 0))
     setRetentionPct(String(editingInvoice.retention_pct ?? 0))
+    setRetentionReleaseDate(editingInvoice.retention_release_date ?? '')
     setDueDays(editingInvoice.due_days != null ? String(editingInvoice.due_days) : '')
     setStatus(editingInvoice.status)
     setInvoiceDate(editingInvoice.invoice_date ?? '')
@@ -65,6 +67,7 @@ export function InvoiceForm({
     setGstPct('0')
     setTdsPct('0')
     setRetentionPct('0')
+    setRetentionReleaseDate('')
     setDueDays('')
     setStatus('draft')
     setInvoiceDate('')
@@ -109,6 +112,7 @@ export function InvoiceForm({
         gst_pct: Number(gstPct) || 0,
         tds_pct: Number(tdsPct) || 0,
         retention_pct: Number(retentionPct) || 0,
+        retention_release_date: Number(retentionPct) > 0 ? retentionReleaseDate || null : null,
         due_days: dueDays ? Number(dueDays) : null,
         status,
         invoice_date: status === 'sent' ? invoiceDate || todayStr() : null,
@@ -205,7 +209,8 @@ export function InvoiceForm({
         </div>
 
         {/* Row 4b: Retention % — held back by the client for a period, not
-            counted as due/overdue until released. */}
+            counted as due/overdue until released — and the date it is due to
+            be released. */}
         <div className="field-row">
           <div className="field field-narrow">
             <label>Retention %</label>
@@ -218,6 +223,12 @@ export function InvoiceForm({
               onChange={(e) => setRetentionPct(e.target.value)}
             />
           </div>
+          {Number(retentionPct) > 0 && (
+            <div className="field field-narrow">
+              <label>Retention release date</label>
+              <input type="date" value={retentionReleaseDate} onChange={(e) => setRetentionReleaseDate(e.target.value)} />
+            </div>
+          )}
         </div>
 
         {/* Row 5: Status, Add invoice */}
