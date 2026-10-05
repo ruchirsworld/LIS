@@ -1,7 +1,7 @@
 import { useClients, useProjects } from '../../lib/queries/masters'
 import { useInvoices, useInvoicePayments } from '../../lib/queries/invoices'
 import { fmt } from '../../lib/calc/format'
-import { netPayable, totalPaid } from '../../lib/calc/invoices'
+import { netPayable, totalPaid, retentionHeld } from '../../lib/calc/invoices'
 import { clientLabel } from '../../lib/labels'
 
 export function ProjectSummaryTable() {
@@ -24,13 +24,14 @@ export function ProjectSummaryTable() {
               <th>Client</th>
               <th style={{ textAlign: 'right' }}>Total invoiced</th>
               <th style={{ textAlign: 'right' }}>Received</th>
+              <th style={{ textAlign: 'right' }}>Retention held</th>
               <th style={{ textAlign: 'right' }}>Due</th>
             </tr>
           </thead>
           <tbody>
             {relevant.length === 0 && (
               <tr>
-                <td colSpan={5} className="empty-row">
+                <td colSpan={6} className="empty-row">
                   No project-linked invoices yet
                 </td>
               </tr>
@@ -44,6 +45,10 @@ export function ProjectSummaryTable() {
                 return s + totalPaid(invPayments)
               }, 0)
 
+              const retention = invs.reduce(
+                (s, i) => s + retentionHeld(i, payments?.filter((pm) => pm.invoice_id === i.id) ?? []),
+                0
+              )
               const balance = totalInvoiced - received
 
               return (
@@ -52,6 +57,7 @@ export function ProjectSummaryTable() {
                   <td>{clientLabel(client)}</td>
                   <td className="amt">{fmt(totalInvoiced)}</td>
                   <td className="amt">{fmt(received)}</td>
+                  <td className={retention > 0 ? 'amt amt-retention' : 'amt'}>{retention > 0 ? fmt(retention) : '—'}</td>
                   <td className={`amt ${balance > 0.01 ? 'amt-due' : balance < -0.01 ? 'amt-extra' : ''}`}>{balance < -0.01 ? `+${fmt(-balance)} extra` : fmt(balance)}</td>
                 </tr>
               )
