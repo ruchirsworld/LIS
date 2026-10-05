@@ -40,7 +40,7 @@ function buildLedgerSections(
   range: DateRange | null,
   clientFilter: string
 ): ExportSection[] {
-  type Entry = { date: string; particulars: string; vch: string; debit: number; credit: number }
+  type Entry = { date: string; particulars: string; vch: string; debit: number; credit: number; retention?: boolean }
 
   const relevantClients = (clients ?? [])
     .filter((c) => !clientFilter || c.id === clientFilter)
@@ -66,7 +66,14 @@ function buildLedgerSections(
     for (const inv of clientInvoices) {
       bucket({
         date: inv.invoice_date as string,
-        particulars: `Invoice ${inv.invoice_number ?? inv.display_id ?? ''}`.trim(),
+        particulars:
+          `Invoice ${inv.invoice_number ?? inv.display_id ?? ''}`.trim() +
+          (inv.retention_pct
+            ? ` — Retention ${fmt(retentionAmt(inv))} (${inv.retention_pct}%)${
+                inv.retention_release_date ? ', release ' + fmtDate(inv.retention_release_date) : ''
+              }`
+            : ''),
+        retention: !!inv.retention_pct,
         vch: inv.invoice_number ?? inv.display_id ?? '',
         debit: netPayable(inv),
         credit: 0,
@@ -87,8 +94,10 @@ function buildLedgerSections(
 
     let running = openingBalance
     const rows: (string | number)[][] = [['', 'Opening balance', '', '', '', fmtBalance(running)]]
+    const highlightRows: number[] = []
     for (const e of within) {
       running += e.debit - e.credit
+      if (e.retention) highlightRows.push(rows.length)
       rows.push([
         fmtDate(e.date),
         e.particulars,
@@ -99,11 +108,22 @@ function buildLedgerSections(
       ])
     }
     rows.push(['', 'Closing balance', '', '', '', fmtBalance(running)])
+    // Retention still held back across all of this client's invoices (today,
+    // not limited to the period) — already inside the closing balance above.
+    const held = clientInvoices.reduce(
+      (s, inv) => s + retentionHeld(inv, (allPayments ?? []).filter((p) => p.invoice_id === inv.id)),
+      0
+    )
+    if (held > 0) {
+      highlightRows.push(rows.length)
+      rows.push(['', 'Retention held (included in the balance above)', '', '', '', fmt(held)])
+    }
 
     sections.push({
       title: clientFullName(client),
       columns: ['Date', 'Particulars', 'Vch No.', 'Debit', 'Credit', 'Balance'],
       rows,
+      highlightRows,
     })
   }
 

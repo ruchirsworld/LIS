@@ -10,7 +10,14 @@ export interface ExportSection {
   title: string
   columns: string[]
   rows: (string | number)[][]
+  /** Indexes into `rows` to emphasise (blue fill, bold) in both the PDF and
+   * the Excel file — e.g. retention lines in the invoice ledger. */
+  highlightRows?: number[]
 }
+
+// Same blue as the on-screen retention highlight (--blue-soft / --blue).
+const HIGHLIGHT_FILL: [number, number, number] = [227, 236, 246]
+const HIGHLIGHT_TEXT: [number, number, number] = [31, 78, 140]
 
 // DD-MM-YYYY, matching the date format used everywhere else user-facing in
 // this app (Excel uploads, on-screen dates via fmtDate).
@@ -145,6 +152,13 @@ export async function exportReportPdf(
       headStyles: { font: 'NotoSans', fontStyle: 'bold', fillColor: brandGreen, textColor: 255, halign: 'left' },
       alternateRowStyles: { fillColor: [246, 248, 246] },
       columnStyles,
+      didParseCell: (data) => {
+        if (data.section === 'body' && section.highlightRows?.includes(data.row.index)) {
+          data.cell.styles.fillColor = HIGHLIGHT_FILL
+          data.cell.styles.textColor = HIGHLIGHT_TEXT
+          data.cell.styles.fontStyle = 'bold'
+        }
+      },
       margin: { left: marginX, right: marginX },
       theme: 'grid',
     })
@@ -194,6 +208,42 @@ export async function exportReportExcel(
   // function only ever calls the write-side APIs (book_new/aoa_to_sheet/
   // book_append_sheet/writeFile) against our own trusted report data, so
   // that attack surface doesn't apply here.
+  // Plain SheetJS can't colour cells, so a report with highlighted rows goes
+  // through exceljs instead (same layout: title, note, period, blank, header,
+  // rows).
+  if (sections.some((s) => s.highlightRows?.length)) {
+    const ExcelJS = await import('exceljs')
+    const ewb = new ExcelJS.Workbook()
+    const used = new Set<string>()
+    for (const section of sections) {
+      const ws = ewb.addWorksheet(sanitizeSheetName(section.title, used))
+      ws.addRow([reportTitle])
+      if (headerNote) ws.addRow([headerNote])
+      ws.addRow([periodLabel])
+      ws.addRow([])
+      ws.addRow(section.columns).font = { bold: true }
+      section.rows.forEach((r, i) => {
+        const row = ws.addRow(r)
+        if (section.highlightRows?.includes(i)) {
+          row.font = { bold: true, color: { argb: 'FF1F4E8C' } }
+          row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE3ECF6' } }
+        }
+      })
+      section.columns.forEach((c, i) => {
+        ws.getColumn(i + 1).width = Math.max(14, c.length + 2, i === 1 ? 44 : 0)
+      })
+    }
+    const buf = await ewb.xlsx.writeBuffer()
+    const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${fileSafe(fileNamePrefix ?? reportTitle)}_${fileStamp()}.xlsx`
+    a.click()
+    URL.revokeObjectURL(url)
+    return
+  }
+
   const XLSX = await import('xlsx')
 
   const wb = XLSX.utils.book_new()

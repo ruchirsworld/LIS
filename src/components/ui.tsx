@@ -29,15 +29,18 @@ export function KpiCard({
   value,
   onClick,
   active,
+  retention,
 }: {
   label: string
   value: ReactNode
   onClick?: () => void
   active?: boolean
+  /** Blue treatment used for retention figures everywhere in the app. */
+  retention?: boolean
 }) {
   return (
     <div
-      className={onClick ? 'dash-card dash-card-clickable' : 'dash-card'}
+      className={`${onClick ? 'dash-card dash-card-clickable' : 'dash-card'}${retention ? ' dash-card-retention' : ''}`}
       onClick={onClick}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}

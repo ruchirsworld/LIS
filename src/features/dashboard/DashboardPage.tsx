@@ -10,7 +10,7 @@ import { useExpenses } from '../../lib/queries/expenses'
 import { usePendingApprovalsCount } from '../../lib/queries/approvals'
 import { useSiteImprestBalances } from '../../lib/queries/ledger'
 import { useProfiles } from '../../lib/queries/admin'
-import { dueAmount, netPayable } from '../../lib/calc/invoices'
+import { dueAmount, netPayable, retentionHeld } from '../../lib/calc/invoices'
 import { projectExpenseTotal, projectVendorBillTotal } from '../../lib/calc/projects'
 import { ReportPeriodFilter } from '../reports/ReportPeriodFilter'
 import { FinancialSummaryReport } from '../reports/FinancialSummaryReport'
@@ -48,6 +48,13 @@ export function DashboardPage() {
   const { data: clients } = useClients()
   const { data: invoices } = useInvoices(null)
   const { data: invoicePayments } = useInvoicePayments()
+  // Retention still held back by clients across every invoice — part of what
+  // clients owe in total, but not of "Outstanding from clients" above, which
+  // only counts what is collectible now.
+  const totalRetentionHeld = (invoices ?? []).reduce(
+    (s, inv) => s + retentionHeld(inv, invoicePayments?.filter((p) => p.invoice_id === inv.id) ?? []),
+    0
+  )
   const { data: overdueInvoices } = useOverdueInvoices()
   const { data: pendingClaims } = useExpenses(null, 'pending')
   const { data: allExpenses } = useExpenses(null)
@@ -220,6 +227,7 @@ export function DashboardPage() {
       <div className="dash-grid">
         <KpiCard label="Cash & bank" value={isLoading ? '—' : fmt(data?.cash_and_bank_balance)} />
         <KpiCard label="Outstanding from clients" value={isLoading ? '—' : fmt(data?.outstanding_from_clients)} />
+        <KpiCard label="Retention held by clients" value={isLoading ? '—' : fmt(totalRetentionHeld)} retention />
         <KpiCard label="Owed to vendors" value={isLoading ? '—' : fmt(data?.owed_to_vendors)} />
         <KpiCard label="Loan principal outstanding" value={isLoading ? '—' : fmt(data?.loan_principal_outstanding)} />
         <KpiCard
