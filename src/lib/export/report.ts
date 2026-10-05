@@ -13,6 +13,8 @@ export interface ExportSection {
   /** Indexes into `rows` to emphasise (blue fill, bold) in both the PDF and
    * the Excel file — e.g. retention lines in the invoice ledger. */
   highlightRows?: number[]
+  /** Column indexes left out of the PDF only (the Excel file keeps them). */
+  pdfHiddenColumns?: number[]
 }
 
 // Same blue as the on-screen retention highlight (--blue-soft / --blue).
@@ -138,15 +140,21 @@ export async function exportReportPdf(
       cursorY += 5
     }
 
-    const numericCols = numericColumnIndexes(section.rows)
+    // Columns marked pdfHiddenColumns are dropped here; the Excel export
+    // reads section.columns/rows directly so keeps them.
+    const keep = (_: unknown, i: number) => !section.pdfHiddenColumns?.includes(i)
+    const pdfColumns = section.columns.filter(keep)
+    const pdfRows = section.rows.map((r) => r.filter(keep))
+
+    const numericCols = numericColumnIndexes(pdfRows)
     const columnStyles = Object.fromEntries(numericCols.map((i) => [i, { halign: 'right' as const }]))
 
     autoTable(doc, {
       startY: cursorY,
-      head: [section.columns],
+      head: [pdfColumns],
       body:
-        section.rows.length > 0
-          ? section.rows.map((r) => r.map((c) => (typeof c === 'number' ? fmt(c) : String(c))))
+        pdfRows.length > 0
+          ? pdfRows.map((r) => r.map((c) => (typeof c === 'number' ? fmt(c) : String(c))))
           : [['No data in this period']],
       styles: { font: 'NotoSans', fontStyle: 'normal', fontSize: 9, textColor: ink, lineColor: 225, lineWidth: 0.1 },
       headStyles: { font: 'NotoSans', fontStyle: 'bold', fillColor: brandGreen, textColor: 255, halign: 'left' },

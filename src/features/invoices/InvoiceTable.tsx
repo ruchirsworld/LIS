@@ -124,6 +124,8 @@ function buildLedgerSections(
       columns: ['Date', 'Particulars', 'Vch No.', 'Debit', 'Credit', 'Balance'],
       rows,
       highlightRows,
+      // Voucher numbers stay in the Excel file but are left off the PDF.
+      pdfHiddenColumns: [2],
     })
   }
 
