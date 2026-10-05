@@ -1308,6 +1308,19 @@ table.data tr.group-header-row td {
 .row-overdue td {
   background: var(--red-soft);
 }
+/* Invoice with an amount still due — row tinted, the Due figure in red; an
+   overpaid one shows its extra in green instead. */
+.row-due td {
+  background: var(--amber-soft);
+}
+.amt-due {
+  color: var(--red);
+  font-weight: 600;
+}
+.amt-extra {
+  color: var(--green);
+  font-weight: 600;
+}
 
 .dash-grid {
   display: grid;

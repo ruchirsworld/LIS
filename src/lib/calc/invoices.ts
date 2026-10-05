@@ -52,6 +52,14 @@ export function dueAmount(inv: InvoiceRow, payments: InvoicePaymentRow[]): numbe
   return Math.max(0, netPayable(inv) - retentionAmt(inv) - totalPaid(payments))
 }
 
+// What the client has paid beyond the full net payable (retention included —
+// money received against a held-back retention is a release, not an
+// overpayment). dueAmount floors at 0, so this is where an excess shows up.
+export function extraPaid(inv: InvoiceRow, payments: InvoicePaymentRow[]): number {
+  const extra = totalPaid(payments) - netPayable(inv)
+  return extra > 0.01 ? extra : 0
+}
+
 function addDays(dateStr: string, days: number): string {
   const d = new Date(dateStr)
   d.setDate(d.getDate() + Number(days))

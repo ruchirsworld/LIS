@@ -8,10 +8,10 @@ import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
-import { useInvoices, useInvoicePayments, useDeleteInvoice, useCycleInvoiceStatus } from '../../lib/queries/invoices'
+import { useInvoices, useInvoicePayments, useDeleteInvoice, useCycleInvoiceStatus, useMovePaymentExcess } from '../../lib/queries/invoices'
 import { useClients, useProjects } from '../../lib/queries/masters'
 import { fmt, fmtDate } from '../../lib/calc/format'
-import { gstAmt, tdsAmt, netPayable, retentionAmt, totalPaid, dueAmount, effectiveDueDate, effectiveStatus } from '../../lib/calc/invoices'
+import { gstAmt, tdsAmt, netPayable, retentionAmt, totalPaid, dueAmount, extraPaid, effectiveDueDate, effectiveStatus } from '../../lib/calc/invoices'
 import type { DateRange } from '../../lib/calc/period'
 import { InvoicePaymentForm, EditInvoicePaymentFields } from './InvoicePaymentForm'
 import { clientLabel, clientFullName, clientGstLine } from '../../lib/labels'
@@ -120,6 +120,8 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
   const { data: projects } = useProjects()
   const deleteInvoice = useDeleteInvoice()
   const cycleStatus = useCycleInvoiceStatus()
+  const movePaymentExcess = useMovePaymentExcess()
+  const [adjustError, setAdjustError] = useState<string | null>(null)
   const [payFormId, setPayFormId] = useState<string | null>(null)
   const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null)
 
@@ -127,6 +129,34 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
   const projectNameOf = (inv: Invoice) => (inv.project_id ? projects?.find((p) => p.id === inv.project_id)?.name : '') ?? ''
   const paidOf = (inv: Invoice) => totalPaid(payments?.filter((p) => p.invoice_id === inv.id) ?? [])
   const dueOf = (inv: Invoice) => dueAmount(inv, payments?.filter((p) => p.invoice_id === inv.id) ?? [])
+
+  // The client's next invoice that still has something due, other than the
+  // one holding the extra — oldest first, and only ones dated on/after it so
+  // "next" really means the following bill, not an earlier one.
+  const nextOpenInvoiceFor = (inv: Invoice) =>
+    (allInvoices ?? [])
+      .filter(
+        (o) =>
+          o.id !== inv.id &&
+          o.client_id === inv.client_id &&
+          (o.invoice_date ?? '9999-99-99') >= (inv.invoice_date ?? '') &&
+          dueOf(o) > 0.01
+      )
+      .sort((a, b) => (a.invoice_date ?? '9999-99-99').localeCompare(b.invoice_date ?? '9999-99-99'))[0]
+
+  async function adjustExtraToNext(inv: Invoice, extra: number, target: Invoice) {
+    setAdjustError(null)
+    try {
+      await movePaymentExcess.mutateAsync({
+        payments: payments?.filter((p) => p.invoice_id === inv.id) ?? [],
+        amount: Math.min(extra, dueOf(target)),
+        targetInvoiceId: target.id,
+        fromLabel: inv.invoice_number ?? inv.display_id ?? 'earlier invoice',
+      })
+    } catch (err) {
+      setAdjustError(err instanceof Error ? err.message : 'Could not adjust the extra payment.')
+    }
+  }
 
   const filteredInvoices = clientFilter ? invoices?.filter((inv) => inv.client_id === clientFilter) : invoices
 
@@ -191,6 +221,12 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
         />
       </div>
 
+      {adjustError && (
+        <div className="note" style={{ color: 'var(--red)' }}>
+          {adjustError}
+        </div>
+      )}
+
       <TableScroll>
         <table className="data">
           <thead>
@@ -233,6 +269,8 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
               const invPayments = payments?.filter((p) => p.invoice_id === inv.id) ?? []
               const paid = totalPaid(invPayments)
               const due = dueAmount(inv, invPayments)
+              const extra = extraPaid(inv, invPayments)
+              const nextInvoice = extra > 0 ? nextOpenInvoiceFor(inv) : undefined
               const status = effectiveStatus(inv, invPayments)
               const dueDateDisplay = effectiveDueDate(inv)
               const hasHistory = invPayments.length > 0
@@ -240,7 +278,7 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
 
               return (
                 <Fragment key={inv.id}>
-                  <tr className={status === 'overdue' ? 'row-overdue' : undefined}>
+                  <tr className={status === 'overdue' ? 'row-overdue' : due > 0.01 && inv.status === 'sent' ? 'row-due' : undefined}>
                     <td>{inv.display_id ?? '—'}</td>
                     <td>{inv.invoice_number ?? '—'}</td>
                     <td>{clientLabel(client)}</td>
@@ -265,7 +303,17 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
                       )}
                     </td>
                     <td className="amt">{fmt(paid)}</td>
-                    <td className="amt">{fmt(due)}</td>
+                    <td className="amt">
+                      {due > 0.01 ? (
+                        <span className="amt-due">{fmt(due)}</span>
+                      ) : extra > 0 ? (
+                        <span className="amt-extra" title="Paid more than the invoice">
+                          +{fmt(extra)} extra
+                        </span>
+                      ) : (
+                        fmt(due)
+                      )}
+                    </td>
                     <td>
                       {canCycle ? (
                         <button
@@ -287,8 +335,19 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
                           Record payment
                         </button>
                       )}
+                      {nextInvoice && (
+                        <button
+                          type="button"
+                          className="pay-btn"
+                          disabled={movePaymentExcess.isPending}
+                          title={`Move the extra to ${nextInvoice.invoice_number ?? nextInvoice.display_id ?? 'the next invoice'}`}
+                          onClick={() => adjustExtraToNext(inv, extra, nextInvoice)}
+                        >
+                          Adjust to next invoice
+                        </button>
+                      )}
                       <button type="button" className="pay-btn" onClick={() => onEdit(inv)}>
-                        Edit
+                        {inv.status === 'sent' ? 'Adjust' : 'Edit'}
                       </button>
                       <button type="button" className="btn danger-link" onClick={() => deleteInvoice.mutate(inv.id)}>
                         Remove

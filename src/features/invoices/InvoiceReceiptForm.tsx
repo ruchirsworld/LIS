@@ -86,13 +86,24 @@ export function InvoiceReceiptForm() {
     }
     setSubmitting(true)
     try {
-      await createPayment.mutateAsync({
-        invoice_id: target.invoice.id,
-        date,
-        amount: amt,
-        payment_mode: accountId === CASH ? 'Cash' : 'Bank',
-        bank_account_id: accountId === CASH ? null : accountId,
-      })
+      // The chosen (or oldest) invoice takes what it is owed; anything more
+      // carries on to the client's next invoices in date order. Whatever is
+      // left once every open invoice is settled stays on the last one as an
+      // extra payment, shown in green, to adjust against a future invoice.
+      const order = [target, ...clientOpenInvoices.filter((row) => row.invoice.id !== target.invoice.id)]
+      let remaining = amt
+      for (let i = 0; i < order.length && remaining > 0.005; i++) {
+        const isLast = i === order.length - 1
+        const share = isLast ? remaining : Math.min(remaining, order[i].due)
+        await createPayment.mutateAsync({
+          invoice_id: order[i].invoice.id,
+          date,
+          amount: share,
+          payment_mode: accountId === CASH ? 'Cash' : 'Bank',
+          bank_account_id: accountId === CASH ? null : accountId,
+        })
+        remaining -= share
+      }
       setClientId('')
       setInvoiceId('')
       setDate(todayStr())
@@ -138,6 +149,13 @@ export function InvoiceReceiptForm() {
             {target && (
               <div className="note" style={{ marginTop: 2 }}>
                 {invoiceId ? 'Applies to' : 'Will auto-adjust against'} {target.invoice.invoice_number ?? target.invoice.display_id ?? 'this invoice'} — Due: {fmt(target.due)}
+                {parseINR(amount) > target.due + 0.005 && (
+                  <>
+                    {' '}
+                    — the extra {fmt(parseINR(amount) - target.due)} goes to the client's next invoice
+                    {clientOpenInvoices.length < 2 ? ' (or stays as an extra payment if there is none)' : ''}
+                  </>
+                )}
               </div>
             )}
             {!target && (

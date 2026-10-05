@@ -44,13 +44,15 @@ export function ProjectSummaryTable() {
                 return s + totalPaid(invPayments)
               }, 0)
 
+              const balance = totalInvoiced - received
+
               return (
-                <tr key={p.id}>
+                <tr key={p.id} className={balance > 0.01 ? 'row-due' : undefined}>
                   <td>{p.name}</td>
                   <td>{clientLabel(client)}</td>
                   <td className="amt">{fmt(totalInvoiced)}</td>
                   <td className="amt">{fmt(received)}</td>
-                  <td className="amt">{fmt(totalInvoiced - received)}</td>
+                  <td className={`amt ${balance > 0.01 ? 'amt-due' : balance < -0.01 ? 'amt-extra' : ''}`}>{balance < -0.01 ? `+${fmt(-balance)} extra` : fmt(balance)}</td>
                 </tr>
               )
             })}

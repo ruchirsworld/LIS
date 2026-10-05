@@ -162,3 +162,67 @@ export function useDeleteInvoicePayment() {
     },
   })
 }
+
+type InvoicePaymentRow = Database['public']['Tables']['invoice_payments']['Row']
+
+/** Moves `amount` of excess money off one invoice onto another invoice of the
+ * same client — the "adjust extra payment to the next invoice" action. Works
+ * newest payment first: a payment that moves in full is simply re-pointed at
+ * the target invoice; one that only partly moves is trimmed and its moved
+ * share added to the target as a fresh payment (same date, account, mode).
+ * Cash and the client's receivable are unchanged overall — only which
+ * invoice the money is credited to — so the ledger stays balanced. */
+export function useMovePaymentExcess() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      payments,
+      amount,
+      targetInvoiceId,
+      fromLabel,
+    }: {
+      payments: InvoicePaymentRow[]
+      amount: number
+      targetInvoiceId: string
+      fromLabel: string
+    }) => {
+      let remaining = amount
+      const newestFirst = [...payments].sort((a, b) => b.date.localeCompare(a.date))
+      for (const p of newestFirst) {
+        if (remaining <= 0.005) break
+        const payAmt = Number(p.amount)
+        const take = Math.min(payAmt, remaining)
+        if (take >= payAmt - 0.005) {
+          const { error } = await supabase
+            .from('invoice_payments')
+            .update({
+              invoice_id: targetInvoiceId,
+              reference: [p.reference, `Adjusted from ${fromLabel}`].filter(Boolean).join(' · '),
+            })
+            .eq('id', p.id)
+          if (error) throw error
+        } else {
+          const { error: trimErr } = await supabase
+            .from('invoice_payments')
+            .update({ amount: payAmt - take })
+            .eq('id', p.id)
+          if (trimErr) throw trimErr
+          const { error: addErr } = await supabase.from('invoice_payments').insert({
+            invoice_id: targetInvoiceId,
+            date: p.date,
+            amount: take,
+            payment_mode: p.payment_mode,
+            bank_account_id: p.bank_account_id,
+            reference: [p.reference, `Adjusted from ${fromLabel}`].filter(Boolean).join(' · '),
+          })
+          if (addErr) throw addErr
+        }
+        remaining -= take
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['invoice_payments'] })
+      qc.invalidateQueries({ queryKey: ['dashboard-kpis'] })
+    },
+  })
+}
