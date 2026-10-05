@@ -1,7 +1,7 @@
 import { useClients } from '../../lib/queries/masters'
 import { useInvoices, useInvoicePayments } from '../../lib/queries/invoices'
 import { fmt } from '../../lib/calc/format'
-import { netPayable, totalPaid, retentionHeld } from '../../lib/calc/invoices'
+import { netPayable, totalPaid, retentionHeld, dueAmount, extraPaid } from '../../lib/calc/invoices'
 import { clientLabel } from '../../lib/labels'
 
 export function ClientSummaryTable() {
@@ -46,15 +46,22 @@ export function ClientSummaryTable() {
                 (s, i) => s + retentionHeld(i, payments?.filter((pay) => pay.invoice_id === i.id) ?? []),
                 0
               )
-              const balance = totalInvoiced - received
+              // Due is what is collectible now — retention held back is shown in
+              // its own column, not counted here, matching the Ledger and the
+              // dashboard. Overpayments on any invoice show as extra.
+              const due = invs.reduce((s, i) => s + dueAmount(i, payments?.filter((pay) => pay.invoice_id === i.id) ?? []), 0)
+              const extra = invs.reduce((s, i) => s + extraPaid(i, payments?.filter((pay) => pay.invoice_id === i.id) ?? []), 0)
 
               return (
-                <tr key={c.id} className={balance > 0.01 ? 'row-due' : undefined}>
+                <tr key={c.id} className={due > 0.01 ? 'row-due' : undefined}>
                   <td>{clientLabel(c)}</td>
                   <td className="amt">{fmt(totalInvoiced)}</td>
                   <td className="amt">{fmt(received)}</td>
                   <td className={retention > 0 ? 'amt amt-retention' : 'amt'}>{retention > 0 ? fmt(retention) : '—'}</td>
-                  <td className={`amt ${balance > 0.01 ? 'amt-due' : balance < -0.01 ? 'amt-extra' : ''}`}>{balance < -0.01 ? `+${fmt(-balance)} extra` : fmt(balance)}</td>
+                  <td className="amt">
+                    {due > 0.01 ? <span className="amt-due">{fmt(due)}</span> : fmt(0)}
+                    {extra > 0 && <div className="amt-extra">+{fmt(extra)} extra</div>}
+                  </td>
                 </tr>
               )
             })}
