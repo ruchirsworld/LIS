@@ -41,7 +41,7 @@ function buildLedgerSections(
   range: DateRange | null,
   clientFilter: string
 ): ExportSection[] {
-  type Entry = { date: string; particulars: string; vch: string; debit: number; credit: number; retention?: boolean }
+  type Entry = { date: string; particulars: string; vch: string; debit: number; credit: number }
 
   const relevantClients = (clients ?? [])
     .filter((c) => !clientFilter || c.id === clientFilter)
@@ -67,16 +67,7 @@ function buildLedgerSections(
     for (const inv of clientInvoices) {
       bucket({
         date: inv.invoice_date as string,
-        particulars:
-          `Invoice ${inv.invoice_number ?? inv.display_id ?? ''}`.trim() +
-          (inv.retention_pct
-            ? ` — Retention ${fmt(retentionAmt(inv))} (${inv.retention_pct}%)${
-                inv.retention_release_date ? ', release ' + fmtDate(inv.retention_release_date) : ''
-              }`
-            : ''),
-        // Only retention that is still held is highlighted — a fully
-        // released one is just noted in the particulars.
-        retention: !!inv.retention_pct && retentionHeld(inv, (allPayments ?? []).filter((p) => p.invoice_id === inv.id)) > 0,
+        particulars: `Invoice ${inv.invoice_number ?? inv.display_id ?? ''}`.trim(),
         vch: inv.invoice_number ?? inv.display_id ?? '',
         debit: netPayable(inv),
         credit: 0,
@@ -97,10 +88,8 @@ function buildLedgerSections(
 
     let running = openingBalance
     const rows: (string | number)[][] = [['', 'Opening balance', '', '', '', fmtBalance(running)]]
-    const highlightRows: number[] = []
     for (const e of within) {
       running += e.debit - e.credit
-      if (e.retention) highlightRows.push(rows.length)
       rows.push([
         fmtDate(e.date),
         e.particulars,
@@ -111,16 +100,6 @@ function buildLedgerSections(
       ])
     }
     rows.push(['', 'Closing balance', '', '', '', fmtBalance(running)])
-    // Retention still held back across all of this client's invoices (today,
-    // not limited to the period) — already inside the closing balance above.
-    const held = clientInvoices.reduce(
-      (s, inv) => s + retentionHeld(inv, (allPayments ?? []).filter((p) => p.invoice_id === inv.id)),
-      0
-    )
-    if (held > 0) {
-      highlightRows.push(rows.length)
-      rows.push(['', 'Retention held (included in the balance above)', '', '', '', fmt(held)])
-    }
 
     const retentionInvoices = clientInvoices
       .filter((inv) => inv.retention_pct)
@@ -130,14 +109,15 @@ function buildLedgerSections(
       title: clientFullName(client),
       columns: ['Date', 'Particulars', 'Vch No.', 'Debit', 'Credit', 'Balance'],
       rows,
-      highlightRows,
+      sheetName: clientLabel(client),
       // Voucher numbers stay in the Excel file but are left off the PDF.
       pdfHiddenColumns: [2],
     })
 
-    // The retention workings, laid out on their own in the PDF: per invoice,
-    // net payable × retention % = retention, how much has been released and
-    // what is still held. (Excel skips this — its ledger already notes it.)
+    // The retention workings sit apart from the ledger — the next section in
+    // the PDF, the next sheet in Excel: per invoice, net payable × retention %
+    // = retention, how much has been released and what is still held. The
+    // ledger itself carries no retention figures.
     if (retentionInvoices.length > 0) {
       const lines = retentionInvoices.map((inv) => {
         const retention = retentionAmt(inv)
@@ -147,6 +127,7 @@ function buildLedgerSections(
       const sum = (pick: (l: (typeof lines)[number]) => number) => lines.reduce((s, l) => s + pick(l), 0)
       sections.push({
         title: `${clientFullName(client)} — Retention calculation`,
+        sheetName: `${clientLabel(client)} - Retention`,
         columns: ['Invoice', 'Invoice date', 'Net payable', 'Retention %', 'Retention (net × %)', 'Released', 'Still held', 'Release date'],
         rows: [
           ...lines.map((l) => [
@@ -162,7 +143,6 @@ function buildLedgerSections(
           ['Total', '', sum((l) => netPayable(l.inv)), '', sum((l) => l.retention), sum((l) => l.released), sum((l) => l.held), ''],
         ],
         highlightRows: [...lines.flatMap((l, i) => (l.held > 0 ? [i] : [])), ...(sum((l) => l.held) > 0 ? [lines.length] : [])],
-        pdfOnly: true,
       })
     }
   }

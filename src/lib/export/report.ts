@@ -15,8 +15,8 @@ export interface ExportSection {
   highlightRows?: number[]
   /** Column indexes left out of the PDF only (the Excel file keeps them). */
   pdfHiddenColumns?: number[]
-  /** Section appears in the PDF only — skipped in the Excel file. */
-  pdfOnly?: boolean
+  /** Name of this section's sheet in the Excel file (default: the title). */
+  sheetName?: string
 }
 
 // Same blue as the on-screen retention highlight (--blue-soft / --blue).
@@ -218,8 +218,6 @@ export async function exportReportExcel(
   // function only ever calls the write-side APIs (book_new/aoa_to_sheet/
   // book_append_sheet/writeFile) against our own trusted report data, so
   // that attack surface doesn't apply here.
-  sections = sections.filter((s) => !s.pdfOnly)
-
   // Plain SheetJS can't colour cells, so a report with highlighted rows goes
   // through exceljs instead (same layout: title, note, period, blank, header,
   // rows).
@@ -228,7 +226,7 @@ export async function exportReportExcel(
     const ewb = new ExcelJS.Workbook()
     const used = new Set<string>()
     for (const section of sections) {
-      const ws = ewb.addWorksheet(sanitizeSheetName(section.title, used))
+      const ws = ewb.addWorksheet(sanitizeSheetName(section.sheetName ?? section.title, used))
       ws.addRow([reportTitle])
       if (headerNote) ws.addRow([headerNote])
       ws.addRow([periodLabel])
@@ -270,7 +268,7 @@ export async function exportReportExcel(
       ...section.rows,
     ]
     const ws = XLSX.utils.aoa_to_sheet(sheetData)
-    XLSX.utils.book_append_sheet(wb, ws, sanitizeSheetName(section.title, usedNames))
+    XLSX.utils.book_append_sheet(wb, ws, sanitizeSheetName(section.sheetName ?? section.title, usedNames))
   }
   XLSX.writeFile(wb, `${fileSafe(fileNamePrefix ?? reportTitle)}_${fileStamp()}.xlsx`)
 }
