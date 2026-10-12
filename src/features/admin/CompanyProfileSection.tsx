@@ -20,6 +20,8 @@ export function CompanyProfileSection() {
   const [name, setName] = useState('')
   const [gstin, setGstin] = useState('')
   const [udyam, setUdyam] = useState('')
+  const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
   const [bank, setBank] = useState('')
   const [address, setAddress] = useState('')
   const [lockedUntil, setLockedUntil] = useState('')
@@ -32,6 +34,8 @@ export function CompanyProfileSection() {
     setName(company.name ?? '')
     setGstin(company.gstin ?? '')
     setUdyam(company.udyam_no ?? '')
+    setEmail(company.email ?? '')
+    setPhone(company.phone ?? '')
     setBank(company.bank_details ?? '')
     setAddress(company.address ?? '')
     setLockedUntil(company.books_locked_until ?? '')
@@ -57,6 +61,8 @@ export function CompanyProfileSection() {
           // Kept for the books (it is the PAN inside the GSTIN) but never shown or printed.
           pan: panOfGstin(g) || null,
           udyam_no: udyam.trim() || null,
+          email: email.trim() || null,
+          phone: phone.trim() || null,
           bank_details: bank.trim() || null,
           address: address.trim() || null,
           state_code: g ? g.slice(0, 2) : null,
@@ -118,6 +124,14 @@ export function CompanyProfileSection() {
         <div className="field">
           <label>Udyam registration no.</label>
           <input type="text" placeholder="UDYAM-XX-00-0000000" value={udyam} onChange={(e) => setUdyam(e.target.value.toUpperCase())} />
+        </div>
+        <div className="field">
+          <label>Email</label>
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>Phone / WhatsApp</label>
+          <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} />
         </div>
         <div className="field full">
           <label>Address</label>

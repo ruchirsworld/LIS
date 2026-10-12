@@ -8,7 +8,7 @@ import { fmt2, fmtDate } from '../calc/format'
 import { amountInWords } from '../calc/words'
 import { round2 } from '../calc/invoices'
 import { stateCodeOfGstin, stateLabelOfGstin, stateNameOfCode } from '../gst'
-import { CHARCOAL, CREAM, GREEN, HAIRLINE, MUTED } from './report'
+import { CHARCOAL, CREAM, GREEN, HAIRLINE, HIGHLIGHT_TEXT as TERRACOTTA, MUTED } from './report'
 import type { Database } from '../../types/database'
 
 type Invoice = Database['public']['Tables']['invoices']['Row']
@@ -86,38 +86,117 @@ export async function downloadTaxDocumentPdf(input: TaxDocumentInput): Promise<v
   }
   const halfRate = gstPct / 2
 
-  // ── Header: supplier on the left, document title on the right ───────────
-  doc.setFontSize(15)
-  text(GREEN)
-  doc.setFont('NotoSans', 'bold')
-  doc.text(company?.name || 'Laavin InfraScapes', marginX, 18)
-  doc.setFont('NotoSans', 'normal')
-  doc.setFontSize(8.5)
-  text(MUTED)
-  let y = 23
-  for (const line of doc.splitTextToSize(company?.address ?? '', 100) as string[]) {
-    if (!line) continue
-    doc.text(line, marginX, y)
-    y += 4
+  // ── Header: logo and document title, then a quiet strip of supplier details ──
+  let y = 0
+  let logo: { data: string; w: number; h: number } | null = null
+  try {
+    const blob = await (await fetch('/laavin-logo.jpg')).blob()
+    const data = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = () => reject(reader.error)
+      reader.readAsDataURL(blob)
+    })
+    const size = await new Promise<{ w: number; h: number }>((resolve, reject) => {
+      const img = new Image()
+      img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight })
+      img.onerror = () => reject(new Error('logo'))
+      img.src = data
+    })
+    logo = { data, ...size }
+  } catch {
+    logo = null
   }
-  const idLine = [company?.gstin ? `GSTIN: ${company.gstin}` : '', company?.udyam_no ? `Udyam: ${company.udyam_no}` : ''].filter(Boolean).join('   |   ')
-  if (idLine) {
-    doc.text(idLine, marginX, y)
-    y += 4
+
+  const logoW = 48
+  const logoH = logo ? (logoW * logo.h) / logo.w : 0
+  if (logo) {
+    doc.addImage(logo.data, 'JPEG', marginX, 10, logoW, logoH)
+  } else {
+    doc.setFontSize(15)
+    text(GREEN)
+    doc.text(company?.name || 'Laavin InfraScapes', marginX, 18)
   }
 
   doc.setFontSize(17)
   text(GREEN)
   doc.setFont('NotoSans', 'bold')
-  doc.text(kind, rightX, 18, { align: 'right' })
+  doc.text(kind, rightX, 19, { align: 'right' })
   doc.setFont('NotoSans', 'normal')
   doc.setFontSize(8.5)
   text(MUTED)
-  doc.text('Original for recipient', rightX, 23, { align: 'right' })
+  doc.text('Original for recipient', rightX, 24.5, { align: 'right' })
 
-  y = Math.max(y, 30) + 2
+  y = 10 + Math.max(logoH, 16) + 3
   doc.setDrawColor(GREEN[0], GREEN[1], GREEN[2])
   doc.setLineWidth(0.5)
+  doc.line(marginX, y, rightX, y)
+  y += 6
+
+  // Three columns: where to find us, how to reach us, and our registration
+  // numbers — the last set small, as reference detail rather than headline.
+  const colB = marginX + 72
+  const label = (t: string, x: number, atY: number, align: 'left' | 'right' = 'left') => {
+    doc.setFontSize(6.5)
+    text(TERRACOTTA)
+    doc.text(t.toUpperCase(), x, atY, { align })
+  }
+  let ya = y
+  label('Registered office', marginX, ya)
+  ya += 3.8
+  doc.setFontSize(8)
+  text(CHARCOAL)
+  // Wrap at commas so a pin code never ends up alone on a line.
+  let addressLine = ''
+  const addressLines: string[] = []
+  for (const token of (company?.address ?? '').split(',').map((t) => t.trim()).filter(Boolean)) {
+    const candidate = addressLine ? addressLine + ', ' + token : token
+    if (addressLine && doc.getTextWidth(candidate) > 66) {
+      addressLines.push(addressLine + ',')
+      addressLine = token
+    } else addressLine = candidate
+  }
+  if (addressLine) addressLines.push(addressLine)
+  for (const part of addressLines) {
+    doc.text(part, marginX, ya)
+    ya += 3.7
+  }
+
+  let yb = y
+  label('Contact', colB, yb)
+  yb += 3.8
+  doc.setFontSize(8)
+  text(CHARCOAL)
+  if (company?.email) {
+    doc.text(company.email, colB, yb)
+    yb += 3.7
+  }
+  if (company?.phone) {
+    doc.text(company.phone, colB, yb)
+    yb += 3.7
+    doc.setFontSize(6.5)
+    text(MUTED)
+    doc.text('Phone / WhatsApp', colB, yb)
+    yb += 3.4
+  }
+
+  let yc = y
+  label('Registration', rightX, yc, 'right')
+  yc += 3.8
+  doc.setFontSize(7)
+  text(MUTED)
+  if (company?.gstin) {
+    doc.text(`GSTIN  ${company.gstin}`, rightX, yc, { align: 'right' })
+    yc += 3.5
+  }
+  if (company?.udyam_no) {
+    doc.text(`Udyam  ${company.udyam_no}`, rightX, yc, { align: 'right' })
+    yc += 3.5
+  }
+
+  y = Math.max(ya, yb, yc) + 1.5
+  doc.setDrawColor(HAIRLINE[0], HAIRLINE[1], HAIRLINE[2])
+  doc.setLineWidth(0.2)
   doc.line(marginX, y, rightX, y)
   y += 7
 

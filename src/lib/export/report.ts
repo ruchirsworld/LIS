@@ -41,7 +41,7 @@ export const MUTED: RGB = [112, 108, 98]
 export const CREAM: RGB = [247, 242, 232] // #F7F2E8
 export const HAIRLINE: RGB = [226, 220, 206]
 const HIGHLIGHT_FILL: RGB = [243, 228, 220]
-const HIGHLIGHT_TEXT: RGB = [163, 93, 64] // #A35D40
+export const HIGHLIGHT_TEXT: RGB = [163, 93, 64] // #A35D40
 
 // DD-MM-YYYY, matching the date format used everywhere else user-facing in
 // this app (Excel uploads, on-screen dates via fmtDate).
@@ -137,7 +137,8 @@ export async function exportReportPdf(
   let y = 20
   if (headerNote) {
     y += 6
-    doc.setFontSize(9.5)
+    // Registration numbers are reference detail, so they are set small.
+    doc.setFontSize(8)
     setText(inkSoft)
     doc.text(headerNote, marginX, y)
   }

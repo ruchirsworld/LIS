@@ -18,6 +18,8 @@ export type Database = {
         Row: {
           address: string | null;
           bank_details: string | null;
+          email: string | null;
+          phone: string | null;
           books_locked_until: string | null;
           gstin: string | null;
           id: string;
@@ -31,6 +33,8 @@ export type Database = {
         Insert: {
           address?: string | null;
           bank_details?: string | null;
+          email?: string | null;
+          phone?: string | null;
           books_locked_until?: string | null;
           gstin?: string | null;
           id?: string;
@@ -44,6 +48,8 @@ export type Database = {
         Update: {
           address?: string | null;
           bank_details?: string | null;
+          email?: string | null;
+          phone?: string | null;
           books_locked_until?: string | null;
           gstin?: string | null;
           id?: string;
