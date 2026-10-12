@@ -37,7 +37,7 @@ export function ProjectsPage() {
   const { data: expenses } = useExpenses(null)
   const { data: pendingExpenses } = useExpenses(null, 'pending')
   const { data: vendorBills } = useVendorBills(null)
-  const { data: invoices } = useInvoices(null)
+  const { data: invoices } = useInvoices(null, { sentOnly: true })
   const { data: invoicePayments } = useInvoicePayments()
   const { data: staff } = useStaff()
   const { data: staffAttendance } = useAllStaffAttendance()

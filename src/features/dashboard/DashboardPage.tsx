@@ -76,7 +76,9 @@ export function DashboardPage() {
   const { data: booksHealth, isLoading: booksHealthLoading } = useBooksHealth()
   const { data: projects, isLoading: projectsLoading } = useProjects()
   const { data: clients } = useClients()
-  const { data: invoices } = useInvoices(null)
+  // Totals count Sent invoices only; Drafts are listed separately below.
+  const { data: invoices } = useInvoices(null, { sentOnly: true })
+  const { data: everyInvoice } = useInvoices(null)
   const { data: invoicePayments } = useInvoicePayments()
   // Retention still held back by clients across every invoice — part of what
   // clients owe in total, but not of "Outstanding from clients" below, which
@@ -136,7 +138,7 @@ export function DashboardPage() {
         return totalDue > 0.01
       }).length ?? 0
 
-  const draftInvoices = (invoices ?? []).filter((i) => i.status === 'draft')
+  const draftInvoices = (everyInvoice ?? []).filter((i) => i.status === 'draft')
   const pendingProjectClaims = (pendingClaims ?? []).filter((e) => e.cost_center === 'Project')
 
   const activeProjects = (projects ?? []).filter((p) => p.status === 'active')

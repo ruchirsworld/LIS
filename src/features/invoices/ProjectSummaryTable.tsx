@@ -7,7 +7,7 @@ import { clientLabel } from '../../lib/labels'
 export function ProjectSummaryTable() {
   const { data: projects } = useProjects()
   const { data: clients } = useClients()
-  const { data: invoices } = useInvoices(null)
+  const { data: invoices } = useInvoices(null, { sentOnly: true })
   const { data: payments } = useInvoicePayments()
 
   const relevant = projects?.filter((p) => invoices?.some((i) => i.project_id === p.id)) ?? []

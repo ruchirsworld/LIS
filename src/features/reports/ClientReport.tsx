@@ -10,7 +10,7 @@ import type { ExportSection } from '../../lib/export/report'
 
 export function ClientReport({ range }: { range: DateRange | null }) {
   const { data: clients } = useClients()
-  const { data: invoices } = useInvoices(null)
+  const { data: invoices } = useInvoices(null, { sentOnly: true })
   const { data: payments } = useInvoicePayments()
 
   const relevantClients = clients?.filter((c) => invoices?.some((i) => i.client_id === c.id)) ?? []

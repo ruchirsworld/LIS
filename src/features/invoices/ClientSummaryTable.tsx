@@ -6,7 +6,7 @@ import { clientLabel } from '../../lib/labels'
 
 export function ClientSummaryTable() {
   const { data: clients } = useClients()
-  const { data: invoices } = useInvoices(null)
+  const { data: invoices } = useInvoices(null, { sentOnly: true })
   const { data: payments } = useInvoicePayments()
 
   const relevant = clients?.filter((c) => invoices?.some((i) => i.client_id === c.id)) ?? []

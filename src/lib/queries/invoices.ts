@@ -20,9 +20,14 @@ export type InvoiceWithNotes = InvoiceRow & {
   adj_retention: number
 }
 
-export function useInvoices(range: DateRange | null) {
+/** Every invoice, with its credit / debit notes totalled. Pass { sentOnly: true } for
+ * anything that adds invoices up (client and project totals, dues, GST): a Draft is only
+ * a rough copy and is not in the books, so it must not be counted. */
+export function useInvoices(range: DateRange | null, options?: { sentOnly?: boolean }) {
+  const sentOnly = !!options?.sentOnly
   return useQuery({
     queryKey: ['invoices', range],
+    select: sentOnly ? (rows: InvoiceWithNotes[]) => rows.filter((i) => i.status === 'sent') : undefined,
     queryFn: async (): Promise<InvoiceWithNotes[]> => {
       let query = supabase.from('invoices').select('*').order('created_at', { ascending: false })
       if (range?.from) query = query.gte('invoice_date', range.from)

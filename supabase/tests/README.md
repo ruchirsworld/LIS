@@ -12,6 +12,7 @@ you want to check. A passing file ends with an error whose message starts
 | File | Checks |
 | --- | --- |
 | `accounting_posting.sql` | An invoice, its receipt and an expense post balanced entries to the right accounts. |
+| `summaries.sql` | The Financial summary, GST summary and Dashboard cards ignore Draft invoices and pending or rejected expenses, and count an invoice once it is Sent. |
 | `access_rules.sql` | A supervisor cannot read the books, approve reimbursements or call the posting helpers; unique numbers and non-negative amounts are enforced. |
 
 Run them against a staging project first, and against production after every

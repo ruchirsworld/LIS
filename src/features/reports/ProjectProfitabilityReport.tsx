@@ -16,7 +16,7 @@ export function ProjectProfitabilityReport({ range }: { range: DateRange | null 
   const { data: clients } = useClients()
   const { data: expenses } = useExpenses(null)
   const { data: bills } = useVendorBills(null)
-  const { data: invoices } = useInvoices(null)
+  const { data: invoices } = useInvoices(null, { sentOnly: true })
   const { data: payments } = useInvoicePayments()
 
   const from = range?.from ?? null
