@@ -1,3 +1,4 @@
+import { activateProps } from '../../lib/a11y'
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { PeriodFilter } from '../../components/PeriodFilter'
 import { useNavFilter } from '../../lib/navContext'
@@ -204,7 +205,7 @@ export function InvoicePaymentRecordsTable() {
               const open = expandedReceipts.has(entry.key)
               return (
                 <Fragment key={entry.key}>
-                  <tr className="row-link" onClick={() => toggleReceipt(entry.key)} aria-expanded={open}>
+                  <tr className="row-link" {...activateProps(() => toggleReceipt(entry.key))} aria-expanded={open}>
                     <td>
                       <span aria-hidden="true">{open ? '\u25BE' : '\u25B8'}</span> {first.display_id} – {group[group.length - 1].display_id}
                     </td>

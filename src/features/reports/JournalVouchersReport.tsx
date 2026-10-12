@@ -1,3 +1,4 @@
+import { confirmAction } from '../../lib/feedback'
 import { useState } from 'react'
 import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
@@ -282,8 +283,14 @@ export function JournalVouchersReport() {
                     <button
                       type="button"
                       className="btn danger-link"
-                      onClick={() => {
-                        if (window.confirm(`Delete voucher ${v.display_id}? It is removed from the ledger and kept in the audit log.`)) remove.mutate(v.id)
+                      onClick={async () => {
+                        const ok = await confirmAction({
+                          title: 'Delete voucher',
+                          message: `Delete voucher ${v.display_id}? It is removed from the ledger and kept in the audit log.`,
+                          confirmLabel: 'Delete',
+                          danger: true,
+                        })
+                        if (ok) remove.mutate(v.id)
                       }}
                     >
                       Delete

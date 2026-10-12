@@ -1,14 +1,23 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useAuth } from '../lib/auth'
 import { Sidebar } from './Sidebar'
-import { RowMenu } from './RowMenu'
+import { SearchLauncher } from './CommandPalette'
 import { MobileFooter } from './MobileFooter'
 import { MobileFab } from './MobileFab'
 import { usePendingApprovalsCount } from '../lib/queries/approvals'
 import { useLanguage } from '../lib/i18n'
-import { TABS, isTabVisible, HEADER_MENU_TAB_IDS, type TabId } from '../lib/nav'
+import type { TabId } from '../lib/nav'
 import laavinMark from '../assets/laavin-mark.png'
 import './Shell.css'
+
+function BellIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    </svg>
+  )
+}
 
 function SignOutIcon() {
   return (
@@ -46,10 +55,6 @@ export function Shell({
   const isSupervisor = profile?.role === 'supervisor'
   const { lang, setLang } = useLanguage()
   const pendingApprovalsCount = usePendingApprovalsCount(canApprove)
-  // Admin/CXO only — these tabs live in the hamburger instead of the
-  // Sidebar (see HEADER_MENU_TAB_IDS); a Supervisor's sidebar keeps them
-  // inline, so this list stays empty for that role.
-  const headerMenuTabs = TABS.filter((t) => isAdminSide && HEADER_MENU_TAB_IDS.includes(t.id) && isTabVisible(t, profile?.role))
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [headerHidden, setHeaderHidden] = useState(false)
   const lastScrollY = useRef(0)
@@ -76,6 +81,9 @@ export function Shell({
 
   return (
     <div className="app-layout">
+      <a className="skip-link" href="#main-content">
+        Skip to content
+      </a>
       <Sidebar
         active={active}
         onChange={onChange}
@@ -118,23 +126,28 @@ export function Shell({
                   {lang === 'en' ? 'हिं' : 'EN'}
                 </button>
               )}
-              {isAdminSide ? (
-                <RowMenu
-                  badge={pendingApprovalsCount}
-                  items={[
-                    ...headerMenuTabs.map((t) => ({ label: t.label, onClick: () => onChange(t.id) })),
-                    { label: 'Sign out', onClick: () => signOut() },
-                  ]}
-                />
-              ) : (
-                <button type="button" className="icon-btn danger" onClick={() => signOut()} aria-label="Sign out" title="Sign out">
-                  <SignOutIcon />
+              {isAdminSide && <SearchLauncher onNavigate={onChange} />}
+              {isAdminSide && (
+                <button
+                  type="button"
+                  className="icon-btn bell-btn"
+                  onClick={() => onChange('approvals')}
+                  aria-label={pendingApprovalsCount > 0 ? `Approvals: ${pendingApprovalsCount} waiting` : 'Approvals'}
+                  title={pendingApprovalsCount > 0 ? `${pendingApprovalsCount} waiting for approval` : 'Nothing waiting for approval'}
+                >
+                  <BellIcon />
+                  {pendingApprovalsCount > 0 && <span className="bell-badge">{pendingApprovalsCount}</span>}
                 </button>
               )}
+              <button type="button" className="icon-btn danger" onClick={() => signOut()} aria-label="Sign out" title="Sign out">
+                <SignOutIcon />
+              </button>
             </div>
           </div>
 
-          <div className="shell-content">{children}</div>
+          <main className="shell-content" id="main-content" tabIndex={-1}>
+            {children}
+          </main>
         </div>
       </div>
 

@@ -1,3 +1,4 @@
+import { confirmAction } from '../../lib/feedback'
 import { Fragment, useRef, useState, type FormEvent } from 'react'
 import html2canvas from 'html2canvas'
 import laavinLogo from '../../assets/laavin-logo.jpg'
@@ -388,7 +389,13 @@ export function SalarySection() {
   }
 
   async function handleDeleteAdvance(a: NonNullable<typeof salaryAdvances>[number]) {
-    if (!window.confirm(`Delete this advance of ${fmt(a.amount)} to ${staffName(a.staff_id)} dated ${fmtDate(a.date)}? This cannot be undone.`)) return
+    const ok = await confirmAction({
+      title: 'Delete advance',
+      message: `Delete this advance of ${fmt(a.amount)} to ${staffName(a.staff_id)} dated ${fmtDate(a.date)}? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (!ok) return
     setAdvanceEditBusyId(a.id)
     setAdvanceEditError((m) => ({ ...m, [a.id]: '' }))
     try {

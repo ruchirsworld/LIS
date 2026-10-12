@@ -26,8 +26,11 @@ import { AuditLogReport } from './AuditLogReport'
 import { BooksHealthReport } from './BooksHealthReport'
 import { JournalVouchersReport } from './JournalVouchersReport'
 import { GstTdsRegisterReport } from './GstTdsRegisterReport'
+import { GstReturnsReport } from './GstReturnsReport'
+import { BankReconciliationReport } from './BankReconciliationReport'
 import { PurchaseGstTdsRegisterReport } from './PurchaseGstTdsRegisterReport'
 import { GstReleaseStatementReport } from './GstReleaseStatementReport'
+import { BalanceSheetReport, ProfitAndLossReport } from './FinancialStatementsReports'
 import { SegregationOfDutiesReport } from './SegregationOfDutiesReport'
 import { reportPeriodToRange } from '../../lib/calc/reportPeriod'
 import type { DateRange, ReportPeriodType } from '../../lib/calc/reportPeriod'
@@ -67,6 +70,20 @@ const CATEGORIES: ReportCategory[] = [
         Component: GstSummaryReport,
       },
       {
+        id: 'profit-and-loss',
+        title: 'Profit and Loss',
+        description: 'Income, expenses and net profit for a financial year, with the year before alongside.',
+        Component: ProfitAndLossReport,
+        periodless: true,
+      },
+      {
+        id: 'balance-sheet',
+        title: 'Balance Sheet',
+        description: 'What the firm owns and owes, and the partners funds, as at a financial year end, with the year before alongside. Close and lock the year here.',
+        Component: BalanceSheetReport,
+        periodless: true,
+      },
+      {
         id: 'trial-balance',
         title: 'Trial balance',
         description: 'Every GL account’s debit/credit totals and balance, as of now.',
@@ -97,6 +114,12 @@ const CATEGORIES: ReportCategory[] = [
         title: 'GST & TDS register',
         description: 'Invoice-wise taxable value, CGST / SGST / IGST and TDS deducted — for GSTR-1, GSTR-3B and Form 26AS.',
         Component: GstTdsRegisterReport,
+      },
+      {
+        id: 'gst-returns',
+        title: 'GST return workings',
+        description: 'GSTR-3B tax payable after input credit, GSTR-1 tables (B2B, B2C, notes, HSN), and a match of purchase bills against GSTR-2B.',
+        Component: GstReturnsReport,
       },
       {
         id: 'gst-release-statement',
@@ -160,6 +183,13 @@ const CATEGORIES: ReportCategory[] = [
     key: 'cash-capital',
     label: 'Cash & capital',
     reports: [
+      {
+        id: 'bank-reconciliation',
+        title: 'Bank reconciliation',
+        description: 'Tick the lines that appear on the bank statement and see whether the books and the bank agree.',
+        Component: BankReconciliationReport,
+        periodless: true,
+      },
       {
         id: 'cash-bank',
         title: 'Cash & bank',

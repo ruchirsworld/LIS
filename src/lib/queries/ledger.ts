@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../supabase'
+import { selectByIds } from './byIds'
 
 export interface LedgerLine {
   id: string
@@ -41,12 +42,8 @@ export function useLedgerLines(
       if (!lines || lines.length === 0) return []
 
       const entryIds = [...new Set(lines.map((l) => l.entry_id))]
-      const { data: entries, error: entriesError } = await supabase
-        .from('journal_entries')
-        .select('id, date, description')
-        .in('id', entryIds)
-      if (entriesError) throw entriesError
-      const entryById = new Map((entries ?? []).map((e) => [e.id, e]))
+      const entries = await selectByIds<{ id: string; date: string; description: string }>('journal_entries', 'id, date, description', 'id', entryIds)
+      const entryById = new Map(entries.map((e) => [e.id, e]))
 
       // One party-ledger line per journal entry: when a party's ledger spans
       // several accounts (receivable + retention + advances for a client),
@@ -143,12 +140,8 @@ export function useCashAndBankLines() {
       if (!lines || lines.length === 0) return []
 
       const entryIds = [...new Set(lines.map((l) => l.entry_id))]
-      const { data: entries, error: entriesError } = await supabase
-        .from('journal_entries')
-        .select('id, date')
-        .in('id', entryIds)
-      if (entriesError) throw entriesError
-      const dateById = new Map((entries ?? []).map((e) => [e.id, e.date]))
+      const entries = await selectByIds<{ id: string; date: string }>('journal_entries', 'id, date', 'id', entryIds)
+      const dateById = new Map(entries.map((e) => [e.id, e.date]))
 
       return lines.map((l) => ({
         date: dateById.get(l.entry_id) ?? '',

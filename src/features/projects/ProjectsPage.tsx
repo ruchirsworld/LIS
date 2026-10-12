@@ -1,3 +1,4 @@
+import { activateProps } from '../../lib/a11y'
 import { Fragment, useEffect, useState } from 'react'
 import { ModuleHeader, KpiCard } from '../../components/ui'
 import { SearchableSelect } from '../../components/SearchableSelect'
@@ -374,7 +375,7 @@ export function ProjectsPage() {
                                 const isExpanded = expandedBillId === b.id
                                 return (
                                   <Fragment key={b.id}>
-                                    <tr onClick={() => setExpandedBillId(isExpanded ? null : b.id)} style={{ cursor: 'pointer' }}>
+                                    <tr {...activateProps(() => setExpandedBillId(isExpanded ? null : b.id))} style={{ cursor: 'pointer' }}>
                                       <td>
                                         <button
                                           type="button"
@@ -489,7 +490,7 @@ export function ProjectsPage() {
                                 const isExpanded = expandedExpenseId === e.id
                                 return (
                                   <Fragment key={e.id}>
-                                    <tr onClick={() => setExpandedExpenseId(isExpanded ? null : e.id)} style={{ cursor: 'pointer' }}>
+                                    <tr {...activateProps(() => setExpandedExpenseId(isExpanded ? null : e.id))} style={{ cursor: 'pointer' }}>
                                       <td>
                                         <button
                                           type="button"

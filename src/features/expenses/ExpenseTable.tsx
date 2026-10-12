@@ -1,3 +1,4 @@
+import { confirmAction } from '../../lib/feedback'
 import { Fragment, useState } from 'react'
 import { useNavFilter } from '../../lib/navContext'
 import { Button } from '../../components/ui'
@@ -130,7 +131,13 @@ export function ExpenseTable({
 
   async function removeSelected() {
     if (selectedIds.size === 0) return
-    if (!window.confirm(`Remove ${selectedIds.size} selected expense${selectedIds.size === 1 ? '' : 's'}? This cannot be undone.`)) return
+    const ok = await confirmAction({
+      title: 'Remove expenses',
+      message: `Remove ${selectedIds.size} selected expense${selectedIds.size === 1 ? '' : 's'}? This cannot be undone.`,
+      confirmLabel: 'Remove',
+      danger: true,
+    })
+    if (!ok) return
     await bulkDeleteExpenses.mutateAsync(Array.from(selectedIds))
     clearSelection()
   }

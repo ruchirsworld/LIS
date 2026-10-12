@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../supabase'
+import { selectByIds } from './byIds'
 import type { Database, Json } from '../../types/database'
 
 type CompanyProfile = Database['public']['Tables']['company_profile']['Row']
@@ -127,14 +128,12 @@ export function useJournalVouchers() {
         .order('date', { ascending: false })
       if (error) throw error
       if (!entries || entries.length === 0) return []
-      const { data: lines, error: linesError } = await supabase
-        .from('journal_lines')
-        .select('id, entry_id, debit, credit, gl_account_id')
-        .in(
-          'entry_id',
-          entries.map((e) => e.id)
-        )
-      if (linesError) throw linesError
+      const lines = await selectByIds<{ id: string; entry_id: string; debit: number; credit: number; gl_account_id: string }>(
+        'journal_lines',
+        'id, entry_id, debit, credit, gl_account_id',
+        'entry_id',
+        entries.map((e) => e.id)
+      )
       const { data: accounts, error: accountsError } = await supabase.from('gl_accounts').select('id, code, name')
       if (accountsError) throw accountsError
       const accountById = new Map((accounts ?? []).map((a) => [a.id, a]))
@@ -243,3 +242,101 @@ export function useSetClientGstHold() {
     },
   })
 }
+
+/** Account totals between two dates (null = unbounded) for the financial statements. */
+export function useGlBalances(from: string | null, to: string | null) {
+  return useQuery({
+    queryKey: ['gl_balances', from, to],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('gl_balances', { p_from: from ?? undefined, p_to: to ?? undefined })
+      if (error) throw error
+      return (data ?? []).map((r) => ({
+        ...r,
+        total_debit: Number(r.total_debit),
+        total_credit: Number(r.total_credit),
+        sort_order: Number(r.sort_order),
+      }))
+    },
+  })
+}
+
+/** Date of the earliest ledger entry — where the financial-year list starts. */
+export function useFirstEntryDate() {
+  return useQuery({
+    queryKey: ['first_entry_date'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('journal_entries').select('date').order('date').limit(1).maybeSingle()
+      if (error) throw error
+      return data?.date ?? null
+    },
+  })
+}
+
+// ── Bank reconciliation ──────────────────────────────────────────────────
+
+export interface BankLineRow {
+  id: string
+  date: string
+  description: string
+  deposit: number
+  withdrawal: number
+}
+
+/** Every ledger line posted to one bank account, oldest first. */
+export function useBankLines(bankAccountId: string | null) {
+  return useQuery({
+    queryKey: ['bank_lines', bankAccountId],
+    enabled: !!bankAccountId,
+    queryFn: async (): Promise<BankLineRow[]> => {
+      const { data: account, error: accountError } = await supabase.from('gl_accounts').select('id').eq('code', '1020').single()
+      if (accountError) throw accountError
+      const { data, error } = await supabase
+        .from('journal_lines')
+        .select('id, debit, credit, journal_entries!inner(date, description)')
+        .eq('gl_account_id', account.id)
+        .eq('bank_account_id', bankAccountId as string)
+      if (error) throw error
+      return (data ?? [])
+        .map((row) => {
+          const entry = row.journal_entries as unknown as { date: string; description: string } | { date: string; description: string }[]
+          const e = Array.isArray(entry) ? entry[0] : entry
+          return { id: row.id, date: e?.date ?? '', description: e?.description ?? '', deposit: Number(row.debit || 0), withdrawal: Number(row.credit || 0) }
+        })
+        .sort((a, b) => a.date.localeCompare(b.date))
+    },
+  })
+}
+
+/** The ledger lines of a bank account already ticked off against a statement. */
+export function useClearedBankLines(bankAccountId: string | null) {
+  return useQuery({
+    queryKey: ['bank_reconciliations', bankAccountId],
+    enabled: !!bankAccountId,
+    queryFn: async (): Promise<Map<string, string>> => {
+      const { data, error } = await supabase.from('bank_reconciliations').select('journal_line_id, cleared_on').eq('bank_account_id', bankAccountId as string)
+      if (error) throw error
+      return new Map((data ?? []).map((r) => [r.journal_line_id, r.cleared_on]))
+    },
+  })
+}
+
+export function useSetBankLineCleared(bankAccountId: string | null) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ lineIds, cleared, clearedOn }: { lineIds: string[]; cleared: boolean; clearedOn: string }) => {
+      if (!bankAccountId || lineIds.length === 0) return
+      if (cleared) {
+        const { error } = await supabase
+          .from('bank_reconciliations')
+          .upsert(lineIds.map((id) => ({ journal_line_id: id, bank_account_id: bankAccountId, cleared_on: clearedOn })), { onConflict: 'journal_line_id' })
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from('bank_reconciliations').delete().in('journal_line_id', lineIds)
+        if (error) throw error
+      }
+    },
+    meta: { quiet: true },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['bank_reconciliations', bankAccountId] }),
+  })
+}
+

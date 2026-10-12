@@ -1,3 +1,5 @@
+import { activateProps } from '../../lib/a11y'
+import { confirmAction } from '../../lib/feedback'
 import { Fragment, useEffect, useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui'
 import { Modal } from '../../components/Modal'
@@ -180,13 +182,25 @@ export function TripRecordsTable() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [expandedId])
 
-  function handleDeleteExpense(e: ExpenseRow) {
-    if (!window.confirm(`Delete this entry of ${fmt(e.amount)} dated ${fmtDate(e.date)}? This cannot be undone.`)) return
+  async function handleDeleteExpense(e: ExpenseRow) {
+    const ok = await confirmAction({
+      title: 'Delete entry',
+      message: `Delete this entry of ${fmt(e.amount)} dated ${fmtDate(e.date)}? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (!ok) return
     deleteExpense.mutate(e.id)
   }
 
   async function handleDeleteTrip(t: Trip) {
-    if (!window.confirm(`Delete trip "${t.name}"? This cannot be undone, and will fail if any expenses are still logged against it.`)) return
+    const ok = await confirmAction({
+      title: 'Delete trip',
+      message: `Delete trip "${t.name}"? This cannot be undone, and will fail if any expenses are still logged against it.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (!ok) return
     setDeleteBusyId(t.id)
     setDeleteError((m) => ({ ...m, [t.id]: '' }))
     try {
@@ -287,7 +301,7 @@ export function TripRecordsTable() {
               const tripExpenses = expensesByTrip(t.id)
               return (
                 <Fragment key={t.id}>
-                  <tr onClick={() => setExpandedId(isExpanded ? null : t.id)} style={{ cursor: 'pointer' }}>
+                  <tr {...activateProps(() => setExpandedId(isExpanded ? null : t.id))} style={{ cursor: 'pointer' }}>
                     <td>
                       <button
                         type="button"

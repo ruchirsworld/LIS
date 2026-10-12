@@ -1,3 +1,4 @@
+import { confirmAction } from '../../lib/feedback'
 import { Fragment, useEffect, useState } from 'react'
 import { PeriodFilter } from '../../components/PeriodFilter'
 import { SearchableSelect } from '../../components/SearchableSelect'
@@ -416,8 +417,14 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
                                   <button
                                     type="button"
                                     className="btn link"
-                                    onClick={() => {
-                                      if (window.confirm(`Remove ${n.display_id}? This takes it out of the invoice and the ledger.`)) deleteNote.mutate(n.id)
+                                    onClick={async () => {
+                                      const ok = await confirmAction({
+                                        title: 'Remove note',
+                                        message: `Remove ${n.display_id}? This takes it out of the invoice and the ledger.`,
+                                        confirmLabel: 'Remove',
+                                        danger: true,
+                                      })
+                                      if (ok) deleteNote.mutate(n.id)
                                     }}
                                   >
                                     Remove

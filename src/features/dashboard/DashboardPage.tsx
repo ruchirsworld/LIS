@@ -1,3 +1,4 @@
+import { activateProps } from '../../lib/a11y'
 import { Fragment, useState, type ReactNode } from 'react'
 import { useIsFetching, useQueryClient } from '@tanstack/react-query'
 import { Button, ModuleHeader, KpiCard, type KpiTone } from '../../components/ui'
@@ -300,7 +301,7 @@ export function DashboardPage() {
                 </thead>
                 <tbody>
                   {pendingProjectClaims.map((e) => (
-                    <tr key={e.id} className={goTo ? 'row-link' : undefined} onClick={goTo ? () => goTo('approvals', { filter: { supervisorId: e.created_by ?? undefined } }) : undefined}>
+                    <tr key={e.id} className={goTo ? 'row-link' : undefined} {...activateProps(goTo ? () => goTo('approvals', { filter: { supervisorId: e.created_by ?? undefined } }) : undefined)}>
                       <td>{supervisorName(e.created_by)}</td>
                       <td>{projectName(e.project_id)}</td>
                       <td>{fmtDate(e.date)}</td>
@@ -332,7 +333,7 @@ export function DashboardPage() {
                 </thead>
                 <tbody>
                   {imprestRows.map((r) => (
-                    <tr key={r.profileId} className={goTo ? 'row-link' : undefined} onClick={goTo ? () => goTo('hr', { filter: { hrSection: 'Imprest' } }) : undefined}>
+                    <tr key={r.profileId} className={goTo ? 'row-link' : undefined} {...activateProps(goTo ? () => goTo('hr', { filter: { hrSection: 'Imprest' } }) : undefined)}>
                       <td>{r.name}</td>
                       <td className="amt">{fmt(r.balance)}</td>
                     </tr>
@@ -383,7 +384,7 @@ export function DashboardPage() {
                 </thead>
                 <tbody>
                   {draftInvoices.map((i) => (
-                    <tr key={i.id} className={goTo ? 'row-link' : undefined} onClick={goTo ? () => goTo('invoices', { filter: { invoiceView: 'draft', focus: 'inv-ledger' } }) : undefined}>
+                    <tr key={i.id} className={goTo ? 'row-link' : undefined} {...activateProps(goTo ? () => goTo('invoices', { filter: { invoiceView: 'draft', focus: 'inv-ledger' } }) : undefined)}>
                       <td>{clientName(i.client_id)}</td>
                       <td>{i.invoice_date ? fmtDate(i.invoice_date) : '—'}</td>
                       <td className="amt">{fmt(netPayable(i))}</td>
@@ -419,7 +420,7 @@ export function DashboardPage() {
                     <Fragment key={i.id}>
                       <tr
                         className={goTo ? 'row-link' : undefined}
-                        onClick={goTo ? () => goTo('invoices', { filter: { clientId: i.client_id ?? undefined, invoiceView: 'overdue', focus: 'inv-ledger' } }) : undefined}
+                        {...activateProps(goTo ? () => goTo('invoices', { filter: { clientId: i.client_id ?? undefined, invoiceView: 'overdue', focus: 'inv-ledger' } }) : undefined)}
                       >
                         <td>{clientName(i.client_id)}</td>
                         <td>{i.effective_due_date ? fmtDate(i.effective_due_date) : '—'}</td>
@@ -563,7 +564,7 @@ export function DashboardPage() {
                       <tr
                         key={r.id}
                         className={goTo ? 'row-link' : undefined}
-                        onClick={goTo ? () => goTo('invoices', { filter: { clientId: r.id, invoiceView: 'gst', focus: 'inv-ledger' } }) : undefined}
+                        {...activateProps(goTo ? () => goTo('invoices', { filter: { clientId: r.id, invoiceView: 'gst', focus: 'inv-ledger' } }) : undefined)}
                       >
                         <td>{r.name}</td>
                         <td className="amt">{fmt(r.gstHeld)}</td>
@@ -600,7 +601,7 @@ export function DashboardPage() {
                   </thead>
                   <tbody>
                     {rows.map((r) => (
-                      <tr key={r.id} className={goTo ? 'row-link' : undefined} onClick={goTo ? () => goTo('invoices', { filter: { clientId: r.id, invoiceView: key === 'due' ? 'due' : 'retention', focus: 'inv-ledger' } }) : undefined}>
+                      <tr key={r.id} className={goTo ? 'row-link' : undefined} {...activateProps(goTo ? () => goTo('invoices', { filter: { clientId: r.id, invoiceView: key === 'due' ? 'due' : 'retention', focus: 'inv-ledger' } }) : undefined)}>
                         <td>{r.name}</td>
                         <td className={key === 'due' ? 'amt amt-due' : 'amt amt-retention'}>{fmt(r[key])}</td>
                       </tr>

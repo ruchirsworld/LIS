@@ -42,12 +42,18 @@ export function isTabVisible(tab: { roles: readonly string[] | null }, role: Nav
   return !tab.roles || (!!role && (tab.roles as readonly string[]).includes(role))
 }
 
-// Admin/CXO only: these tabs sit in the header's hamburger menu (next to
-// Sign out) instead of the main Sidebar list — their sidebar would otherwise
-// be a long flat list of everything. A Supervisor's sidebar is short enough
-// already (Dashboard, Expenses, Calendar, Records) and keeps all of it
-// inline, so this set is never applied to that role.
-export const HEADER_MENU_TAB_IDS: readonly TabId[] = ['approvals', 'supervisor', 'calendar', 'projects', 'reports', 'admin']
+// Admin/CXO sidebar: every page, grouped by the job it does rather than by
+// the kind of data it holds. Nothing is hidden behind a menu. A Supervisor's
+// sidebar is short already (Dashboard, Expenses, Calendar, Records) and stays
+// a single flat list.
+export const NAV_GROUPS: readonly { label: string; ids: readonly TabId[] }[] = [
+  { label: 'Overview', ids: ['dashboard', 'approvals'] },
+  { label: 'Sales', ids: ['invoices'] },
+  { label: 'Purchases', ids: ['purchases', 'vendor'] },
+  { label: 'Money', ids: ['expenses', 'transfers', 'loans', 'capital'] },
+  { label: 'People & projects', ids: ['projects', 'hr', 'calendar', 'supervisor'] },
+  { label: 'Books', ids: ['reports', 'admin'] },
+]
 
 // The Expenses tab's three flows, merged behind one cost-center switcher in
 // its header — was three separate tabs (Admin / Trips / Project) before

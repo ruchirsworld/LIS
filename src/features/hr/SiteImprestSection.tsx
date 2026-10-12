@@ -1,3 +1,4 @@
+import { confirmAction } from '../../lib/feedback'
 import { Fragment, useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
@@ -260,7 +261,13 @@ export function SiteImprestSection() {
 
   async function handleDeleteTxn(t: StaffImprestTransaction) {
     const kindLabel = t.kind === 'advance' ? 'advance' : 'return'
-    if (!window.confirm(`Delete this ${kindLabel} of ${fmt(t.amount)} dated ${fmtDate(t.date)}? This cannot be undone.`)) return
+    const ok = await confirmAction({
+      title: `Delete ${kindLabel}`,
+      message: `Delete this ${kindLabel} of ${fmt(t.amount)} dated ${fmtDate(t.date)}? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (!ok) return
     setTxnBusyId(t.id)
     setTxnError((m) => ({ ...m, [t.id]: '' }))
     try {
@@ -273,7 +280,13 @@ export function SiteImprestSection() {
   }
 
   async function handleDeleteRequest(t: StaffImprestTransaction) {
-    if (!window.confirm(`Delete this pending request for ${fmt(t.amount)} dated ${fmtDate(t.date)}? This cannot be undone.`)) return
+    const ok = await confirmAction({
+      title: 'Delete request',
+      message: `Delete this pending request for ${fmt(t.amount)} dated ${fmtDate(t.date)}? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (!ok) return
     setRequestBusyId(t.id)
     setRequestError((m) => ({ ...m, [t.id]: '' }))
     try {

@@ -6,6 +6,8 @@ import { Shell } from './components/Shell'
 import { SplitPaneHead } from './components/SplitPaneHead'
 import { useMediaQuery } from './lib/useMediaQuery'
 import { LocationGate } from './components/LocationGate'
+import { ErrorBoundary, PageLoading } from './components/ErrorBoundary'
+import { FeedbackHost } from './components/FeedbackHost'
 import {
   EXPENSE_COST_CENTERS,
   SUPERVISOR_EXPENSE_COST_CENTERS,
@@ -171,7 +173,8 @@ function AppShellRouter() {
       }}
           split={{ canSplit, isOpen: splitOpen, onToggle: toggleSplit, tab: splitTab }}
         >
-          <Suspense fallback={null}>
+          <ErrorBoundary resetKey={`${tab}|${splitTab ?? ''}`}>
+          <Suspense fallback={<PageLoading />}>
             {splitOpen && splitTab ? (
               <div className="split-panes">
                 <div className="split-pane">
@@ -201,6 +204,7 @@ function AppShellRouter() {
               />
             )}
           </Suspense>
+          </ErrorBoundary>
         </Shell>
       </NavIntentContext.Provider>
     </NavContext.Provider>
@@ -210,18 +214,21 @@ function AppShellRouter() {
 function AppInner() {
   const { session, loading } = useAuth()
 
-  if (loading) return null
+  if (loading) return <PageLoading />
   if (!session) return <LoginPage />
   return <AppShellRouter />
 }
 
 function App() {
   return (
-    <AuthProvider>
-      <LanguageProvider>
-        <AppInner />
-      </LanguageProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <LanguageProvider>
+          <AppInner />
+          <FeedbackHost />
+        </LanguageProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   )
 }
 
