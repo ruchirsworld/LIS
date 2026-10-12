@@ -3049,7 +3049,7 @@ export type Database = {
         }[];
       };
       delete_journal_voucher: { Args: { p_entry: string }; Returns: undefined };
-      repost_all_invoices: { Args: never; Returns: number };
+      repost_all_invoices: { Args: never; Returns: Json };
       post_journal_voucher: {
         Args: { p_date: string; p_narration: string; p_lines: Json };
         Returns: string;

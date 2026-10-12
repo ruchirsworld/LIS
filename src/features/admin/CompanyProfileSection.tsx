@@ -80,8 +80,15 @@ export function CompanyProfileSection() {
     setRepostMessage(null)
     setError(null)
     try {
-      const n = await repost.mutateAsync()
-      setRepostMessage(`Re-posted ${n} invoice${n === 1 ? '' : 's'} with the GST split.`)
+      const result = (await repost.mutateAsync()) as { reposted?: number; skipped?: number } | null
+      const done = result?.reposted ?? 0
+      const skipped = result?.skipped ?? 0
+      setRepostMessage(
+        `Re-posted ${done} invoice${done === 1 ? '' : 's'} with the GST split.` +
+          (skipped > 0
+            ? ` ${skipped} dated within the locked period ${skipped === 1 ? 'was' : 'were'} left as filed — to include them, move the lock back, re-post, then lock again.`
+            : '')
+      )
     } catch (err) {
       setError(getErrorMessage(err, 'Could not re-post the invoices.'))
     }
@@ -149,7 +156,7 @@ export function CompanyProfileSection() {
             </Button>
             <div className="note">
               Run this after saving the GSTIN: it re-posts past invoices so their GST is split into CGST / SGST / IGST. Totals do not change.
-              Clients without a GSTIN stay under "not split".
+              Clients without a GSTIN stay under "not split", and anything inside the locked period is left as filed.
             </div>
             {repostMessage && <div className="note">{repostMessage}</div>}
           </div>
