@@ -16,7 +16,7 @@ export interface LedgerLine {
  * journal_entries in two queries rather than a PostgREST embed, matching
  * how the rest of the app composes report data client-side. */
 export function useLedgerLines(
-  glAccountCode: string,
+  glAccountCode: string | string[],
   partyColumn: 'client_id' | 'vendor_id' | 'loan_id' | 'partner_id' | 'profile_id' | 'staff_id',
   partyId: string | null
 ) {
@@ -24,17 +24,18 @@ export function useLedgerLines(
     queryKey: ['ledger_lines', glAccountCode, partyColumn, partyId],
     enabled: !!partyId,
     queryFn: async (): Promise<LedgerLine[]> => {
-      const { data: account, error: accountError } = await supabase
-        .from('gl_accounts')
-        .select('id')
-        .eq('code', glAccountCode)
-        .single()
+      const codes = Array.isArray(glAccountCode) ? glAccountCode : [glAccountCode]
+      const { data: accounts, error: accountError } = await supabase.from('gl_accounts').select('id').in('code', codes)
       if (accountError) throw accountError
+      if (!accounts || accounts.length === 0) return []
 
       const { data: lines, error: linesError } = await supabase
         .from('journal_lines')
         .select('id, entry_id, debit, credit')
-        .eq('gl_account_id', account.id)
+        .in(
+          'gl_account_id',
+          accounts.map((a) => a.id)
+        )
         .eq(partyColumn, partyId as string)
       if (linesError) throw linesError
       if (!lines || lines.length === 0) return []
@@ -47,17 +48,29 @@ export function useLedgerLines(
       if (entriesError) throw entriesError
       const entryById = new Map((entries ?? []).map((e) => [e.id, e]))
 
-      return lines
-        .map((l) => {
-          const entry = entryById.get(l.entry_id)
-          return {
+      // One party-ledger line per journal entry: when a party's ledger spans
+      // several accounts (receivable + retention + advances for a client),
+      // one invoice posts to more than one of them, but it is one voucher.
+      // Pure reclassifications between those accounts net to nothing and drop out.
+      const byEntry = new Map<string, LedgerLine>()
+      for (const l of lines) {
+        const entry = entryById.get(l.entry_id)
+        const existing = byEntry.get(l.entry_id)
+        if (existing) {
+          existing.debit += Number(l.debit || 0)
+          existing.credit += Number(l.credit || 0)
+        } else {
+          byEntry.set(l.entry_id, {
             id: l.id,
             date: entry?.date ?? '',
             description: entry?.description ?? '',
             debit: Number(l.debit || 0),
             credit: Number(l.credit || 0),
-          }
-        })
+          })
+        }
+      }
+      return [...byEntry.values()]
+        .filter((l) => Math.abs(l.debit - l.credit) > 0.004 || (l.debit === 0 && l.credit === 0))
         .sort((a, b) => a.date.localeCompare(b.date))
     },
   })

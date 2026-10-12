@@ -9,6 +9,11 @@ export interface InvoiceRow {
   tds_pct: number | null
   retention_pct?: number | null
   retention_release_date?: string | null
+  // Totals of the invoice's credit (−) and debit (+) notes, attached by useInvoices.
+  adj_amount?: number | null
+  adj_gst?: number | null
+  adj_tds?: number | null
+  adj_retention?: number | null
   due_date_manual: string | null
   due_days: number | null
   invoice_date: string | null
@@ -21,30 +26,41 @@ export interface InvoicePaymentRow {
   is_retention_release?: boolean | null
 }
 
+// Every tax figure is held to the paisa, exactly as it is posted to the
+// ledger — otherwise a client's balance drifts from the books by a few paise.
+export function round2(n: number): number {
+  return Math.round((n + Number.EPSILON) * 100) / 100
+}
+
 export function gstAmt(inv: InvoiceRow): number {
-  return Number(inv.amount || 0) * Number(inv.gst_pct || 0) / 100
+  return round2(Number(inv.amount || 0) * Number(inv.gst_pct || 0) / 100) + Number(inv.adj_gst || 0)
 }
 
 export function tdsAmt(inv: InvoiceRow): number {
-  return Number(inv.amount || 0) * Number(inv.tds_pct || 0) / 100
+  return round2(Number(inv.amount || 0) * Number(inv.tds_pct || 0) / 100) + Number(inv.adj_tds || 0)
 }
 
 export function netPayable(inv: InvoiceRow): number {
-  return Number(inv.amount || 0) + gstAmt(inv) - tdsAmt(inv)
+  return Number(inv.amount || 0) + Number(inv.adj_amount || 0) + gstAmt(inv) - tdsAmt(inv)
 }
 
 // Same as netPayable but leaving GST out — GST is collected on the
 // government's behalf, never real revenue, so a few displays (Project
 // Invoiced/Due) show this instead of the GST-inclusive figure.
 export function netPayableExGst(inv: InvoiceRow): number {
-  return Number(inv.amount || 0) - tdsAmt(inv)
+  return Number(inv.amount || 0) + Number(inv.adj_amount || 0) - tdsAmt(inv)
 }
 
 // The % of net_payable a client contractually holds back for a period —
 // still owed, but not collectible (or overdue) until released. Doesn't
 // reduce GST liability, which is charged on the full invoice value.
 export function retentionAmt(inv: InvoiceRow): number {
-  return netPayable(inv) * Number(inv.retention_pct || 0) / 100
+  // Retention on the invoice as issued, plus retention on its notes.
+  const asIssued =
+    Number(inv.amount || 0) +
+    round2(Number(inv.amount || 0) * Number(inv.gst_pct || 0) / 100) -
+    round2(Number(inv.amount || 0) * Number(inv.tds_pct || 0) / 100)
+  return round2(asIssued * Number(inv.retention_pct || 0) / 100) + Number(inv.adj_retention || 0)
 }
 
 export function totalPaid(payments: InvoicePaymentRow[]): number {

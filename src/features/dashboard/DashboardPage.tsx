@@ -10,6 +10,7 @@ import { useVendorBills } from '../../lib/queries/purchases'
 import { useExpenses } from '../../lib/queries/expenses'
 import { usePendingApprovalsCount } from '../../lib/queries/approvals'
 import { useCashMovements, useSiteImprestBalances } from '../../lib/queries/ledger'
+import { useBooksHealth } from '../../lib/queries/books'
 import { useProfiles } from '../../lib/queries/admin'
 import { dueAmount, netPayable, retentionHeld } from '../../lib/calc/invoices'
 import { projectExpenseTotal, projectVendorBillTotal } from '../../lib/calc/projects'
@@ -71,6 +72,7 @@ export function DashboardPage() {
   const prevRange = previousRange(range, periodType)
   const { data: prevSummary } = useReportSummary(prevRange, prevRange !== null)
   const { data: cashMovements } = useCashMovements(30)
+  const { data: booksHealth, isLoading: booksHealthLoading } = useBooksHealth()
   const { data: projects, isLoading: projectsLoading } = useProjects()
   const { data: clients } = useClients()
   const { data: invoices } = useInvoices(null)
@@ -174,6 +176,8 @@ export function DashboardPage() {
     return count > 0 ? waiting : 'All clear'
   }
 
+  const booksToFix = (booksHealth ?? []).filter((c) => c.severity === 'error').length
+  const booksToReview = (booksHealth ?? []).filter((c) => c.severity === 'warning').length
   const overdueCount = data?.overdue_invoices_count ?? 0
   const overdueAmount = data?.overdue_invoices_amount ?? 0
   const outstandingAmount = data?.outstanding_from_clients ?? 0
@@ -441,6 +445,18 @@ export function DashboardPage() {
               {viewAll('invoices', 'Open overdue in Invoices', { invoiceView: 'overdue', focus: 'inv-ledger' })}
             </div>
           ))}
+        <div className="dash-subhead">Books</div>
+        <div className="dash-grid">
+          <KpiCard
+            label="Books health"
+            value={String(booksToFix + booksToReview)}
+            loading={booksHealthLoading}
+            tone={booksHealthLoading ? undefined : booksToFix > 0 ? 'danger' : booksToReview > 0 ? 'warn' : 'good'}
+            sub={booksHealthLoading ? undefined : booksToFix + booksToReview === 0 ? 'All clear' : `${booksToFix} to fix · ${booksToReview} to review`}
+            hint="A live audit of the ledger — click to see what needs a look"
+            {...drill('reports', { report: 'books-health' })}
+          />
+        </div>
       </DashSection>
 
       <DashSection

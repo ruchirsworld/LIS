@@ -23,6 +23,9 @@ import {
   SalaryAdvanceLedgerReport,
 } from './PartyLedgerReport'
 import { AuditLogReport } from './AuditLogReport'
+import { BooksHealthReport } from './BooksHealthReport'
+import { JournalVouchersReport } from './JournalVouchersReport'
+import { GstTdsRegisterReport } from './GstTdsRegisterReport'
 import { SegregationOfDutiesReport } from './SegregationOfDutiesReport'
 import { reportPeriodToRange } from '../../lib/calc/reportPeriod'
 import type { DateRange, ReportPeriodType } from '../../lib/calc/reportPeriod'
@@ -86,6 +89,12 @@ const CATEGORIES: ReportCategory[] = [
         description: 'Every invoice and payment for one client, with a running balance.',
         Component: ClientLedgerReport,
         periodless: true,
+      },
+      {
+        id: 'gst-tds-register',
+        title: 'GST & TDS register',
+        description: 'Invoice-wise taxable value, CGST / SGST / IGST and TDS deducted — for GSTR-1, GSTR-3B and Form 26AS.',
+        Component: GstTdsRegisterReport,
       },
       {
         id: 'receipts',
@@ -194,6 +203,20 @@ const CATEGORIES: ReportCategory[] = [
     key: 'audit',
     label: 'Audit & controls',
     reports: [
+      {
+        id: 'books-health',
+        title: 'Books health check',
+        description: 'A live audit of the ledger: unbalanced entries, mismatches, negative cash, missing GST details, items to reconcile.',
+        Component: BooksHealthReport,
+        periodless: true,
+      },
+      {
+        id: 'journal-vouchers',
+        title: 'Journal vouchers',
+        description: 'Post a manual voucher — GST payment or set-off, bad-debt write-off, corrections — and see those already posted.',
+        Component: JournalVouchersReport,
+        periodless: true,
+      },
       {
         id: 'audit-log',
         title: 'Audit log',

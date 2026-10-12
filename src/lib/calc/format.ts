@@ -61,3 +61,10 @@ export function fmtCompact(n: number | string | null | undefined): string {
   if (abs >= 1e3) return `${sign}₹${trim(abs / 1e3)}K`
   return `${sign}₹${Math.round(abs)}`
 }
+
+/** ₹ with paise (Indian digit grouping) — for ledgers and registers that must foot to the paisa. */
+export function fmt2(n: number | string | null | undefined): string {
+  const num = Number(n || 0)
+  const sign = num < 0 ? '-' : ''
+  return sign + '₹' + Math.abs(num).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}

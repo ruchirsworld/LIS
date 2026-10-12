@@ -98,6 +98,8 @@ export function InvoiceReceiptForm() {
       // extra payment, shown in green, to adjust against a future invoice.
       const order = [target, ...clientOpenInvoices.filter((row) => row.invoice.id !== target.invoice.id)]
       let remaining = amt
+      // Ties together the rows one receipt is split into across invoices.
+      const receiptId = crypto.randomUUID()
       const record = (invoiceId: string, share: number, release: boolean) =>
         createPayment.mutateAsync({
           invoice_id: invoiceId,
@@ -106,6 +108,7 @@ export function InvoiceReceiptForm() {
           payment_mode: accountId === CASH ? 'Cash' : 'Bank',
           bank_account_id: accountId === CASH ? null : accountId,
           is_retention_release: release,
+          receipt_id: receiptId,
         })
       for (const row of order) {
         if (remaining <= 0.005) break

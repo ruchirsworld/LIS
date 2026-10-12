@@ -17,6 +17,15 @@ export interface ExportSection {
   pdfHiddenColumns?: number[]
   /** Name of this section's sheet in the Excel file (default: the title). */
   sheetName?: string
+  /** Lines printed under the section title (party name, address, GSTIN, period). */
+  subtitle?: string[]
+  /** Columns that hold amounts (right-aligned, numbers formatted) — by default
+   * every column whose values are all numbers. */
+  numericColumns?: number[]
+  /** Decimal places for amounts in the PDF; 0 (whole rupees) unless set. */
+  decimals?: number
+  /** Indexes into `rows` set in bold — totals, closing balances. */
+  boldRows?: number[]
 }
 
 // Same blue as the on-screen retention highlight (--blue-soft / --blue).
@@ -30,6 +39,11 @@ function fileStamp(): string {
   const dd = String(d.getDate()).padStart(2, '0')
   const mm = String(d.getMonth() + 1).padStart(2, '0')
   return `${dd}-${mm}-${d.getFullYear()}`
+}
+
+function fmt2(n: number, decimals: number): string {
+  const sign = n < 0 ? '-' : ''
+  return sign + '₹' + Math.abs(n).toLocaleString('en-IN', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
 }
 
 function fileSafe(name: string): string {
@@ -133,13 +147,23 @@ export async function exportReportPdf(
       doc.addPage()
       cursorY = 20
     }
-    if (sections.length > 1) {
+    if (sections.length > 1 || section.subtitle?.length) {
       doc.setFontSize(11)
       doc.setTextColor(ink)
       doc.setFont('NotoSans', 'bold')
       doc.text(section.title, marginX, cursorY)
       doc.setFont('NotoSans', 'normal')
       cursorY += 5
+    }
+    if (section.subtitle?.length) {
+      doc.setFontSize(9)
+      doc.setTextColor(inkSoft)
+      for (const line of section.subtitle.slice(1)) {
+        doc.text(line, marginX, cursorY)
+        cursorY += 4.5
+      }
+      doc.setTextColor(ink)
+      cursorY += 1.5
     }
 
     // Columns marked pdfHiddenColumns are dropped here; the Excel export
@@ -148,7 +172,11 @@ export async function exportReportPdf(
     const pdfColumns = section.columns.filter(keep)
     const pdfRows = section.rows.map((r) => r.filter(keep))
 
-    const numericCols = numericColumnIndexes(pdfRows)
+    const keptIdx = section.columns.map((_, i) => i).filter((i) => !section.pdfHiddenColumns?.includes(i))
+    const numericCols = section.numericColumns
+      ? section.numericColumns.map((i) => keptIdx.indexOf(i)).filter((i) => i >= 0)
+      : numericColumnIndexes(pdfRows)
+    const money = (n: number) => (section.decimals ? fmt2(n, section.decimals) : fmt(n))
     const columnStyles = Object.fromEntries(numericCols.map((i) => [i, { halign: 'right' as const }]))
 
     autoTable(doc, {
@@ -156,13 +184,16 @@ export async function exportReportPdf(
       head: [pdfColumns],
       body:
         pdfRows.length > 0
-          ? pdfRows.map((r) => r.map((c) => (typeof c === 'number' ? fmt(c) : String(c))))
+          ? pdfRows.map((r) => r.map((c) => (typeof c === 'number' ? money(c) : String(c))))
           : [['No data in this period']],
       styles: { font: 'NotoSans', fontStyle: 'normal', fontSize: 9, textColor: ink, lineColor: 225, lineWidth: 0.1 },
       headStyles: { font: 'NotoSans', fontStyle: 'bold', fillColor: brandGreen, textColor: 255, halign: 'left' },
       alternateRowStyles: { fillColor: [246, 248, 246] },
       columnStyles,
       didParseCell: (data) => {
+        if (data.section === 'body' && section.boldRows?.includes(data.row.index)) {
+          data.cell.styles.fontStyle = 'bold'
+        }
         if (data.section === 'body' && section.highlightRows?.includes(data.row.index)) {
           data.cell.styles.fillColor = HIGHLIGHT_FILL
           data.cell.styles.textColor = HIGHLIGHT_TEXT
@@ -221,26 +252,38 @@ export async function exportReportExcel(
   // Plain SheetJS can't colour cells, so a report with highlighted rows goes
   // through exceljs instead (same layout: title, note, period, blank, header,
   // rows).
-  if (sections.some((s) => s.highlightRows?.length)) {
+  if (sections.some((s) => s.highlightRows?.length || s.boldRows?.length || s.subtitle?.length)) {
     const ExcelJS = await import('exceljs')
     const ewb = new ExcelJS.Workbook()
     const used = new Set<string>()
     for (const section of sections) {
       const ws = ewb.addWorksheet(sanitizeSheetName(section.sheetName ?? section.title, used))
-      ws.addRow([reportTitle])
+      ws.addRow([reportTitle]).font = { bold: true, size: 13 }
       if (headerNote) ws.addRow([headerNote])
+      for (const line of section.subtitle ?? []) ws.addRow([line])
       ws.addRow([periodLabel])
       ws.addRow([])
-      ws.addRow(section.columns).font = { bold: true }
+      const headRow = ws.addRow(section.columns)
+      headRow.font = { bold: true }
+      const numeric = new Set(section.numericColumns ?? [])
       section.rows.forEach((r, i) => {
         const row = ws.addRow(r)
+        numeric.forEach((c) => {
+          const cell = row.getCell(c + 1)
+          if (typeof cell.value === 'number') cell.numFmt = '#,##0.00'
+          cell.alignment = { horizontal: 'right' }
+        })
+        if (section.boldRows?.includes(i)) row.font = { bold: true }
         if (section.highlightRows?.includes(i)) {
           row.font = { bold: true, color: { argb: 'FF1F4E8C' } }
           row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE3ECF6' } }
         }
       })
+      numeric.forEach((c) => {
+        headRow.getCell(c + 1).alignment = { horizontal: 'right' }
+      })
       section.columns.forEach((c, i) => {
-        ws.getColumn(i + 1).width = Math.max(14, c.length + 2, i === 1 ? 44 : 0)
+        ws.getColumn(i + 1).width = Math.max(14, c.length + 2, i === 1 ? 60 : 0)
       })
     }
     const buf = await ewb.xlsx.writeBuffer()

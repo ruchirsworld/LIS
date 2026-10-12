@@ -7,148 +7,21 @@ import { TableScroll } from '../../components/TableScroll'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
-import type { ExportSection } from '../../lib/export/report'
 import { useInvoices, useInvoicePayments, useDeleteInvoice, useCycleInvoiceStatus, useMovePaymentExcess } from '../../lib/queries/invoices'
 import { useClients, useProjects } from '../../lib/queries/masters'
 import { fmt, fmtDate } from '../../lib/calc/format'
 import { gstAmt, tdsAmt, netPayable, retentionAmt, totalPaid, dueAmount, extraPaid, retentionHeld, isRetentionReleaseDue, effectiveDueDate, effectiveStatus } from '../../lib/calc/invoices'
 import type { DateRange } from '../../lib/calc/period'
 import { InvoicePaymentForm, EditInvoicePaymentFields } from './InvoicePaymentForm'
-import { clientLabel, clientFullName, clientGstLine } from '../../lib/labels'
+import { clientLabel, clientFullName } from '../../lib/labels'
+import { useAuth } from '../../lib/auth'
+import { useInvoiceNotes, useCompanyProfile, useDeleteInvoiceNote } from '../../lib/queries/books'
+import { buildLedgerSections, companyHeaderLine } from './ledgerExport'
+import { InvoiceNoteForm } from './InvoiceNoteForm'
 import { useNavFilter, type InvoiceView } from '../../lib/navContext'
 import type { Database } from '../../types/database'
 
 type Invoice = Database['public']['Tables']['invoices']['Row']
-type InvoicePayment = Database['public']['Tables']['invoice_payments']['Row']
-type Client = Database['public']['Tables']['clients']['Row']
-
-/** Formats a running balance the way a Tally-style ledger does: the figure plus Dr/Cr side. */
-function fmtBalance(balance: number): string {
-  return `${fmt(Math.abs(balance))} ${balance >= 0 ? 'Dr' : 'Cr'}`
-}
-
-/**
- * Builds one ledger section per client — Tally-style: opening balance carried in from
- * before the selected period, then a chronological Date/Particulars/Vch No./Debit/Credit/
- * Balance trail (invoices debit the client, payments credit them), ending in a closing
- * balance. This is what Excel/PDF export renders; the on-screen table stays a flat grid
- * since it needs per-row action buttons (edit/pay/remove) a ledger layout has no room for.
- */
-function buildLedgerSections(
-  clients: Client[] | undefined,
-  allInvoices: Invoice[] | undefined,
-  allPayments: InvoicePayment[] | undefined,
-  range: DateRange | null,
-  clientFilter: string
-): ExportSection[] {
-  type Entry = { date: string; particulars: string; vch: string; debit: number; credit: number }
-
-  const relevantClients = (clients ?? [])
-    .filter((c) => !clientFilter || c.id === clientFilter)
-    .sort((a, b) => clientLabel(a).localeCompare(clientLabel(b)))
-
-  const sections: ExportSection[] = []
-
-  for (const client of relevantClients) {
-    const clientInvoices = (allInvoices ?? []).filter((inv) => inv.client_id === client.id && inv.invoice_date)
-    const invoiceIds = new Set(clientInvoices.map((inv) => inv.id))
-    const clientPayments = (allPayments ?? []).filter((p) => invoiceIds.has(p.invoice_id))
-
-    if (clientInvoices.length === 0 && clientPayments.length === 0) continue
-
-    const before: Entry[] = []
-    const within: Entry[] = []
-
-    const bucket = (entry: Entry) => {
-      if (range?.from && entry.date < range.from) before.push(entry)
-      else if (!range?.to || entry.date <= range.to) within.push(entry)
-    }
-
-    for (const inv of clientInvoices) {
-      bucket({
-        date: inv.invoice_date as string,
-        particulars: `Invoice ${inv.invoice_number ?? inv.display_id ?? ''}`.trim(),
-        vch: inv.invoice_number ?? inv.display_id ?? '',
-        debit: netPayable(inv),
-        credit: 0,
-      })
-    }
-    for (const p of clientPayments) {
-      bucket({
-        date: p.date,
-        particulars: `Payment received${p.reference ? ' — ' + p.reference : ''}`,
-        vch: p.display_id ?? '',
-        debit: 0,
-        credit: Number(p.amount || 0),
-      })
-    }
-
-    within.sort((a, b) => a.date.localeCompare(b.date))
-    const openingBalance = before.reduce((bal, e) => bal + e.debit - e.credit, 0)
-
-    let running = openingBalance
-    const rows: (string | number)[][] = [['', 'Opening balance', '', '', '', fmtBalance(running)]]
-    for (const e of within) {
-      running += e.debit - e.credit
-      rows.push([
-        fmtDate(e.date),
-        e.particulars,
-        e.vch,
-        e.debit ? fmt(e.debit) : '',
-        e.credit ? fmt(e.credit) : '',
-        fmtBalance(running),
-      ])
-    }
-    rows.push(['', 'Closing balance', '', '', '', fmtBalance(running)])
-
-    const retentionInvoices = clientInvoices
-      .filter((inv) => inv.retention_pct)
-      .sort((a, b) => (a.invoice_date as string).localeCompare(b.invoice_date as string))
-
-    sections.push({
-      title: clientFullName(client),
-      columns: ['Date', 'Particulars', 'Vch No.', 'Debit', 'Credit', 'Balance'],
-      rows,
-      sheetName: clientLabel(client),
-      // Voucher numbers stay in the Excel file but are left off the PDF.
-      pdfHiddenColumns: [2],
-    })
-
-    // The retention workings sit apart from the ledger — the next section in
-    // the PDF, the next sheet in Excel: per invoice, net payable × retention %
-    // = retention, how much has been released and what is still held. The
-    // ledger itself carries no retention figures.
-    if (retentionInvoices.length > 0) {
-      const lines = retentionInvoices.map((inv) => {
-        const retention = retentionAmt(inv)
-        const held = retentionHeld(inv, (allPayments ?? []).filter((p) => p.invoice_id === inv.id))
-        return { inv, retention, held, released: Math.max(0, retention - held) }
-      })
-      const sum = (pick: (l: (typeof lines)[number]) => number) => lines.reduce((s, l) => s + pick(l), 0)
-      sections.push({
-        title: `${clientFullName(client)} — Retention calculation`,
-        sheetName: `${clientLabel(client)} - Retention`,
-        columns: ['Invoice', 'Invoice date', 'Net payable', 'Retention %', 'Retention (net × %)', 'Released', 'Still held', 'Release date'],
-        rows: [
-          ...lines.map((l) => [
-            l.inv.invoice_number ?? l.inv.display_id ?? '',
-            fmtDate(l.inv.invoice_date),
-            netPayable(l.inv),
-            `${l.inv.retention_pct}%`,
-            l.retention,
-            l.released,
-            l.held,
-            l.inv.retention_release_date ? fmtDate(l.inv.retention_release_date) : '—',
-          ]),
-          ['Total', '', sum((l) => netPayable(l.inv)), '', sum((l) => l.retention), sum((l) => l.released), sum((l) => l.held), ''],
-        ],
-        highlightRows: [...lines.flatMap((l, i) => (l.held > 0 ? [i] : [])), ...(sum((l) => l.held) > 0 ? [lines.length] : [])],
-      })
-    }
-  }
-
-  return sections
-}
 
 export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void }) {
   const [range, setRange] = useState<DateRange | null>(null)
@@ -167,6 +40,12 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
   const { data: clients } = useClients()
   const { data: projects } = useProjects()
   const deleteInvoice = useDeleteInvoice()
+  const { profile } = useAuth()
+  const isAdmin = profile?.role === 'admin'
+  const { data: notes } = useInvoiceNotes()
+  const { data: company } = useCompanyProfile()
+  const deleteNote = useDeleteInvoiceNote()
+  const [noteForm, setNoteForm] = useState<{ invoiceId: string; type: 'credit' | 'debit' } | null>(null)
   const cycleStatus = useCycleInvoiceStatus()
   const movePaymentExcess = useMovePaymentExcess()
   const [adjustError, setAdjustError] = useState<string | null>(null)
@@ -242,14 +121,13 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
   )
   const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedInvoices)
 
-  const exportSections = buildLedgerSections(clients, allInvoices, payments, range, clientFilter)
+  const exportSections = buildLedgerSections({ clients, invoices: allInvoices, payments, notes, projects, range, clientFilter })
   // When narrowed to one client, the export should say so up front — full
   // name and GST in the document, client code in the downloaded filename —
   // rather than leaving the header as the generic "Ledger" title with no
   // per-section title (which only prints when there's more than one).
   const filterClient = clientFilter ? clients?.find((c) => c.id === clientFilter) : undefined
   const ledgerTitle = filterClient ? `${clientFullName(filterClient)} ledger` : 'Ledger'
-  const ledgerGst = filterClient ? clientGstLine(filterClient) : undefined
   const ledgerFileNamePrefix = filterClient ? `${clientLabel(filterClient)}_Ledger` : 'Ledger'
 
   return (
@@ -286,7 +164,7 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
           sections={exportSections}
           range={range}
           style={{ marginTop: 0 }}
-          headerNote={ledgerGst ?? undefined}
+          headerNote={companyHeaderLine(company)}
           fileNamePrefix={ledgerFileNamePrefix}
         />
       </div>
@@ -357,7 +235,10 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
                     <td>{project ? project.name : '—'}</td>
                     <td>{inv.invoice_date ? fmtDate(inv.invoice_date) : '— (not sent yet)'}</td>
                     <td>{dueDateDisplay ? fmtDate(dueDateDisplay) : '—'}</td>
-                    <td className="amt">{fmt(inv.amount)}</td>
+                    <td className="amt">
+                      {fmt(inv.amount + inv.adj_amount)}
+                      {inv.adj_amount !== 0 && <div className="retention-note">revised by notes</div>}
+                    </td>
                     <td className="amt">
                       {fmt(gstAmt(inv))} <span style={{ color: 'var(--ink-soft)', fontSize: 11 }}>({inv.gst_pct || 0}%)</span>
                     </td>
@@ -431,12 +312,52 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
                           Adjust to next invoice
                         </button>
                       )}
-                      <button type="button" className="pay-btn" onClick={() => onEdit(inv)}>
-                        {inv.status === 'sent' ? 'Adjust' : 'Edit'}
-                      </button>
+                      {inv.status === 'sent' && (
+                        <>
+                          <button type="button" className="pay-btn" title="Reduce the invoice (GST credit note)" onClick={() => setNoteForm({ invoiceId: inv.id, type: 'credit' })}>
+                            Credit note
+                          </button>
+                          <button type="button" className="pay-btn" title="Increase the invoice (GST debit note)" onClick={() => setNoteForm({ invoiceId: inv.id, type: 'debit' })}>
+                            Debit note
+                          </button>
+                        </>
+                      )}
+                      {(inv.status === 'draft' || isAdmin) && (
+                        <button
+                          type="button"
+                          className="pay-btn"
+                          title={inv.status === 'sent' ? 'Correct the invoice itself — for a typing error. Once the client has it, use a credit or debit note.' : undefined}
+                          onClick={() => onEdit(inv)}
+                        >
+                          {inv.status === 'sent' ? 'Correct' : 'Edit'}
+                        </button>
+                      )}
                       <button type="button" className="btn danger-link" onClick={() => deleteInvoice.mutate(inv.id)}>
                         Remove
                       </button>
+                      {(notes ?? []).filter((n) => n.invoice_id === inv.id).length > 0 && (
+                        <div className="pay-history">
+                          {(notes ?? [])
+                            .filter((n) => n.invoice_id === inv.id)
+                            .map((n) => (
+                              <div key={n.id}>
+                                {n.display_id} — {fmtDate(n.date)} — {n.note_type === 'credit' ? '−' : '+'}
+                                {fmt(Number(n.amount) + Number(n.gst_amount))} · {n.reason}{' '}
+                                {isAdmin && (
+                                  <button
+                                    type="button"
+                                    className="btn link"
+                                    onClick={() => {
+                                      if (window.confirm(`Remove ${n.display_id}? This takes it out of the invoice and the ledger.`)) deleteNote.mutate(n.id)
+                                    }}
+                                  >
+                                    Remove
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                        </div>
+                      )}
                       {hasHistory && (
                         <div className="pay-history">
                           {invPayments.map((p) =>
@@ -446,7 +367,13 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
                               <div key={p.id}>
                                 {p.display_id} — {fmtDate(p.date)} — {fmt(p.amount)}
                                 {p.reference ? ` · ${p.reference}` : ''}
-                                {p.is_retention_release ? ' · retention release' : ''}{' '}
+                                {p.is_retention_release ? ' · retention release' : ''}
+                                {(() => {
+                                  const parts = p.receipt_id ? (payments ?? []).filter((q) => q.receipt_id === p.receipt_id) : []
+                                  return parts.length > 1
+                                    ? ` · part of a ${fmt(parts.reduce((sum, q) => sum + Number(q.amount || 0), 0))} receipt`
+                                    : ''
+                                })()}{' '}
                                 <button type="button" className="btn link" onClick={() => setEditingPaymentId(p.id)}>
                                   Edit
                                 </button>
@@ -457,6 +384,9 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
                       )}
                     </td>
                   </tr>
+                  {noteForm?.invoiceId === inv.id && (
+                    <InvoiceNoteForm invoice={inv} type={noteForm.type} onClose={() => setNoteForm(null)} />
+                  )}
                   {payFormId === inv.id && (
                     <InvoicePaymentForm
                       invoiceId={inv.id}

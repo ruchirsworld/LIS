@@ -3,7 +3,7 @@ import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
 import { SearchableSelect } from '../../components/SearchableSelect'
 import { useClients, useProjects } from '../../lib/queries/masters'
-import { useCreateInvoice, useUpdateInvoice } from '../../lib/queries/invoices'
+import { useInvoices, useCreateInvoice, useUpdateInvoice } from '../../lib/queries/invoices'
 import { parseINR } from '../../lib/calc/format'
 import { getErrorMessage } from '../../lib/errors'
 import { clientLabel } from '../../lib/labels'
@@ -26,6 +26,7 @@ export function InvoiceForm({
   const { data: projects } = useProjects()
   const createInvoice = useCreateInvoice()
   const updateInvoice = useUpdateInvoice()
+  const { data: existingInvoices } = useInvoices(null)
 
   const [clientId, setClientId] = useState('')
   const [projectId, setProjectId] = useState('')
@@ -102,6 +103,30 @@ export function InvoiceForm({
       setFormError('Pick a client.')
       return
     }
+    // GST Rule 46: a tax invoice number is unique, at most 16 characters, and
+    // uses only letters, digits, "/" and "-".
+    const number = invoiceNumber.trim()
+    if (status === 'sent' && !number) {
+      setFormError('A sent invoice needs an invoice number.')
+      return
+    }
+    if (number) {
+      if (number.length > 16) {
+        setFormError(`The invoice number is ${number.length} characters — GST allows at most 16.`)
+        return
+      }
+      if (!/^[A-Za-z0-9/-]+$/.test(number)) {
+        setFormError('Use only letters, digits, "/" and "-" in the invoice number.')
+        return
+      }
+      const clash = (existingInvoices ?? []).find(
+        (i) => i.id !== editingInvoice?.id && (i.invoice_number ?? '').trim().toLowerCase() === number.toLowerCase()
+      )
+      if (clash) {
+        setFormError(`Invoice number ${number} is already used (${clash.display_id ?? 'another invoice'}) — each tax invoice needs its own.`)
+        return
+      }
+    }
     setSubmitting(true)
     try {
       const patch = {
@@ -166,7 +191,8 @@ export function InvoiceForm({
         <div className="field-row inv-row2">
           <div className="field inv-invoice-number">
             <label>Invoice no.</label>
-            <input type="text" value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} />
+            <input type="text" maxLength={16} value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} />
+            <div className="note">Unique, up to 16 characters: letters, digits, / and -</div>
           </div>
           <div className="field inv-invoice-date">
             <label>Invoice date</label>

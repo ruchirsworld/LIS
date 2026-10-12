@@ -14,7 +14,7 @@ type PartyType = 'client' | 'vendor' | 'loan' | 'partner' | 'imprest' | 'salary_
 const PARTY_CONFIG: Record<
   PartyType,
   {
-    glAccountCode: string
+    glAccountCode: string | string[]
     partyColumn: 'client_id' | 'vendor_id' | 'loan_id' | 'partner_id' | 'profile_id' | 'staff_id'
     balanceSign: 1 | -1
     balanceLabel: string
@@ -23,7 +23,8 @@ const PARTY_CONFIG: Record<
 > = {
   // Accounts Receivable is debit-normal — a positive running balance here is
   // straightforwardly what the client still owes, no sign flip needed.
-  client: { glAccountCode: '1030', partyColumn: 'client_id', balanceSign: 1, balanceLabel: 'Amount due', pickerLabel: 'Client' },
+  // A client's account is receivable + retention receivable + advances taken.
+  client: { glAccountCode: ['1030', '1035', '2060'], partyColumn: 'client_id', balanceSign: 1, balanceLabel: 'Amount due', pickerLabel: 'Client' },
   // Accounts Payable / Loans Payable / Partner Capital are all credit-normal
   // — flipping the sign makes the running balance read as "what we owe them"
   // (or "net capital in", for partners) as a positive number, not negative.

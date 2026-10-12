@@ -14,6 +14,92 @@ export type Database = {
   };
   public: {
     Tables: {
+      company_profile: {
+        Row: {
+          address: string | null;
+          books_locked_until: string | null;
+          gstin: string | null;
+          id: string;
+          name: string | null;
+          pan: string | null;
+          state_code: string | null;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          address?: string | null;
+          books_locked_until?: string | null;
+          gstin?: string | null;
+          id?: string;
+          name?: string | null;
+          pan?: string | null;
+          state_code?: string | null;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          address?: string | null;
+          books_locked_until?: string | null;
+          gstin?: string | null;
+          id?: string;
+          name?: string | null;
+          pan?: string | null;
+          state_code?: string | null;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [];
+      };
+      invoice_notes: {
+        Row: {
+          amount: number;
+          created_at: string;
+          created_by: string | null;
+          date: string;
+          display_id: string | null;
+          gst_amount: number;
+          gst_pct: number;
+          id: string;
+          invoice_id: string;
+          net_amount: number;
+          note_type: string;
+          reason: string;
+          retention_amount: number;
+          tds_amount: number;
+          tds_pct: number;
+        };
+        Insert: {
+          amount: number;
+          created_at?: string;
+          created_by?: string | null;
+          date: string;
+          display_id?: string | null;
+          gst_amount?: number;
+          gst_pct?: number;
+          id?: string;
+          invoice_id: string;
+          net_amount?: number;
+          note_type: string;
+          reason: string;
+          retention_amount?: number;
+          tds_amount?: number;
+          tds_pct?: number;
+        };
+        Update: {
+          amount?: number;
+          date?: string;
+          reason?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "invoice_notes_invoice_id_fkey";
+            columns: ["invoice_id"];
+            isOneToOne: false;
+            referencedRelation: "invoices";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       app_settings: {
         Row: {
           key: string;
@@ -823,6 +909,7 @@ export type Database = {
           invoice_id: string;
           payment_mode: string | null;
           is_retention_release: boolean;
+          receipt_id: string | null;
           reference: string | null;
         };
         Insert: {
@@ -836,6 +923,7 @@ export type Database = {
           invoice_id: string;
           payment_mode?: string | null;
           is_retention_release?: boolean;
+          receipt_id?: string | null;
           reference?: string | null;
         };
         Update: {
@@ -849,6 +937,7 @@ export type Database = {
           invoice_id?: string;
           payment_mode?: string | null;
           is_retention_release?: boolean;
+          receipt_id?: string | null;
           reference?: string | null;
         };
         Relationships: [
@@ -2949,6 +3038,22 @@ export type Database = {
       };
     };
     Functions: {
+      books_health_check: {
+        Args: never;
+        Returns: {
+          check_code: string;
+          severity: string;
+          title: string;
+          detail: string;
+          amount: number | null;
+        }[];
+      };
+      delete_journal_voucher: { Args: { p_entry: string }; Returns: undefined };
+      repost_all_invoices: { Args: never; Returns: number };
+      post_journal_voucher: {
+        Args: { p_date: string; p_narration: string; p_lines: Json };
+        Returns: string;
+      };
       cash_or_bank: { Args: { p_bank_account_id: string }; Returns: string };
       current_user_role: {
         Args: never;

@@ -68,7 +68,31 @@ export function InvoicePaymentRecordsTable() {
     },
     'date'
   )
-  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedPayments)
+  // Rows that belong to one split receipt (same receipt_id) sit together as a
+  // single line at the position of the first of them, expandable to the
+  // per-invoice rows. Everything else stays one row each.
+  const entries: { key: string; payments: InvoicePayment[] }[] = []
+  const byReceipt = new Map<string, { key: string; payments: InvoicePayment[] }>()
+  for (const p of sortedPayments ?? []) {
+    const existing = p.receipt_id ? byReceipt.get(p.receipt_id) : undefined
+    if (existing) {
+      existing.payments.push(p)
+      continue
+    }
+    const entry = { key: p.receipt_id ?? p.id, payments: [p] }
+    entries.push(entry)
+    if (p.receipt_id) byReceipt.set(p.receipt_id, entry)
+  }
+  const [expandedReceipts, setExpandedReceipts] = useState<Set<string>>(new Set())
+  function toggleReceipt(key: string) {
+    setExpandedReceipts((cur) => {
+      const next = new Set(cur)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(entries)
 
   const exportSections: ExportSection[] = [
     {
@@ -142,14 +166,13 @@ export function InvoicePaymentRecordsTable() {
                 </td>
               </tr>
             )}
-            {pageRows?.map((p) => {
-              const client = clientOf(p)
-              return (
+            {pageRows?.map((entry) => {
+              const renderRow = (p: InvoicePayment, nested: boolean) => (
                 <Fragment key={p.id}>
                   <tr>
-                    <td>{p.display_id ?? '—'}</td>
+                    <td style={nested ? { paddingLeft: 28 } : undefined}>{p.display_id ?? '—'}</td>
                     <td>{fmtDate(p.date)}</td>
-                    <td>{clientLabel(client)}</td>
+                    <td>{clientLabel(clientOf(p))}</td>
                     <td>{invoiceLabelOf(p)}</td>
                     <td className="amt">{fmt(p.amount)}</td>
                     <td>{p.reference ?? '—'}</td>
@@ -170,6 +193,30 @@ export function InvoicePaymentRecordsTable() {
                       </td>
                     </tr>
                   )}
+                </Fragment>
+              )
+
+              if (entry.payments.length === 1) return renderRow(entry.payments[0], false)
+
+              const group = [...entry.payments].sort((x, y) => (x.display_id ?? '').localeCompare(y.display_id ?? '', undefined, { numeric: true }))
+              const first = group[0]
+              const total = group.reduce((sum, p) => sum + Number(p.amount || 0), 0)
+              const open = expandedReceipts.has(entry.key)
+              return (
+                <Fragment key={entry.key}>
+                  <tr className="row-link" onClick={() => toggleReceipt(entry.key)} aria-expanded={open}>
+                    <td>
+                      <span aria-hidden="true">{open ? '\u25BE' : '\u25B8'}</span> {first.display_id} – {group[group.length - 1].display_id}
+                    </td>
+                    <td>{fmtDate(first.date)}</td>
+                    <td>{clientLabel(clientOf(first))}</td>
+                    <td>Split across {group.length} invoices</td>
+                    <td className="amt">{fmt(total)}</td>
+                    <td>{first.reference ?? '—'}</td>
+                    <td>{first.payment_mode ?? '—'}</td>
+                    <td></td>
+                  </tr>
+                  {open && group.map((p) => renderRow(p, true))}
                 </Fragment>
               )
             })}

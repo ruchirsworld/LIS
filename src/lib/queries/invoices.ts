@@ -8,16 +8,43 @@ type InvoiceUpdate = Database['public']['Tables']['invoices']['Update']
 type InvoicePaymentInsert = Database['public']['Tables']['invoice_payments']['Insert']
 type InvoicePaymentUpdate = Database['public']['Tables']['invoice_payments']['Update']
 
+type InvoiceRow = Database['public']['Tables']['invoices']['Row']
+type InvoiceNoteRow = Database['public']['Tables']['invoice_notes']['Row']
+
+/** An invoice with the totals of its credit (−) and debit (+) notes folded in,
+ * so every calculation that takes an invoice sees what is actually owed. */
+export type InvoiceWithNotes = InvoiceRow & {
+  adj_amount: number
+  adj_gst: number
+  adj_tds: number
+  adj_retention: number
+}
+
 export function useInvoices(range: DateRange | null) {
   return useQuery({
     queryKey: ['invoices', range],
-    queryFn: async () => {
+    queryFn: async (): Promise<InvoiceWithNotes[]> => {
       let query = supabase.from('invoices').select('*').order('created_at', { ascending: false })
       if (range?.from) query = query.gte('invoice_date', range.from)
       if (range?.to) query = query.lte('invoice_date', range.to)
       const { data, error } = await query
       if (error) throw error
-      return data
+      const { data: notes, error: notesError } = await supabase.from('invoice_notes').select('*')
+      if (notesError) throw notesError
+      const totals = new Map<string, { amount: number; gst: number; tds: number; retention: number }>()
+      for (const n of (notes ?? []) as InvoiceNoteRow[]) {
+        const sign = n.note_type === 'credit' ? -1 : 1
+        const t = totals.get(n.invoice_id) ?? { amount: 0, gst: 0, tds: 0, retention: 0 }
+        t.amount += sign * Number(n.amount)
+        t.gst += sign * Number(n.gst_amount)
+        t.tds += sign * Number(n.tds_amount)
+        t.retention += sign * Number(n.retention_amount)
+        totals.set(n.invoice_id, t)
+      }
+      return (data ?? []).map((inv) => {
+        const t = totals.get(inv.id)
+        return { ...inv, adj_amount: t?.amount ?? 0, adj_gst: t?.gst ?? 0, adj_tds: t?.tds ?? 0, adj_retention: t?.retention ?? 0 }
+      })
     },
   })
 }

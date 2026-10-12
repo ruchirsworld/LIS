@@ -12,6 +12,7 @@ import { StaffSection } from './StaffSection'
 import { HolidaysSection } from './HolidaysSection'
 import { BankAccountsSection } from './BankAccountsSection'
 import { AppSettingsSection } from './AppSettingsSection'
+import { CompanyProfileSection } from './CompanyProfileSection'
 
 const headerButtonStyle = {
   background: '#fff',
@@ -60,6 +61,7 @@ export function AdminPage() {
           <VendorsSection />
           <StaffSection />
           <HolidaysSection />
+          <CompanyProfileSection />
           <AppSettingsSection />
         </>
       ) : (
