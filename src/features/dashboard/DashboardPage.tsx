@@ -12,7 +12,7 @@ import { usePendingApprovalsCount } from '../../lib/queries/approvals'
 import { useCashMovements, useSiteImprestBalances } from '../../lib/queries/ledger'
 import { useBooksHealth } from '../../lib/queries/books'
 import { useProfiles } from '../../lib/queries/admin'
-import { dueAmount, netPayable, retentionHeld } from '../../lib/calc/invoices'
+import { dueAmount, gstHeld, netPayable, retentionHeld } from '../../lib/calc/invoices'
 import { projectExpenseTotal, projectVendorBillTotal } from '../../lib/calc/projects'
 import { ReportPeriodFilter } from '../reports/ReportPeriodFilter'
 import { FinancialSummaryReport } from '../reports/FinancialSummaryReport'
@@ -51,7 +51,7 @@ const JUMP_LINKS: { id: DashSectionId; label: string }[] = [
   { id: 'reports', label: 'Reports' },
 ]
 
-type ExpandedKpi = 'approvals' | 'draftInvoices' | 'overdueInvoices' | 'outstanding' | 'retention' | 'imprest' | 'gst' | null
+type ExpandedKpi = 'approvals' | 'draftInvoices' | 'overdueInvoices' | 'outstanding' | 'retention' | 'gstHeld' | 'imprest' | 'gst' | null
 
 function clockTime(ms: number): string {
   return new Date(ms).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })
@@ -80,6 +80,10 @@ export function DashboardPage() {
   // Retention still held back by clients across every invoice — part of what
   // clients owe in total, but not of "Outstanding from clients" below, which
   // only counts what is collectible now.
+  const totalGstHeld = (invoices ?? []).reduce(
+    (s, inv) => s + gstHeld(inv, invoicePayments?.filter((p) => p.invoice_id === inv.id) ?? []),
+    0
+  )
   const totalRetentionHeld = (invoices ?? []).reduce(
     (s, inv) => s + retentionHeld(inv, invoicePayments?.filter((p) => p.invoice_id === inv.id) ?? []),
     0
@@ -161,9 +165,13 @@ export function DashboardPage() {
         name: clientFullName(c),
         due: invs.reduce((s, i) => s + dueAmount(i, paymentsOf(i.id)), 0),
         held: invs.reduce((s, i) => s + retentionHeld(i, paymentsOf(i.id)), 0),
+        gstHeld: invs.reduce((s, i) => s + gstHeld(i, paymentsOf(i.id)), 0),
+        // Of the held GST: filed but proof not yet sent, and proof sent but not yet released.
+        gstProofToSend: invs.filter((i) => i.gstr3b_filed_on && !i.gstr3b_sent_on).reduce((s, i) => s + gstHeld(i, paymentsOf(i.id)), 0),
+        gstAwaitingRelease: invs.filter((i) => i.gstr3b_sent_on).reduce((s, i) => s + gstHeld(i, paymentsOf(i.id)), 0),
       }
     })
-    .filter((r) => r.due > 0.01 || r.held > 0.01)
+    .filter((r) => r.due > 0.01 || r.held > 0.01 || r.gstHeld > 0.01)
 
   // Status colour for a count that should be zero: red/amber when something
   // is waiting, green when all clear; nothing while still loading.
@@ -505,6 +513,15 @@ export function DashboardPage() {
             active={expandedKpi === 'retention'}
           />
           <KpiCard
+            label="GST held by clients"
+            value={fmt(totalGstHeld)}
+            loading={isLoading}
+            sub={totalGstHeld > 0 ? 'Released after GSTR-3B proof' : undefined}
+            hint="GST owed by clients who release it only after we file GSTR-3B and send proof. Click for the split by client"
+            onClick={() => toggleKpi('gstHeld')}
+            active={expandedKpi === 'gstHeld'}
+          />
+          <KpiCard
             label="Owed to vendors"
             value={fmt(data?.owed_to_vendors)}
             loading={isLoading}
@@ -519,6 +536,47 @@ export function DashboardPage() {
             {...drill('loans')}
           />
         </div>
+
+        {expandedKpi === 'gstHeld' &&
+          (() => {
+            const rows = clientBalances.filter((r) => r.gstHeld > 0.01).sort((a, b) => b.gstHeld - a.gstHeld)
+            if (rows.length === 0) {
+              return (
+                <div className="note" style={{ marginTop: 10 }}>
+                  No GST is being held by any client.
+                </div>
+              )
+            }
+            return (
+              <div className="table-scroll" style={{ marginTop: 10 }}>
+                <table className="data">
+                  <thead>
+                    <tr>
+                      <th>Client</th>
+                      <th style={{ textAlign: 'right' }}>GST held</th>
+                      <th style={{ textAlign: 'right' }}>Filed, proof not sent</th>
+                      <th style={{ textAlign: 'right' }}>Proof sent, awaiting release</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((r) => (
+                      <tr
+                        key={r.id}
+                        className={goTo ? 'row-link' : undefined}
+                        onClick={goTo ? () => goTo('invoices', { filter: { clientId: r.id, invoiceView: 'gst', focus: 'inv-ledger' } }) : undefined}
+                      >
+                        <td>{r.name}</td>
+                        <td className="amt">{fmt(r.gstHeld)}</td>
+                        <td className="amt">{r.gstProofToSend > 0.01 ? fmt(r.gstProofToSend) : '-'}</td>
+                        <td className="amt">{r.gstAwaitingRelease > 0.01 ? fmt(r.gstAwaitingRelease) : '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {viewAll('invoices', 'Open held GST in Invoices', { invoiceView: 'gst', focus: 'inv-ledger' })}
+              </div>
+            )
+          })()}
 
         {(expandedKpi === 'outstanding' || expandedKpi === 'retention') &&
           (() => {

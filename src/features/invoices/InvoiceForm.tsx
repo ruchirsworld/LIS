@@ -37,6 +37,7 @@ export function InvoiceForm({
   const [retentionPct, setRetentionPct] = useState('0')
   const [retentionReleaseDate, setRetentionReleaseDate] = useState('')
   const [hsnSac, setHsnSac] = useState('')
+  const [gstOnHold, setGstOnHold] = useState(false)
   const [description, setDescription] = useState('')
   const [dueDays, setDueDays] = useState('')
   const [status, setStatus] = useState<'draft' | 'sent'>('draft')
@@ -57,6 +58,7 @@ export function InvoiceForm({
     setRetentionPct(String(editingInvoice.retention_pct ?? 0))
     setRetentionReleaseDate(editingInvoice.retention_release_date ?? '')
     setHsnSac(editingInvoice.hsn_sac ?? '')
+    setGstOnHold(!!editingInvoice.gst_on_hold)
     setDescription(editingInvoice.description ?? '')
     setDueDays(editingInvoice.due_days != null ? String(editingInvoice.due_days) : '')
     setStatus(editingInvoice.status)
@@ -74,6 +76,7 @@ export function InvoiceForm({
     setRetentionPct('0')
     setRetentionReleaseDate('')
     setHsnSac('')
+    setGstOnHold(false)
     setDescription('')
     setDueDays('')
     setStatus('draft')
@@ -82,6 +85,7 @@ export function InvoiceForm({
 
   function handleClientChange(id: string) {
     setClientId(id)
+    if (!editingInvoice) setGstOnHold(!!clients?.find((c) => c.id === id)?.gst_on_proof)
     const proj = projects?.find((p) => p.id === projectId)
     if (id && proj?.client_id !== id) setProjectId('')
   }
@@ -89,7 +93,10 @@ export function InvoiceForm({
   function handleProjectChange(id: string) {
     setProjectId(id)
     const proj = projects?.find((p) => p.id === id)
-    if (proj) setClientId(proj.client_id)
+    if (proj) {
+      setClientId(proj.client_id)
+      if (!editingInvoice) setGstOnHold(!!clients?.find((c) => c.id === proj.client_id)?.gst_on_proof)
+    }
   }
 
   function handleStatusChange(next: 'draft' | 'sent') {
@@ -149,6 +156,7 @@ export function InvoiceForm({
         retention_pct: Number(retentionPct) || 0,
         retention_release_date: Number(retentionPct) > 0 ? retentionReleaseDate || null : null,
         hsn_sac: hsnSac.trim() || null,
+        gst_on_hold: gstOnHold,
         description: description.trim() || null,
         due_days: dueDays ? Number(dueDays) : null,
         status,
@@ -279,6 +287,15 @@ export function InvoiceForm({
               <input type="date" value={retentionReleaseDate} onChange={(e) => setRetentionReleaseDate(e.target.value)} />
             </div>
           )}
+        </div>
+
+        {/* The client releases the GST only after proof of deposit (GSTR-3B). */}
+        <div className="field full">
+          <label className="check-inline">
+            <input type="checkbox" checked={gstOnHold} onChange={(e) => setGstOnHold(e.target.checked)} />
+            Client releases the GST only after GSTR-3B proof
+          </label>
+          <div className="note">The GST then stays out of Due and "overdue" until the client releases it. You track the filing and the proof on the invoice.</div>
         </div>
 
         {/* Row 5: Status, Add invoice */}

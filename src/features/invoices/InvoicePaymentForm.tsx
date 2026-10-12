@@ -21,8 +21,8 @@ function todayStr() {
  * (InvoiceTable.tsx), which isn't a table row so doesn't want that wrapper. */
 function InvoicePaymentFields(
   props:
-    | { mode: 'create'; invoiceId: string; due: number; retentionRelease?: boolean; onClose: () => void }
-    | { mode: 'edit'; payment: InvoicePayment; hasRetention?: boolean; onClose: () => void }
+    | { mode: 'create'; invoiceId: string; due: number; retentionRelease?: boolean; gstOnHold?: boolean; gstRelease?: number; onClose: () => void }
+    | { mode: 'edit'; payment: InvoicePayment; hasRetention?: boolean; gstOnHold?: boolean; onClose: () => void }
 ) {
   const createPayment = useCreateInvoicePayment()
   const updatePayment = useUpdateInvoicePayment()
@@ -45,6 +45,11 @@ function InvoicePaymentFields(
   const [amount, setAmount] = useState(fmtPlain(initial ? initial.amount : props.mode === 'create' ? props.due : 0).replace(/,/g, ''))
   const [reference, setReference] = useState(initial?.reference ?? '')
   const [accountId, setAccountId] = useState(initial?.bank_account_id ?? CASH)
+  // For a client that releases GST only after proof of deposit: how much of this
+  // payment was that GST release (a lump sum can carry the taxable part and the GST).
+  const [gstPart, setGstPart] = useState(
+    props.mode === 'edit' ? String(props.payment.gst_component ?? 0) : String(props.gstRelease ?? 0)
+  )
   const [isRelease, setIsRelease] = useState(
     props.mode === 'edit' ? !!props.payment.is_retention_release : !!props.retentionRelease
   )
@@ -80,6 +85,7 @@ function InvoicePaymentFields(
         payment_mode: accountId === CASH ? 'Cash' : 'Bank',
         bank_account_id: accountId === CASH ? null : accountId,
         is_retention_release: isRelease,
+        gst_component: isRelease || !props.gstOnHold ? 0 : parseINR(gstPart),
       }
       if (props.mode === 'edit') {
         await updatePayment.mutateAsync({ id: props.payment.id, patch })
@@ -123,6 +129,12 @@ function InvoicePaymentFields(
         <label>Reference / receipt no.</label>
         <input type="text" value={reference} onChange={(e) => setReference(e.target.value)} />
       </div>
+      {props.gstOnHold && !isRelease && (
+        <div className="field">
+          <label>Of which GST released (₹)</label>
+          <CurrencyInput value={gstPart} onValueChange={setGstPart} />
+        </div>
+      )}
       {(props.mode === 'create' ? props.retentionRelease : props.hasRetention) && (
         <label className="check-inline">
           <input type="checkbox" checked={isRelease} onChange={(e) => setIsRelease(e.target.checked)} />
@@ -148,17 +160,30 @@ export function InvoicePaymentForm({
   invoiceId,
   due,
   retentionRelease,
+  gstOnHold,
+  gstRelease,
   onClose,
 }: {
   invoiceId: string
   due: number
   retentionRelease?: boolean
+  gstOnHold?: boolean
+  /** Opens the form as a GST release: the amount and the GST part both start at this figure. */
+  gstRelease?: number
   onClose: () => void
 }) {
   return (
     <tr className="pay-form-row">
       <td colSpan={15}>
-        <InvoicePaymentFields mode="create" invoiceId={invoiceId} due={due} retentionRelease={retentionRelease} onClose={onClose} />
+        <InvoicePaymentFields
+          mode="create"
+          invoiceId={invoiceId}
+          due={due}
+          retentionRelease={retentionRelease}
+          gstOnHold={gstOnHold}
+          gstRelease={gstRelease}
+          onClose={onClose}
+        />
       </td>
     </tr>
   )
@@ -167,11 +192,13 @@ export function InvoicePaymentForm({
 export function EditInvoicePaymentFields({
   payment,
   hasRetention,
+  gstOnHold,
   onClose,
 }: {
   payment: InvoicePayment
   hasRetention?: boolean
+  gstOnHold?: boolean
   onClose: () => void
 }) {
-  return <InvoicePaymentFields mode="edit" payment={payment} hasRetention={hasRetention} onClose={onClose} />
+  return <InvoicePaymentFields mode="edit" payment={payment} hasRetention={hasRetention} gstOnHold={gstOnHold} onClose={onClose} />
 }

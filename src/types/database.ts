@@ -319,6 +319,7 @@ export type Database = {
           display_id: string | null;
           email: string | null;
           gst: string | null;
+          gst_on_proof: boolean;
           id: string;
           name: string;
           pincode: string | null;
@@ -333,6 +334,7 @@ export type Database = {
           display_id?: string | null;
           email?: string | null;
           gst?: string | null;
+          gst_on_proof?: boolean;
           id?: string;
           name: string;
           pincode?: string | null;
@@ -347,6 +349,7 @@ export type Database = {
           display_id?: string | null;
           email?: string | null;
           gst?: string | null;
+          gst_on_proof?: boolean;
           id?: string;
           name?: string;
           pincode?: string | null;
@@ -921,6 +924,7 @@ export type Database = {
           invoice_id: string;
           payment_mode: string | null;
           is_retention_release: boolean;
+          gst_component: number;
           receipt_id: string | null;
           reference: string | null;
         };
@@ -935,6 +939,7 @@ export type Database = {
           invoice_id: string;
           payment_mode?: string | null;
           is_retention_release?: boolean;
+          gst_component?: number;
           receipt_id?: string | null;
           reference?: string | null;
         };
@@ -949,6 +954,7 @@ export type Database = {
           invoice_id?: string;
           payment_mode?: string | null;
           is_retention_release?: boolean;
+          gst_component?: number;
           receipt_id?: string | null;
           reference?: string | null;
         };
@@ -1015,6 +1021,10 @@ export type Database = {
           tds_pct: number;
           retention_pct: number;
           hsn_sac: string | null;
+          gst_on_hold: boolean;
+          gstr3b_period: string | null;
+          gstr3b_filed_on: string | null;
+          gstr3b_sent_on: string | null;
           description: string | null;
           retention_release_date: string | null;
         };
@@ -1035,6 +1045,10 @@ export type Database = {
           tds_pct?: number;
           retention_pct?: number;
           hsn_sac?: string | null;
+          gst_on_hold?: boolean;
+          gstr3b_period?: string | null;
+          gstr3b_filed_on?: string | null;
+          gstr3b_sent_on?: string | null;
           description?: string | null;
           retention_release_date?: string | null;
         };
@@ -1055,6 +1069,10 @@ export type Database = {
           tds_pct?: number;
           retention_pct?: number;
           hsn_sac?: string | null;
+          gst_on_hold?: boolean;
+          gstr3b_period?: string | null;
+          gstr3b_filed_on?: string | null;
+          gstr3b_sent_on?: string | null;
           description?: string | null;
           retention_release_date?: string | null;
         };

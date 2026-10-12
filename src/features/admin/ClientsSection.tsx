@@ -9,6 +9,7 @@ import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
 import { useClients } from '../../lib/queries/masters'
 import { useCreateClient, useUpdateClient, useDeleteClient } from '../../lib/queries/admin'
+import { useSetClientGstHold } from '../../lib/queries/books'
 import { getErrorMessage } from '../../lib/errors'
 
 export function ClientsSection() {
@@ -44,6 +45,7 @@ export function ClientsSection() {
   ]
   const createClient = useCreateClient()
   const updateClient = useUpdateClient()
+  const setHold = useSetClientGstHold()
   const deleteClient = useDeleteClient()
 
   const [formOpen, setFormOpen] = useState(false)
@@ -56,6 +58,8 @@ export function ClientsSection() {
   const [clientCode, setClientCode] = useState('')
   const [gst, setGst] = useState('')
   const [email, setEmail] = useState('')
+  const [gstOnProof, setGstOnProof] = useState(false)
+  const [applyToExisting, setApplyToExisting] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -69,6 +73,8 @@ export function ClientsSection() {
     setClientCode('')
     setGst('')
     setEmail('')
+    setGstOnProof(false)
+    setApplyToExisting(false)
   }
 
   function startEdit(c: NonNullable<typeof clients>[number]) {
@@ -82,6 +88,8 @@ export function ClientsSection() {
     setClientCode(c.client_code ?? '')
     setGst(c.gst ?? '')
     setEmail(c.email ?? '')
+    setGstOnProof(!!c.gst_on_proof)
+    setApplyToExisting(false)
     setFormError(null)
   }
 
@@ -103,9 +111,11 @@ export function ClientsSection() {
         client_code: clientCode.trim() || null,
         gst: gst.trim() || null,
         email: email.trim() || null,
+        gst_on_proof: gstOnProof,
       }
       if (editingId) {
         await updateClient.mutateAsync({ id: editingId, patch })
+        if (applyToExisting) await setHold.mutateAsync({ clientId: editingId, hold: gstOnProof })
       } else {
         await createClient.mutateAsync(patch)
       }
@@ -170,6 +180,22 @@ export function ClientsSection() {
         <div className="field">
           <label>Email</label>
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        </div>
+        <div className="field full">
+          <label className="check-inline">
+            <input type="checkbox" checked={gstOnProof} onChange={(e) => setGstOnProof(e.target.checked)} />
+            Releases GST only after we file GSTR-3B and send proof
+          </label>
+          <div className="note">
+            For clients that pay the taxable value first and the GST later: their GST stays out of Due and "overdue" until released. New invoices
+            for this client start on that footing.
+          </div>
+          {editingId && (
+            <label className="check-inline" style={{ marginTop: 6 }}>
+              <input type="checkbox" checked={applyToExisting} onChange={(e) => setApplyToExisting(e.target.checked)} />
+              Also {gstOnProof ? 'switch on' : 'switch off'} for this client's existing invoices
+            </label>
+          )}
         </div>
 
         <div className="field full" style={{ display: 'flex', gap: 8 }}>

@@ -27,6 +27,7 @@ import { BooksHealthReport } from './BooksHealthReport'
 import { JournalVouchersReport } from './JournalVouchersReport'
 import { GstTdsRegisterReport } from './GstTdsRegisterReport'
 import { PurchaseGstTdsRegisterReport } from './PurchaseGstTdsRegisterReport'
+import { GstReleaseStatementReport } from './GstReleaseStatementReport'
 import { SegregationOfDutiesReport } from './SegregationOfDutiesReport'
 import { reportPeriodToRange } from '../../lib/calc/reportPeriod'
 import type { DateRange, ReportPeriodType } from '../../lib/calc/reportPeriod'
@@ -96,6 +97,13 @@ const CATEGORIES: ReportCategory[] = [
         title: 'GST & TDS register',
         description: 'Invoice-wise taxable value, CGST / SGST / IGST and TDS deducted — for GSTR-1, GSTR-3B and Form 26AS.',
         Component: GstTdsRegisterReport,
+      },
+      {
+        id: 'gst-release-statement',
+        title: 'GST release statement',
+        description: 'For clients that release GST after GSTR-3B proof: GST charged, deposited, proof sent, released and pending, invoice by invoice.',
+        Component: GstReleaseStatementReport,
+        periodless: true,
       },
       {
         id: 'receipts',

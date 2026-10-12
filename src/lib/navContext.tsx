@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import type { ExpenseCostCenter, TabId } from './nav'
 import type { ReportPeriodType } from './calc/reportPeriod'
 
-export type InvoiceView = 'all' | 'due' | 'overdue' | 'draft' | 'retention'
+export type InvoiceView = 'all' | 'due' | 'overdue' | 'draft' | 'retention' | 'gst'
 
 /** What the destination page should show on arrival. Every field is optional;
  * a page only reads the ones it understands. */

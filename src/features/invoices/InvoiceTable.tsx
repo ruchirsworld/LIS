@@ -10,9 +10,10 @@ import { ReportExportButtons } from '../reports/ReportExportButtons'
 import { useInvoices, useInvoicePayments, useDeleteInvoice, useCycleInvoiceStatus, useMovePaymentExcess } from '../../lib/queries/invoices'
 import { useClients, useProjects } from '../../lib/queries/masters'
 import { fmt, fmtDate } from '../../lib/calc/format'
-import { gstAmt, tdsAmt, netPayable, retentionAmt, totalPaid, dueAmount, extraPaid, retentionHeld, isRetentionReleaseDue, effectiveDueDate, effectiveStatus } from '../../lib/calc/invoices'
+import { gstAmt, tdsAmt, netPayable, retentionAmt, totalPaid, dueAmount, extraPaid, retentionHeld, isRetentionReleaseDue, gstHeld as gstHeldOf, effectiveDueDate, effectiveStatus } from '../../lib/calc/invoices'
 import type { DateRange } from '../../lib/calc/period'
 import { InvoicePaymentForm, EditInvoicePaymentFields } from './InvoicePaymentForm'
+import { GstReleaseForm } from './GstReleaseForm'
 import { clientLabel, clientFullName } from '../../lib/labels'
 import { useAuth } from '../../lib/auth'
 import { useInvoiceNotes, useCompanyProfile, useDeleteInvoiceNote } from '../../lib/queries/books'
@@ -70,6 +71,9 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
   const [adjustError, setAdjustError] = useState<string | null>(null)
   const [payFormId, setPayFormId] = useState<string | null>(null)
   const [payFormRelease, setPayFormRelease] = useState(false)
+  // Opens the payment form as a GST release, pre-filled with this GST amount.
+  const [payFormGst, setPayFormGst] = useState(0)
+  const [gstFormId, setGstFormId] = useState<string | null>(null)
   const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null)
 
   const clientNameOf = (inv: Invoice) => clientLabel(clients?.find((c) => c.id === inv.client_id))
@@ -115,6 +119,7 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
           if (view === 'due') return inv.status === 'sent' && dueAmount(inv, invPayments) > 0.01
           if (view === 'overdue') return effectiveStatus(inv, invPayments) === 'overdue'
           if (view === 'draft') return inv.status === 'draft'
+          if (view === 'gst') return gstHeldOf(inv, invPayments) > 0
           return retentionHeld(inv, invPayments) > 0
         })
 
@@ -175,6 +180,7 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
               <option value="overdue">Overdue</option>
               <option value="draft">Drafts to send</option>
               <option value="retention">Retention held</option>
+              <option value="gst">GST held by client</option>
             </select>
           </div>
         </div>
@@ -245,6 +251,7 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
               const extra = extraPaid(inv, invPayments)
               const held = retentionHeld(inv, invPayments)
               const releaseDue = isRetentionReleaseDue(inv, invPayments)
+              const gstHeldAmt = gstHeldOf(inv, invPayments)
               const nextInvoice = extra > 0 ? nextOpenInvoiceFor(inv) : undefined
               const status = effectiveStatus(inv, invPayments)
               const dueDateDisplay = effectiveDueDate(inv)
@@ -299,6 +306,18 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
                       ) : (
                         fmt(due)
                       )}
+                      {inv.gst_on_hold && gstHeldAmt > 0 && (
+                        <div className="gst-held-note" title="The client releases this GST after GSTR-3B proof">
+                          GST held {fmt(gstHeldAmt)}
+                          <span>
+                            {!inv.gstr3b_filed_on
+                              ? ' - not filed yet'
+                              : !inv.gstr3b_sent_on
+                                ? ` - filed ${fmtDate(inv.gstr3b_filed_on)}, proof not sent`
+                                : ` - proof sent ${fmtDate(inv.gstr3b_sent_on)}`}
+                          </span>
+                        </div>
+                      )}
                     </td>
                     <td>
                       {canCycle ? (
@@ -317,12 +336,31 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
                     </td>
                     <td>
                       {due > 0 && (
-                        <button type="button" className="pay-btn" onClick={() => { setPayFormRelease(false); setPayFormId(inv.id) }}>
+                        <button type="button" className="pay-btn" onClick={() => { setPayFormRelease(false); setPayFormGst(0); setPayFormId(inv.id) }}>
                           Record payment
                         </button>
                       )}
+                      {gstHeldAmt > 0 && (
+                        <button
+                          type="button"
+                          className="pay-btn"
+                          title="The client has released the held GST"
+                          onClick={() => {
+                            setPayFormRelease(false)
+                            setPayFormGst(gstHeldAmt)
+                            setPayFormId(inv.id)
+                          }}
+                        >
+                          GST received
+                        </button>
+                      )}
+                      {inv.status === 'sent' && (inv.gst_on_hold || Number(inv.gst_pct) > 0) && (
+                        <button type="button" className="pay-btn" title="Track the GSTR-3B filing and proof for this invoice's GST" onClick={() => setGstFormId(gstFormId === inv.id ? null : inv.id)}>
+                          GST release
+                        </button>
+                      )}
                       {held > 0 && (
-                        <button type="button" className="pay-btn" onClick={() => { setPayFormRelease(true); setPayFormId(inv.id) }}>
+                        <button type="button" className="pay-btn" onClick={() => { setPayFormRelease(true); setPayFormGst(0); setPayFormId(inv.id) }}>
                           Release retention
                         </button>
                       )}
@@ -393,12 +431,13 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
                         <div className="pay-history">
                           {invPayments.map((p) =>
                             editingPaymentId === p.id ? (
-                              <EditInvoicePaymentFields key={p.id} payment={p} hasRetention={!!inv.retention_pct} onClose={() => setEditingPaymentId(null)} />
+                              <EditInvoicePaymentFields key={p.id} payment={p} hasRetention={!!inv.retention_pct} gstOnHold={!!inv.gst_on_hold} onClose={() => setEditingPaymentId(null)} />
                             ) : (
                               <div key={p.id}>
                                 {p.display_id} — {fmtDate(p.date)} — {fmt(p.amount)}
                                 {p.reference ? ` · ${p.reference}` : ''}
                                 {p.is_retention_release ? ' · retention release' : ''}
+                                {Number(p.gst_component) > 0 ? ` · incl. GST ${fmt(p.gst_component)}` : ''}
                                 {(() => {
                                   const parts = p.receipt_id ? (payments ?? []).filter((q) => q.receipt_id === p.receipt_id) : []
                                   return parts.length > 1
@@ -421,9 +460,15 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
                   {payFormId === inv.id && (
                     <InvoicePaymentForm
                       invoiceId={inv.id}
-                      due={payFormRelease ? held : due}
+                      due={payFormRelease ? held : payFormGst > 0 ? payFormGst : due}
                       retentionRelease={payFormRelease}
-                      onClose={() => setPayFormId(null)} />
+                      gstOnHold={!!inv.gst_on_hold}
+                      gstRelease={payFormGst > 0 ? payFormGst : undefined}
+                      onClose={() => setPayFormId(null)}
+                    />
+                  )}
+                  {gstFormId === inv.id && (
+                    <GstReleaseForm invoice={inv} onClose={() => setGstFormId(null)} />
                   )}
                 </Fragment>
               )

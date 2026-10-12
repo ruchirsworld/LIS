@@ -1340,6 +1340,16 @@ td.amt-retention {
 .dash-card-retention .dash-value {
   color: var(--blue);
 }
+.gst-held-note {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--amber);
+  margin-top: 2px;
+}
+.gst-held-note span {
+  font-weight: 400;
+  color: var(--ink-soft);
+}
 .retention-note {
   font-size: 11px;
   font-weight: 400;

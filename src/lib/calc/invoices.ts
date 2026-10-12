@@ -9,6 +9,8 @@ export interface InvoiceRow {
   tds_pct: number | null
   retention_pct?: number | null
   retention_release_date?: string | null
+  /** The client releases this invoice's GST only after proof of deposit (GSTR-3B). */
+  gst_on_hold?: boolean | null
   // Totals of the invoice's credit (−) and debit (+) notes, attached by useInvoices.
   adj_amount?: number | null
   adj_gst?: number | null
@@ -24,6 +26,8 @@ export interface InvoicePaymentRow {
   amount: number
   /** True for a payment recorded as the client releasing held retention. */
   is_retention_release?: boolean | null
+  /** How much of this payment was the client releasing GST (on a GST-held invoice). */
+  gst_component?: number | null
 }
 
 // Every tax figure is held to the paisa, exactly as it is posted to the
@@ -78,8 +82,23 @@ function regularPaid(payments: InvoicePaymentRow[]): number {
   return totalPaid(payments) - releasedPaid(payments)
 }
 
+// GST the client has released so far, for a client that holds it back until
+// proof of deposit; always 0 on an invoice that is not on that footing.
+export function gstReleased(inv: InvoiceRow, payments: InvoicePaymentRow[]): number {
+  if (!inv.gst_on_hold) return 0
+  return payments.filter((p) => !p.is_retention_release).reduce((s, p) => s + Number(p.gst_component || 0), 0)
+}
+
+// GST still held back: owed by the client, but not collectible (or overdue)
+// until they release it. Like retention it stays out of Due.
+export function gstHeld(inv: InvoiceRow, payments: InvoicePaymentRow[]): number {
+  if (!inv.gst_on_hold) return 0
+  const held = gstAmt(inv) - gstReleased(inv, payments)
+  return held > 0.01 ? held : 0
+}
+
 export function dueAmount(inv: InvoiceRow, payments: InvoicePaymentRow[]): number {
-  return Math.max(0, netPayable(inv) - retentionAmt(inv) - regularPaid(payments))
+  return Math.max(0, netPayable(inv) - retentionAmt(inv) - regularPaid(payments) - gstHeld(inv, payments))
 }
 
 // What the client has paid beyond what the invoice can take: ordinary
@@ -87,8 +106,16 @@ export function dueAmount(inv: InvoiceRow, payments: InvoicePaymentRow[]): numbe
 // retention-release payments past the retention. dueAmount floors at 0, so
 // this is where an excess shows up.
 export function extraPaid(inv: InvoiceRow, payments: InvoicePaymentRow[]): number {
-  const collectible = netPayable(inv) - retentionAmt(inv)
-  const extra = Math.max(0, regularPaid(payments) - collectible) + Math.max(0, releasedPaid(payments) - retentionAmt(inv))
+  // On a GST-held invoice the collectible part excludes the GST, which is
+  // measured separately against what the client has released.
+  const onHold = !!inv.gst_on_hold
+  const released = gstReleased(inv, payments)
+  const collectible = netPayable(inv) - retentionAmt(inv) - (onHold ? gstAmt(inv) : 0)
+  const paidThatSide = regularPaid(payments) - released
+  const extra =
+    Math.max(0, paidThatSide - collectible) +
+    (onHold ? Math.max(0, released - gstAmt(inv)) : 0) +
+    Math.max(0, releasedPaid(payments) - retentionAmt(inv))
   return extra > 0.01 ? extra : 0
 }
 
@@ -128,9 +155,10 @@ export type EffectiveStatus = 'paid' | 'overdue' | 'draft' | 'sent'
 
 export function effectiveStatus(inv: InvoiceRow, payments: InvoicePaymentRow[]): EffectiveStatus {
   const net = netPayable(inv)
-  // "Paid" means fully settled — the collectible part received and any
-  // retention released — not just the currently-collectible portion.
-  if (net > 0 && dueAmount(inv, payments) <= 0.01 && retentionHeld(inv, payments) <= 0) return 'paid'
+  // "Paid" means fully settled — the collectible part received, any
+  // retention released and any held GST released — not just the
+  // currently-collectible portion.
+  if (net > 0 && dueAmount(inv, payments) <= 0.01 && retentionHeld(inv, payments) <= 0 && gstHeld(inv, payments) <= 0) return 'paid'
   if (isPastDue(inv) && dueAmount(inv, payments) > 0.01) return 'overdue'
   return inv.status
 }

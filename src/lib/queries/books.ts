@@ -225,3 +225,21 @@ export function useRepostAllInvoices() {
     },
   })
 }
+
+/** Switches the "GST held until proof of deposit" status on or off for every
+ * invoice of one client — used when a client's terms are set or changed. */
+export function useSetClientGstHold() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ clientId, hold }: { clientId: string; hold: boolean }) => {
+      const { error } = await supabase.from('invoices').update({ gst_on_hold: hold }).eq('client_id', clientId)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['invoices'] })
+      qc.invalidateQueries({ queryKey: ['v_invoice_status'] })
+      qc.invalidateQueries({ queryKey: ['dashboard-kpis'] })
+      qc.invalidateQueries({ queryKey: ['books_health'] })
+    },
+  })
+}
