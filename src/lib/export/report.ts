@@ -24,13 +24,24 @@ export interface ExportSection {
   numericColumns?: number[]
   /** Decimal places for amounts in the PDF; 0 (whole rupees) unless set. */
   decimals?: number
+  /** Minimum PDF width in mm for chosen columns (index -> mm) — e.g. wide enough
+   * that a full date stays on one line. */
+  columnWidths?: Record<number, number>
   /** Indexes into `rows` set in bold — totals, closing balances. */
   boldRows?: number[]
 }
 
-// Same blue as the on-screen retention highlight (--blue-soft / --blue).
-const HIGHLIGHT_FILL: [number, number, number] = [227, 236, 246]
-const HIGHLIGHT_TEXT: [number, number, number] = [31, 78, 140]
+// The Laavin website's palette, kept to a minimum: green for the brand and
+// headings, charcoal for text, cream for table headers, hairlines for rules,
+// and a pale terracotta wash for rows that need the eye (retention still held).
+export type RGB = [number, number, number]
+export const GREEN: RGB = [36, 70, 58] // #24463A
+export const CHARCOAL: RGB = [42, 44, 41] // #2A2C29
+export const MUTED: RGB = [112, 108, 98]
+export const CREAM: RGB = [247, 242, 232] // #F7F2E8
+export const HAIRLINE: RGB = [226, 220, 206]
+const HIGHLIGHT_FILL: RGB = [243, 228, 220]
+const HIGHLIGHT_TEXT: RGB = [163, 93, 64] // #A35D40
 
 // DD-MM-YYYY, matching the date format used everywhere else user-facing in
 // this app (Excel uploads, on-screen dates via fmtDate).
@@ -91,9 +102,9 @@ export async function exportReportPdf(
 
   const pageWidth = doc.internal.pageSize.getWidth()
   const marginX = 14
-  const brandGreen: [number, number, number] = [47, 107, 64]
-  const ink = 20
-  const inkSoft = 110
+  const ink = CHARCOAL
+  const inkSoft = MUTED
+  const setText = (c: RGB) => doc.setTextColor(c[0], c[1], c[2])
 
   // The small square brand mark (not the wide wordmark logo used
   // elsewhere) — served from /public, so it's a plain root-relative fetch
@@ -117,7 +128,7 @@ export async function exportReportPdf(
   }
 
   doc.setFontSize(17)
-  doc.setTextColor(ink)
+  setText(GREEN)
   doc.text(reportTitle, marginX, 20)
 
   // Extra identifying detail for the party a ledger/statement is about
@@ -127,29 +138,32 @@ export async function exportReportPdf(
   if (headerNote) {
     y += 6
     doc.setFontSize(9.5)
-    doc.setTextColor(inkSoft)
+    setText(inkSoft)
     doc.text(headerNote, marginX, y)
   }
 
   y += 7
   doc.setFontSize(10)
-  doc.setTextColor(inkSoft)
+  setText(inkSoft)
   doc.text(periodLabel, marginX, y)
 
   const ruleY = Math.max(y + 5, 12 + logoSize + 4)
-  doc.setDrawColor(220)
-  doc.setLineWidth(0.3)
+  doc.setDrawColor(GREEN[0], GREEN[1], GREEN[2])
+  doc.setLineWidth(0.4)
   doc.line(marginX, ruleY, pageWidth - marginX, ruleY)
 
   let cursorY = ruleY + 8
   for (const section of sections) {
-    if (cursorY > 260) {
+    // Start a section on a fresh page when it would otherwise be split in two.
+    const pageHeight0 = doc.internal.pageSize.getHeight()
+    const estimated = 14 + (section.subtitle?.length ?? 0) * 4.5 + (section.rows.length + 1) * 8
+    if (cursorY > 260 || (cursorY > 50 && estimated < pageHeight0 - 50 && cursorY + estimated > pageHeight0 - 22)) {
       doc.addPage()
       cursorY = 20
     }
     if (sections.length > 1 || section.subtitle?.length) {
       doc.setFontSize(11)
-      doc.setTextColor(ink)
+      setText(GREEN)
       doc.setFont('NotoSans', 'bold')
       doc.text(section.title, marginX, cursorY)
       doc.setFont('NotoSans', 'normal')
@@ -157,12 +171,12 @@ export async function exportReportPdf(
     }
     if (section.subtitle?.length) {
       doc.setFontSize(9)
-      doc.setTextColor(inkSoft)
+      setText(inkSoft)
       for (const line of section.subtitle.slice(1)) {
         doc.text(line, marginX, cursorY)
         cursorY += 4.5
       }
-      doc.setTextColor(ink)
+      setText(ink)
       cursorY += 1.5
     }
 
@@ -177,7 +191,13 @@ export async function exportReportPdf(
       ? section.numericColumns.map((i) => keptIdx.indexOf(i)).filter((i) => i >= 0)
       : numericColumnIndexes(pdfRows)
     const money = (n: number) => (section.decimals ? fmt2(n, section.decimals) : fmt(n))
-    const columnStyles = Object.fromEntries(numericCols.map((i) => [i, { halign: 'right' as const }]))
+    const columnStyles: Record<number, { halign?: 'right'; cellWidth?: number }> = Object.fromEntries(
+      numericCols.map((i) => [i, { halign: 'right' as const }])
+    )
+    for (const [orig, mm] of Object.entries(section.columnWidths ?? {})) {
+      const pos = keptIdx.indexOf(Number(orig))
+      if (pos >= 0) columnStyles[pos] = { ...columnStyles[pos], cellWidth: mm }
+    }
 
     autoTable(doc, {
       startY: cursorY,
@@ -186,13 +206,17 @@ export async function exportReportPdf(
         pdfRows.length > 0
           ? pdfRows.map((r) => r.map((c) => (typeof c === 'number' ? money(c) : String(c))))
           : [['No data in this period']],
-      styles: { font: 'NotoSans', fontStyle: 'normal', fontSize: 9, textColor: ink, lineColor: 225, lineWidth: 0.1 },
-      headStyles: { font: 'NotoSans', fontStyle: 'bold', fillColor: brandGreen, textColor: 255, halign: 'left' },
-      alternateRowStyles: { fillColor: [246, 248, 246] },
+      // Minimal: no vertical lines or zebra stripes — a cream header with green
+      // text and a green rule under it, then hairlines between rows.
+      styles: { font: 'NotoSans', fontStyle: 'normal', fontSize: 9, textColor: ink, cellPadding: 2.2, lineColor: HAIRLINE, lineWidth: { bottom: 0.15 } },
+      headStyles: { font: 'NotoSans', fontStyle: 'bold', fillColor: CREAM, textColor: GREEN, halign: 'left', lineColor: GREEN, lineWidth: { bottom: 0.5 } },
       columnStyles,
       didParseCell: (data) => {
+        // The font has one weight, so totals are set apart with a cream wash.
         if (data.section === 'body' && section.boldRows?.includes(data.row.index)) {
           data.cell.styles.fontStyle = 'bold'
+          data.cell.styles.fillColor = CREAM
+          data.cell.styles.textColor = GREEN
         }
         if (data.section === 'body' && section.highlightRows?.includes(data.row.index)) {
           data.cell.styles.fillColor = HIGHLIGHT_FILL
@@ -201,7 +225,7 @@ export async function exportReportPdf(
         }
       },
       margin: { left: marginX, right: marginX },
-      theme: 'grid',
+      theme: 'plain',
     })
     cursorY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 12
   }
@@ -212,13 +236,13 @@ export async function exportReportPdf(
   const pageHeight = doc.internal.pageSize.getHeight()
   for (let p = 1; p <= pageCount; p++) {
     doc.setPage(p)
-    doc.setDrawColor(230)
+    doc.setDrawColor(HAIRLINE[0], HAIRLINE[1], HAIRLINE[2])
     doc.setLineWidth(0.2)
     doc.line(marginX, pageHeight - 14, pageWidth - marginX, pageHeight - 14)
     doc.setFont('NotoSans', 'normal')
     doc.setFontSize(8)
-    doc.setTextColor(inkSoft)
-    doc.text('Laavin InfraScapes — system-generated document', marginX, pageHeight - 9)
+    setText(inkSoft)
+    doc.text('Laavin InfraScapes  |  system-generated document', marginX, pageHeight - 9)
     doc.text(`Page ${p} of ${pageCount}`, pageWidth - marginX, pageHeight - 9, { align: 'right' })
   }
 
@@ -258,13 +282,14 @@ export async function exportReportExcel(
     const used = new Set<string>()
     for (const section of sections) {
       const ws = ewb.addWorksheet(sanitizeSheetName(section.sheetName ?? section.title, used))
-      ws.addRow([reportTitle]).font = { bold: true, size: 13 }
+      ws.addRow([reportTitle]).font = { bold: true, size: 13, color: { argb: 'FF24463A' } }
       if (headerNote) ws.addRow([headerNote])
       for (const line of section.subtitle ?? []) ws.addRow([line])
       ws.addRow([periodLabel])
       ws.addRow([])
       const headRow = ws.addRow(section.columns)
-      headRow.font = { bold: true }
+      headRow.font = { bold: true, color: { argb: 'FF24463A' } }
+      headRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF7F2E8' } }
       const numeric = new Set(section.numericColumns ?? [])
       section.rows.forEach((r, i) => {
         const row = ws.addRow(r)
@@ -275,8 +300,8 @@ export async function exportReportExcel(
         })
         if (section.boldRows?.includes(i)) row.font = { bold: true }
         if (section.highlightRows?.includes(i)) {
-          row.font = { bold: true, color: { argb: 'FF1F4E8C' } }
-          row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE3ECF6' } }
+          row.font = { bold: true, color: { argb: 'FFA35D40' } }
+          row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3E4DC' } }
         }
       })
       numeric.forEach((c) => {

@@ -71,11 +71,11 @@ export function stateNameOfCode(code: string | null | undefined): string {
   return code ? GST_STATES[code] ?? '' : ''
 }
 
-/** "27 — Maharashtra" for a GSTIN or state code, '' if unknown. */
+/** "27 - Maharashtra" for a GSTIN or state code, '' if unknown. */
 export function stateLabelOfGstin(v: string | null | undefined): string {
   const code = stateCodeOfGstin(v)
   const name = stateNameOfCode(code)
-  return name ? `${code} — ${name}` : ''
+  return name ? `${code} - ${name}` : ''
 }
 
 /** Indian financial year (April–March) a date falls in, e.g. "2025-26". */

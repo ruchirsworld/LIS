@@ -18,6 +18,7 @@ import { useAuth } from '../../lib/auth'
 import { useInvoiceNotes, useCompanyProfile, useDeleteInvoiceNote } from '../../lib/queries/books'
 import { buildLedgerSections, companyHeaderLine } from './ledgerExport'
 import { InvoiceNoteForm } from './InvoiceNoteForm'
+import { downloadTaxDocumentPdf } from '../../lib/export/taxInvoice'
 import { useNavFilter, type InvoiceView } from '../../lib/navContext'
 import type { Database } from '../../types/database'
 
@@ -45,6 +46,24 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
   const { data: notes } = useInvoiceNotes()
   const { data: company } = useCompanyProfile()
   const deleteNote = useDeleteInvoiceNote()
+  const [pdfError, setPdfError] = useState<string | null>(null)
+
+  // The tax invoice (or a credit / debit note) as a PDF for the client.
+  async function downloadDocument(inv: Invoice, note?: NonNullable<typeof notes>[number]) {
+    setPdfError(null)
+    try {
+      await downloadTaxDocumentPdf({
+        invoice: inv,
+        client: clients?.find((c) => c.id === inv.client_id),
+        company,
+        project: inv.project_id ? projects?.find((p) => p.id === inv.project_id) : null,
+        note,
+        dueDate: effectiveDueDate(inv),
+      })
+    } catch (err) {
+      setPdfError(err instanceof Error ? err.message : 'Could not create the PDF.')
+    }
+  }
   const [noteForm, setNoteForm] = useState<{ invoiceId: string; type: 'credit' | 'debit' } | null>(null)
   const cycleStatus = useCycleInvoiceStatus()
   const movePaymentExcess = useMovePaymentExcess()
@@ -172,6 +191,12 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
       {adjustError && (
         <div className="note" style={{ color: 'var(--red)' }}>
           {adjustError}
+        </div>
+      )}
+
+      {pdfError && (
+        <div className="note" style={{ color: 'var(--red)' }}>
+          {pdfError}
         </div>
       )}
 
@@ -314,6 +339,9 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
                       )}
                       {inv.status === 'sent' && (
                         <>
+                          <button type="button" className="pay-btn" title="Download the tax invoice as a PDF" onClick={() => downloadDocument(inv)}>
+                            Invoice PDF
+                          </button>
                           <button type="button" className="pay-btn" title="Reduce the invoice (GST credit note)" onClick={() => setNoteForm({ invoiceId: inv.id, type: 'credit' })}>
                             Credit note
                           </button>
@@ -343,6 +371,9 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
                               <div key={n.id}>
                                 {n.display_id} — {fmtDate(n.date)} — {n.note_type === 'credit' ? '−' : '+'}
                                 {fmt(Number(n.amount) + Number(n.gst_amount))} · {n.reason}{' '}
+                                <button type="button" className="btn link" onClick={() => downloadDocument(inv, n)}>
+                                  PDF
+                                </button>{' '}
                                 {isAdmin && (
                                   <button
                                     type="button"

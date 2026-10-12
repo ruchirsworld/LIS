@@ -17,34 +17,40 @@ export type Database = {
       company_profile: {
         Row: {
           address: string | null;
+          bank_details: string | null;
           books_locked_until: string | null;
           gstin: string | null;
           id: string;
           name: string | null;
           pan: string | null;
           state_code: string | null;
+          udyam_no: string | null;
           updated_at: string;
           updated_by: string | null;
         };
         Insert: {
           address?: string | null;
+          bank_details?: string | null;
           books_locked_until?: string | null;
           gstin?: string | null;
           id?: string;
           name?: string | null;
           pan?: string | null;
           state_code?: string | null;
+          udyam_no?: string | null;
           updated_at?: string;
           updated_by?: string | null;
         };
         Update: {
           address?: string | null;
+          bank_details?: string | null;
           books_locked_until?: string | null;
           gstin?: string | null;
           id?: string;
           name?: string | null;
           pan?: string | null;
           state_code?: string | null;
+          udyam_no?: string | null;
           updated_at?: string;
           updated_by?: string | null;
         };
@@ -1002,6 +1008,8 @@ export type Database = {
           status: Database["public"]["Enums"]["invoice_status"];
           tds_pct: number;
           retention_pct: number;
+          hsn_sac: string | null;
+          description: string | null;
           retention_release_date: string | null;
         };
         Insert: {
@@ -1020,6 +1028,8 @@ export type Database = {
           status?: Database["public"]["Enums"]["invoice_status"];
           tds_pct?: number;
           retention_pct?: number;
+          hsn_sac?: string | null;
+          description?: string | null;
           retention_release_date?: string | null;
         };
         Update: {
@@ -1038,6 +1048,8 @@ export type Database = {
           status?: Database["public"]["Enums"]["invoice_status"];
           tds_pct?: number;
           retention_pct?: number;
+          hsn_sac?: string | null;
+          description?: string | null;
           retention_release_date?: string | null;
         };
         Relationships: [
@@ -2232,6 +2244,10 @@ export type Database = {
           description: string | null;
           display_id: string | null;
           gst_pct: number;
+          tds_pct: number;
+          tds_section: string | null;
+          vendor_invoice_no: string | null;
+          vendor_invoice_date: string | null;
           id: string;
           other_cost: number | null;
           project_id: string | null;
@@ -2251,6 +2267,10 @@ export type Database = {
           description?: string | null;
           display_id?: string | null;
           gst_pct?: number;
+          tds_pct?: number;
+          tds_section?: string | null;
+          vendor_invoice_no?: string | null;
+          vendor_invoice_date?: string | null;
           id?: string;
           other_cost?: number | null;
           project_id?: string | null;
@@ -2270,6 +2290,10 @@ export type Database = {
           description?: string | null;
           display_id?: string | null;
           gst_pct?: number;
+          tds_pct?: number;
+          tds_section?: string | null;
+          vendor_invoice_no?: string | null;
+          vendor_invoice_date?: string | null;
           id?: string;
           other_cost?: number | null;
           project_id?: string | null;
@@ -2355,6 +2379,8 @@ export type Database = {
           created_by: string | null;
           display_id: string | null;
           gstpan: string | null;
+          gstin: string | null;
+          pan: string | null;
           id: string;
           is_one_time: boolean;
           name: string;
@@ -2368,6 +2394,8 @@ export type Database = {
           created_by?: string | null;
           display_id?: string | null;
           gstpan?: string | null;
+          gstin?: string | null;
+          pan?: string | null;
           id?: string;
           is_one_time?: boolean;
           name: string;
@@ -2381,6 +2409,8 @@ export type Database = {
           created_by?: string | null;
           display_id?: string | null;
           gstpan?: string | null;
+          gstin?: string | null;
+          pan?: string | null;
           id?: string;
           is_one_time?: boolean;
           name?: string;

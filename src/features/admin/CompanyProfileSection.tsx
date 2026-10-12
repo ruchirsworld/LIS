@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui'
 import { useAuth } from '../../lib/auth'
 import { useCompanyProfile, useRepostAllInvoices, useUpdateCompanyProfile } from '../../lib/queries/books'
-import { cleanGstin, isValidGstin, isValidPan, panOfGstin, stateLabelOfGstin } from '../../lib/gst'
+import { cleanGstin, isValidGstin, panOfGstin, stateLabelOfGstin } from '../../lib/gst'
 import { fmtDate } from '../../lib/calc/format'
 import { getErrorMessage } from '../../lib/errors'
 
@@ -19,7 +19,8 @@ export function CompanyProfileSection() {
 
   const [name, setName] = useState('')
   const [gstin, setGstin] = useState('')
-  const [pan, setPan] = useState('')
+  const [udyam, setUdyam] = useState('')
+  const [bank, setBank] = useState('')
   const [address, setAddress] = useState('')
   const [lockedUntil, setLockedUntil] = useState('')
   const [saving, setSaving] = useState(false)
@@ -30,7 +31,8 @@ export function CompanyProfileSection() {
     if (!company) return
     setName(company.name ?? '')
     setGstin(company.gstin ?? '')
-    setPan(company.pan ?? '')
+    setUdyam(company.udyam_no ?? '')
+    setBank(company.bank_details ?? '')
     setAddress(company.address ?? '')
     setLockedUntil(company.books_locked_until ?? '')
   }, [company])
@@ -41,17 +43,8 @@ export function CompanyProfileSection() {
     setError(null)
     setSaved(false)
     const g = cleanGstin(gstin)
-    const p = pan.trim().toUpperCase() || panOfGstin(g)
     if (g && !isValidGstin(g)) {
       setError('That GSTIN is not valid — it should be 15 characters, like 27ABCDE1234F1Z5.')
-      return
-    }
-    if (p && !isValidPan(p)) {
-      setError('That PAN is not valid — it should be 10 characters, like ABCDE1234F.')
-      return
-    }
-    if (g && p && panOfGstin(g) !== p) {
-      setError('The PAN does not match the one inside the GSTIN.')
       return
     }
     setSaving(true)
@@ -61,7 +54,10 @@ export function CompanyProfileSection() {
         patch: {
           name: name.trim() || null,
           gstin: g || null,
-          pan: p || null,
+          // Kept for the books (it is the PAN inside the GSTIN) but never shown or printed.
+          pan: panOfGstin(g) || null,
+          udyam_no: udyam.trim() || null,
+          bank_details: bank.trim() || null,
           address: address.trim() || null,
           state_code: g ? g.slice(0, 2) : null,
           // Only an Admin can move the lock.
@@ -120,18 +116,16 @@ export function CompanyProfileSection() {
           <div className="note">{stateLabel ? `State: ${stateLabel}` : 'The first two digits give your state.'}</div>
         </div>
         <div className="field">
-          <label>PAN</label>
-          <input
-            type="text"
-            maxLength={10}
-            placeholder={panOfGstin(gstin) || 'ABCDE1234F'}
-            value={pan}
-            onChange={(e) => setPan(e.target.value.toUpperCase())}
-          />
+          <label>Udyam registration no.</label>
+          <input type="text" placeholder="UDYAM-XX-00-0000000" value={udyam} onChange={(e) => setUdyam(e.target.value.toUpperCase())} />
         </div>
         <div className="field full">
           <label>Address</label>
           <textarea rows={2} value={address} onChange={(e) => setAddress(e.target.value)} />
+        </div>
+        <div className="field full">
+          <label>Bank details (printed on invoices)</label>
+          <textarea rows={2} placeholder="Bank name, branch, account no., IFSC" value={bank} onChange={(e) => setBank(e.target.value)} />
         </div>
         <div className="field">
           <label>Books locked up to</label>

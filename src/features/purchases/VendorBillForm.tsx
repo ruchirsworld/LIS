@@ -14,7 +14,7 @@ import { useClients, useProjects, useVendors, useExpenseSubHeads } from '../../l
 import { useProfiles } from '../../lib/queries/admin'
 import { useCreateVendorBill, useUpdateVendorBill, useCreateVendorBillPayment } from '../../lib/queries/purchases'
 import { fmt, fmtDate, parseINR } from '../../lib/calc/format'
-import { billTotal } from '../../lib/calc/vendorBills'
+import { billTotal, billTdsAmt } from '../../lib/calc/vendorBills'
 import { compressImage } from '../../lib/compressImage'
 import { uploadReceiptToDrive } from '../../lib/storage'
 import { getErrorMessage } from '../../lib/errors'
@@ -25,6 +25,21 @@ import { useVendorCategoryFilter, VendorCategoryPills } from './VendorCategoryFi
 import type { Database } from '../../types/database'
 
 type VendorBill = Database['public']['Tables']['vendor_bills']['Row']
+
+// Common TDS the firm deducts on payments to vendors — picking one fills the
+// rate, which can still be changed.
+const TDS_SECTIONS: { value: string; section: string; pct: number; label: string }[] = [
+  { value: '', section: '', pct: 0, label: 'No TDS' },
+  { value: '194C-1', section: '194C', pct: 1, label: '194C Contractor - individual / HUF (1%)' },
+  { value: '194C-2', section: '194C', pct: 2, label: '194C Contractor - company / firm (2%)' },
+  { value: '194J-2', section: '194J', pct: 2, label: '194J Technical services (2%)' },
+  { value: '194J-10', section: '194J', pct: 10, label: '194J Professional fees (10%)' },
+  { value: '194I-2', section: '194I', pct: 2, label: '194I Rent - machinery (2%)' },
+  { value: '194I-10', section: '194I', pct: 10, label: '194I Rent - land / building (10%)' },
+  { value: '194H-5', section: '194H', pct: 5, label: '194H Commission (5%)' },
+  { value: '194Q-01', section: '194Q', pct: 0.1, label: '194Q Purchase of goods (0.1%)' },
+  { value: 'other', section: 'Other', pct: 0, label: 'Other section' },
+]
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
 }
@@ -84,6 +99,10 @@ export function VendorBillForm({
   const [amount, setAmount] = useState('0')
   const [gstPct, setGstPct] = useState('0')
   const [otherCost, setOtherCost] = useState('0')
+  const [tdsKey, setTdsKey] = useState('')
+  const [tdsPct, setTdsPct] = useState('0')
+  const [vendorInvoiceNo, setVendorInvoiceNo] = useState('')
+  const [vendorInvoiceDate, setVendorInvoiceDate] = useState('')
   const [receiptBlob, setReceiptBlob] = useState<Blob | null>(null)
   const [receiptStatus, setReceiptStatus] = useState('Take photo')
   const [submitting, setSubmitting] = useState(false)
@@ -152,6 +171,13 @@ export function VendorBillForm({
     setAmount(String(editingBill.amount))
     setGstPct(String(editingBill.gst_pct ?? 0))
     setOtherCost(editingBill.other_cost != null ? String(editingBill.other_cost) : '0')
+    setTdsPct(String(editingBill.tds_pct ?? 0))
+    setTdsKey(
+      TDS_SECTIONS.find((t) => t.section === editingBill.tds_section && t.pct === Number(editingBill.tds_pct ?? 0))?.value ??
+        (editingBill.tds_section ? 'other' : '')
+    )
+    setVendorInvoiceNo(editingBill.vendor_invoice_no ?? '')
+    setVendorInvoiceDate(editingBill.vendor_invoice_date ?? '')
     setReceiptBlob(null)
     setReceiptStatus(editingBill.receipt_path ? 'Photo attached' : 'Take photo')
     setFormError(null)
@@ -171,6 +197,10 @@ export function VendorBillForm({
     setAmount('0')
     setGstPct('0')
     setOtherCost('0')
+    setTdsKey('')
+    setTdsPct('0')
+    setVendorInvoiceNo('')
+    setVendorInvoiceDate('')
     setReceiptBlob(null)
     setReceiptStatus('Take photo')
   }
@@ -280,6 +310,10 @@ export function VendorBillForm({
         qty: null,
         rate: null,
         other_cost: isSupervisor ? 0 : parseINR(otherCost) || 0,
+        tds_pct: isSupervisor ? 0 : Number(tdsPct) || 0,
+        tds_section: isSupervisor || !tdsKey ? null : TDS_SECTIONS.find((t) => t.value === tdsKey)?.section ?? null,
+        vendor_invoice_no: vendorInvoiceNo.trim() || null,
+        vendor_invoice_date: vendorInvoiceDate || null,
       }
 
       if (editingBill) {
@@ -421,6 +455,55 @@ export function VendorBillForm({
           </div>
         )}
 
+        {/* Row 5b: the supplier's own invoice (needed to claim input GST) and TDS deducted */}
+        {!isSupervisor && (
+          <>
+            <div className="field-row">
+              <div className="field">
+                <label>Supplier's invoice no.</label>
+                <input type="text" value={vendorInvoiceNo} onChange={(e) => setVendorInvoiceNo(e.target.value)} />
+              </div>
+              <div className="field field-narrow">
+                <label>Supplier's invoice date</label>
+                <input type="date" value={vendorInvoiceDate} onChange={(e) => setVendorInvoiceDate(e.target.value)} />
+              </div>
+            </div>
+            <div className="field-row">
+              <div className="field">
+                <label>TDS deducted</label>
+                <select
+                  value={tdsKey}
+                  onChange={(e) => {
+                    const t = TDS_SECTIONS.find((x) => x.value === e.target.value)
+                    setTdsKey(e.target.value)
+                    if (t && t.value !== 'other') setTdsPct(String(t.pct))
+                  }}
+                >
+                  {TDS_SECTIONS.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field field-narrow">
+                <label>TDS %</label>
+                <input type="number" min="0" max="100" step="0.01" value={tdsPct} onChange={(e) => setTdsPct(e.target.value)} />
+              </div>
+            </div>
+            {selectedVendor && Number(gstPct) > 0 && !selectedVendor.gstin && (
+              <div className="note" style={{ color: 'var(--red)' }}>
+                This vendor has no GSTIN on file, so the GST on this bill cannot be claimed as input credit. Add the GSTIN under Settings, Vendors.
+              </div>
+            )}
+            {selectedVendor && Number(tdsPct) > 0 && !selectedVendor.pan && (
+              <div className="note" style={{ color: 'var(--red)' }}>
+                This vendor has no PAN on file. TDS without a PAN is deducted at a higher rate (Section 206AA).
+              </div>
+            )}
+          </>
+        )}
+
         {/* Row 6: Other cost + Remarks (Remarks becomes mandatory once Other cost has a value) — Other cost doesn't apply to Supervisor */}
         <div className="field-row">
           {!isSupervisor && (
@@ -443,6 +526,16 @@ export function VendorBillForm({
 
         {/* Row 7: Total + Add bill */}
         <div className="field-row vb-row5">
+          {!isSupervisor && Number(tdsPct) > 0 && (
+            <div className="field vb-total">
+              <label>TDS to deduct (₹)</label>
+              <input
+                type="text"
+                readOnly
+                value={fmt(billTdsAmt({ amount: parseINR(amount), gst_pct: 0, other_cost: parseINR(otherCost), tds_pct: Number(tdsPct) || 0 }))}
+              />
+            </div>
+          )}
           <div className="field vb-total">
             <label>Total value (₹)</label>
             <input

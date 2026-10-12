@@ -28,12 +28,22 @@ const CLIENT_ACCOUNTS = new Set(['1030', '1035', '2060'])
 const TEMPLATES: { label: string; narration: string; lines: Line[] }[] = [
   {
     label: 'Pay GST / set off input credit',
-    narration: 'GST for the month — input credit set off and balance paid',
+    narration: 'GST for the month - input credit set off and balance paid',
     lines: [
       { ...BLANK, account: '2031' },
       { ...BLANK, account: '2032' },
       { ...BLANK, account: '2033' },
-      { ...BLANK, account: '1050' },
+      { ...BLANK, account: '1051' },
+      { ...BLANK, account: '1052' },
+      { ...BLANK, account: '1053' },
+      { ...BLANK, account: '1020' },
+    ],
+  },
+  {
+    label: 'Pay TDS deducted to the government',
+    narration: 'TDS deducted from vendors, paid by challan',
+    lines: [
+      { ...BLANK, account: '2070' },
       { ...BLANK, account: '1020' },
     ],
   },

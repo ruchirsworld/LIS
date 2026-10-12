@@ -26,6 +26,7 @@ import { AuditLogReport } from './AuditLogReport'
 import { BooksHealthReport } from './BooksHealthReport'
 import { JournalVouchersReport } from './JournalVouchersReport'
 import { GstTdsRegisterReport } from './GstTdsRegisterReport'
+import { PurchaseGstTdsRegisterReport } from './PurchaseGstTdsRegisterReport'
 import { SegregationOfDutiesReport } from './SegregationOfDutiesReport'
 import { reportPeriodToRange } from '../../lib/calc/reportPeriod'
 import type { DateRange, ReportPeriodType } from '../../lib/calc/reportPeriod'
@@ -113,6 +114,12 @@ const CATEGORIES: ReportCategory[] = [
         title: 'Vendor report',
         description: 'Purchases, payments and outstanding due, by vendor.',
         Component: VendorReport,
+      },
+      {
+        id: 'purchase-gst-tds-register',
+        title: 'Purchase GST & TDS register',
+        description: 'Bill-wise taxable value, input GST by CGST / SGST / IGST and TDS deducted with vendor PAN - for input credit and Form 26Q.',
+        Component: PurchaseGstTdsRegisterReport,
       },
       {
         id: 'vendor-ledger',

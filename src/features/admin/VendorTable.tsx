@@ -27,7 +27,7 @@ export function VendorTable({ onEdit }: { onEdit: (vendor: Vendor) => void }) {
     category: (v) => v.category,
     contact: (v) => v.contact_person,
     phone: (v) => v.phone,
-    gstpan: (v) => v.gstpan,
+    gstin: (v) => v.gstin ?? v.gstpan,
     address: (v) => v.address,
   })
   const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedVendors)
@@ -35,14 +35,15 @@ export function VendorTable({ onEdit }: { onEdit: (vendor: Vendor) => void }) {
   const exportSections: ExportSection[] = [
     {
       title: 'Vendors',
-      columns: ['ID', 'Vendor', 'Category', 'Contact person', 'Phone', 'GST/PAN', 'Address'],
+      columns: ['ID', 'Vendor', 'Category', 'Contact person', 'Phone', 'GSTIN', 'PAN', 'Address'],
       rows: (sortedVendors ?? []).map((v) => [
         v.display_id ?? '',
         v.name,
         v.category ?? '',
         v.contact_person ?? '',
         v.phone ?? '',
-        v.gstpan ?? '',
+        v.gstin ?? v.gstpan ?? '',
+        v.pan ?? '',
         v.address ?? '',
       ]),
     },
@@ -66,7 +67,8 @@ export function VendorTable({ onEdit }: { onEdit: (vendor: Vendor) => void }) {
             <SortableTh label="Category" sortKey="category" activeKey={sortKey} direction={direction} onSort={toggleSort} />
             <SortableTh label="Contact person" sortKey="contact" activeKey={sortKey} direction={direction} onSort={toggleSort} />
             <SortableTh label="Phone" sortKey="phone" activeKey={sortKey} direction={direction} onSort={toggleSort} />
-            <SortableTh label="GST/PAN" sortKey="gstpan" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+            <SortableTh label="GSTIN" sortKey="gstin" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+            <th>PAN</th>
             <SortableTh label="Address" sortKey="address" activeKey={sortKey} direction={direction} onSort={toggleSort} />
             <th></th>
           </tr>
@@ -74,14 +76,14 @@ export function VendorTable({ onEdit }: { onEdit: (vendor: Vendor) => void }) {
         <tbody>
           {isLoading && (
             <tr>
-              <td colSpan={8} className="empty-row">
+              <td colSpan={9} className="empty-row">
                 Loading…
               </td>
             </tr>
           )}
           {!isLoading && (!sortedVendors || sortedVendors.length === 0) && (
             <tr>
-              <td colSpan={8} className="empty-row">
+              <td colSpan={9} className="empty-row">
                 No vendors yet
               </td>
             </tr>
@@ -93,7 +95,8 @@ export function VendorTable({ onEdit }: { onEdit: (vendor: Vendor) => void }) {
               <td>{v.category ?? '—'}</td>
               <td>{v.contact_person ?? '—'}</td>
               <td>{v.phone ?? '—'}</td>
-              <td>{v.gstpan ?? '—'}</td>
+              <td>{v.gstin ?? v.gstpan ?? '—'}</td>
+              <td>{v.pan ?? '—'}</td>
               <td>{v.address ?? '—'}</td>
               <td>
                 {canManage && (

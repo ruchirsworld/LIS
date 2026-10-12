@@ -1,6 +1,6 @@
 import { fmtDate } from '../../lib/calc/format'
 import { netPayable, retentionAmt, retentionHeld, round2 } from '../../lib/calc/invoices'
-import { financialYearOf, panOfGstin, stateLabelOfGstin } from '../../lib/gst'
+import { financialYearOf, stateLabelOfGstin } from '../../lib/gst'
 import { clientFullName, clientLabel } from '../../lib/labels'
 import type { DateRange } from '../../lib/calc/period'
 import type { ExportSection } from '../../lib/export/report'
@@ -13,7 +13,7 @@ type Client = Database['public']['Tables']['clients']['Row']
 type Project = Database['public']['Tables']['projects']['Row']
 type Company = Database['public']['Tables']['company_profile']['Row']
 
-/** ₹ with paise, Indian digit grouping — a ledger has to foot to the paisa. */
+/** ₹ with paise, Indian digit grouping - a ledger has to foot to the paisa. */
 export function fmtMoney2(n: number): string {
   const sign = n < 0 ? '-' : ''
   return sign + '₹' + Math.abs(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -41,7 +41,7 @@ function addressLine(c: Client): string {
 /** The header line printed above every ledger download: the business's own identity. */
 export function companyHeaderLine(company: Company | null | undefined): string | undefined {
   if (!company) return undefined
-  const parts = [company.name, company.gstin ? `GSTIN ${company.gstin}` : '', company.pan ? `PAN ${company.pan}` : ''].filter(Boolean)
+  const parts = [company.name, company.gstin ? `GSTIN ${company.gstin}` : '', company.udyam_no ? `Udyam ${company.udyam_no}` : ''].filter(Boolean)
   return parts.length ? parts.join('   |   ') : undefined
 }
 
@@ -57,12 +57,12 @@ interface Entry {
 
 /**
  * Builds one ledger account per client in the usual Indian party-ledger
- * layout — party name, address, GSTIN/PAN and the period at the top; opening
+ * layout - party name, address, GSTIN and the period at the top; opening
  * balance; each voucher with its type and number; period totals; closing
  * balance. Invoices go in at their full value including GST, with the TDS
  * deducted as its own credit line, so GST and TDS can be read off the ledger
  * and matched to returns and Form 26AS. Credit and debit notes appear as their
- * own vouchers. Retention is deliberately not part of this ledger — it has its
+ * own vouchers. Retention is deliberately not part of this ledger - it has its
  * own section (a sheet in Excel) right after.
  */
 export function buildLedgerSections(args: {
@@ -102,7 +102,7 @@ export function buildLedgerSections(args: {
         date: inv.invoice_date as string,
         order: 0,
         type: 'Sales',
-        particulars: `To Sales — Invoice ${invNo(inv)}${projectName ? ` (${projectName})` : ''} — ${taxNote}`,
+        particulars: `To Sales - Invoice ${invNo(inv)}${projectName ? ` (${projectName})` : ''} - ${taxNote}`,
         vch: invNo(inv),
         debit: round2(inv.amount + gst),
         credit: 0,
@@ -112,7 +112,7 @@ export function buildLedgerSections(args: {
           date: inv.invoice_date as string,
           order: 1,
           type: 'Sales',
-          particulars: `By TDS receivable @${inv.tds_pct}% — Invoice ${invNo(inv)}`,
+          particulars: `By TDS receivable @${inv.tds_pct}% - Invoice ${invNo(inv)}`,
           vch: invNo(inv),
           debit: 0,
           credit: tds,
@@ -137,7 +137,7 @@ export function buildLedgerSections(args: {
           date: p.date,
           order: 2,
           type: 'Receipt',
-          particulars: `By ${mode} — Payment received${p.reference ? ` (${p.reference})` : ''}, split across ${group.length} invoices`,
+          particulars: `By ${mode} - Payment received${p.reference ? ` (${p.reference})` : ''}, split across ${group.length} invoices`,
           vch: `${ids[0]} – ${ids[ids.length - 1]}`,
           debit: 0,
           credit: round2(group.reduce((sum, g) => sum + Number(g.amount || 0), 0)),
@@ -150,7 +150,7 @@ export function buildLedgerSections(args: {
         date: p.date,
         order: 2,
         type: 'Receipt',
-        particulars: `By ${mode} — ${advance ? 'Advance' : 'Payment'} received${against ? ` against ${invNo(against)}` : ''}${p.reference ? ` (${p.reference})` : ''}`,
+        particulars: `By ${mode} - ${advance ? 'Advance' : 'Payment'} received${against ? ` against ${invNo(against)}` : ''}${p.reference ? ` (${p.reference})` : ''}`,
         vch: p.display_id ?? '',
         debit: 0,
         credit: round2(Number(p.amount || 0)),
@@ -165,7 +165,7 @@ export function buildLedgerSections(args: {
         date: n.date,
         order: 3,
         type: isCredit ? 'Credit Note' : 'Debit Note',
-        particulars: `${isCredit ? 'By' : 'To'} ${isCredit ? 'Credit' : 'Debit'} note ${n.display_id ?? ''} against ${inv ? invNo(inv) : 'invoice'} — ${n.reason}`,
+        particulars: `${isCredit ? 'By' : 'To'} ${isCredit ? 'Credit' : 'Debit'} note ${n.display_id ?? ''} against ${inv ? invNo(inv) : 'invoice'} - ${n.reason}`,
         vch: n.display_id ?? '',
         debit: isCredit ? 0 : gross,
         credit: isCredit ? gross : 0,
@@ -208,14 +208,13 @@ export function buildLedgerSections(args: {
     const closingRow = rows.length
     rows.push(['', 'Closing balance', '', '', '', '', fmtBalance(running)])
 
-    const pan = panOfGstin(client.gst)
     const subtitle = [
       clientFullName(client),
       addressLine(client),
-      [client.gst ? `GSTIN: ${client.gst}` : 'GSTIN: not registered / not provided', pan ? `PAN: ${pan}` : '', stateLabelOfGstin(client.gst) ? `State: ${stateLabelOfGstin(client.gst)}` : '']
+      [client.gst ? `GSTIN: ${client.gst}` : 'GSTIN: not registered / not provided', stateLabelOfGstin(client.gst) ? `State: ${stateLabelOfGstin(client.gst)}` : '']
         .filter(Boolean)
         .join('   |   '),
-      `Ledger account — ${periodLabel(range)}`,
+      `Ledger account - ${periodLabel(range)}`,
     ].filter(Boolean)
 
     sections.push({
@@ -226,13 +225,15 @@ export function buildLedgerSections(args: {
       rows,
       numericColumns: [4, 5, 6],
       decimals: 2,
+      // Wide enough that a full date (23 Apr 2026) never wraps onto a second line.
+      columnWidths: { 0: 25, 2: 21, 4: 27, 5: 27, 6: 34 },
       boldRows: [totalRow, closingRow],
       // Voucher numbers stay in the Excel file but are left off the PDF.
       pdfHiddenColumns: [3],
     })
 
-    // The retention workings sit apart from the ledger — the next section in
-    // the PDF, the next sheet in Excel: per invoice, net payable × retention %
+    // The retention workings sit apart from the ledger - the next section in
+    // the PDF, the next sheet in Excel: per invoice, net payable x retention %
     // = retention, how much has been released and what is still held.
     const retentionInvoices = clientInvoices
       .filter((inv) => inv.retention_pct)
@@ -246,9 +247,9 @@ export function buildLedgerSections(args: {
       })
       const sum = (pick: (l: (typeof lines)[number]) => number) => round2(lines.reduce((s, l) => s + pick(l), 0))
       sections.push({
-        title: `${clientFullName(client)} — Retention calculation`,
+        title: `${clientFullName(client)} - Retention calculation`,
         sheetName: `${clientLabel(client)} - Retention`,
-        columns: ['Invoice', 'Invoice date', 'Net payable', 'Retention %', 'Retention (net × %)', 'Released', 'Still held', 'Release date'],
+        columns: ['Invoice', 'Invoice date', 'Net payable', 'Retention %', 'Retention (net x %)', 'Released', 'Still held', 'Release date'],
         rows: [
           ...lines.map((l) => [
             invNo(l.inv),
@@ -258,12 +259,13 @@ export function buildLedgerSections(args: {
             l.retention,
             l.released,
             l.held,
-            l.inv.retention_release_date ? fmtDate(l.inv.retention_release_date) : '—',
+            l.inv.retention_release_date ? fmtDate(l.inv.retention_release_date) : '-',
           ]),
           ['Total', '', sum((l) => netPayable(l.inv)), '', sum((l) => l.retention), sum((l) => l.released), sum((l) => l.held), ''],
         ],
         numericColumns: [2, 4, 5, 6],
         decimals: 2,
+        columnWidths: { 1: 25 },
         boldRows: [lines.length],
         highlightRows: [...lines.flatMap((l, i) => (l.held > 0 ? [i] : [])), ...(sum((l) => l.held) > 0 ? [lines.length] : [])],
       })

@@ -13,7 +13,7 @@ import type { ExportSection } from '../../lib/export/report'
 import { useVendorBills, useVendorBillPayments, useDeleteVendorBill } from '../../lib/queries/purchases'
 import { useVendors, useProjects, useClients, useExpenseSubHeads } from '../../lib/queries/masters'
 import { fmt, fmtDate } from '../../lib/calc/format'
-import { billGstAmt, billTotal, billPaid, billDue, billDueRaw } from '../../lib/calc/vendorBills'
+import { billGstAmt, billTdsAmt, billTotal, billPaid, billDue, billDueRaw } from '../../lib/calc/vendorBills'
 import type { DateRange } from '../../lib/calc/period'
 import { VendorBillPaymentForm } from './VendorBillPaymentForm'
 import { ReceiptLink } from '../../components/ReceiptLink'
@@ -99,6 +99,7 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
       date: (b) => b.date,
       amount: (b) => b.amount,
       gst: (b) => billGstAmt(b),
+      tds: (b) => billTdsAmt(b),
       total: (b) => billTotal(b),
       paid: (b) => paidOf(b),
       due: (b) => dueOf(b),
@@ -110,7 +111,7 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
   const exportSections: ExportSection[] = [
     {
       title: 'Bill records',
-      columns: ['Ref ID', 'Vendor', 'Description', 'Sub-head', 'Remarks', 'Client', 'Project', 'Date', 'Qty', 'Rate', 'Other cost', 'Amount', 'GST', 'Total', 'Paid', 'Due'],
+      columns: ['Ref ID', 'Vendor', 'Description', 'Sub-head', 'Remarks', 'Client', 'Project', 'Date', 'Qty', 'Rate', 'Other cost', 'Amount', 'GST', 'TDS', 'Total', 'Paid', 'Due'],
       rows: (sortedBills ?? []).map((b) => [
         b.display_id ?? '',
         vendorNameOf(b),
@@ -125,6 +126,7 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
         b.other_cost ?? '',
         b.amount,
         billGstAmt(b),
+        billTdsAmt(b),
         billTotal(b),
         paidOf(b),
         dueOf(b),
@@ -199,6 +201,7 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
               <th style={{ textAlign: 'right' }}>Other cost</th>
               <SortableTh label="Amount" sortKey="amount" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
               <SortableTh label="GST" sortKey="gst" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+              <SortableTh label="TDS" sortKey="tds" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
               <SortableTh label="Total" sortKey="total" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
               <SortableTh label="Paid" sortKey="paid" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
               <SortableTh label="Due" sortKey="due" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
@@ -210,14 +213,14 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={19} className="empty-row">
+                <td colSpan={20} className="empty-row">
                   Loading…
                 </td>
               </tr>
             )}
             {!isLoading && (!sortedBills || sortedBills.length === 0) && (
               <tr>
-                <td colSpan={19} className="empty-row">
+                <td colSpan={20} className="empty-row">
                   No vendor bills in this period
                 </td>
               </tr>
@@ -250,6 +253,7 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
                     <td className="amt">{b.other_cost ? fmt(b.other_cost) : '—'}</td>
                     <td className="amt">{fmt(b.amount)}</td>
                     <td className="amt">{fmt(billGstAmt(b))}</td>
+                    <td className="amt">{billTdsAmt(b) > 0 ? fmt(billTdsAmt(b)) : '—'}</td>
                     <td className="amt">{fmt(billTotal(b))}</td>
                     <td className="amt">{fmt(paid)}</td>
                     <td className="amt">{fmt(rawDue)}</td>
@@ -298,7 +302,7 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
                       billId={b.id}
                       due={due}
                       editingPayment={editingPayment}
-                      colSpan={19}
+                      colSpan={20}
                       onClose={closePayForm}
                     />
                   )}

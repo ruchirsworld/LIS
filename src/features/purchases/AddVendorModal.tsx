@@ -3,6 +3,7 @@ import { Button } from '../../components/ui'
 import { Modal } from '../../components/Modal'
 import { useCreateVendorFull } from '../../lib/queries/admin'
 import { getErrorMessage } from '../../lib/errors'
+import { cleanGstin, isValidGstin, isValidPan, panOfGstin } from '../../lib/gst'
 import type { Database } from '../../types/database'
 
 type Vendor = Database['public']['Tables']['vendors']['Row']
@@ -30,7 +31,8 @@ export function AddVendorModal({
   const [newCategoryName, setNewCategoryName] = useState('')
   const [contactPerson, setContactPerson] = useState('')
   const [phone, setPhone] = useState('')
-  const [gstpan, setGstpan] = useState('')
+  const [gstin, setGstin] = useState('')
+  const [pan, setPan] = useState('')
   const [address, setAddress] = useState('')
   const [isOneTime, setIsOneTime] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -47,6 +49,16 @@ export function AddVendorModal({
       setFormError('Enter a name for the new category.')
       return
     }
+    const g = cleanGstin(gstin)
+    const p = pan.trim().toUpperCase() || panOfGstin(g)
+    if (g && !isValidGstin(g)) {
+      setFormError('That GSTIN is not valid — it should be 15 characters, like 07ABCDE1234F1Z5.')
+      return
+    }
+    if (p && !isValidPan(p)) {
+      setFormError('That PAN is not valid — it should be 10 characters, like ABCDE1234F.')
+      return
+    }
     setSubmitting(true)
     try {
       const finalCategory = category === NEW_CATEGORY ? newCategoryName.trim() : category
@@ -55,7 +67,8 @@ export function AddVendorModal({
         category: finalCategory || null,
         contact_person: contactPerson.trim() || null,
         phone: phone.trim() || null,
-        gstpan: gstpan.trim() || null,
+        gstin: g || null,
+        pan: p || null,
         address: address.trim() || null,
         is_one_time: isOneTime,
       })
@@ -101,8 +114,12 @@ export function AddVendorModal({
           <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} />
         </div>
         <div className="field">
-          <label>GST/PAN</label>
-          <input type="text" value={gstpan} onChange={(e) => setGstpan(e.target.value)} />
+          <label>GSTIN</label>
+          <input type="text" maxLength={15} placeholder="Leave blank if unregistered" value={gstin} onChange={(e) => setGstin(e.target.value.toUpperCase())} />
+        </div>
+        <div className="field">
+          <label>PAN (needed for TDS)</label>
+          <input type="text" maxLength={10} placeholder={panOfGstin(gstin) || 'ABCDE1234F'} value={pan} onChange={(e) => setPan(e.target.value.toUpperCase())} />
         </div>
         <div className="field full">
           <label>Address</label>

@@ -36,6 +36,8 @@ export function InvoiceForm({
   const [tdsPct, setTdsPct] = useState('0')
   const [retentionPct, setRetentionPct] = useState('0')
   const [retentionReleaseDate, setRetentionReleaseDate] = useState('')
+  const [hsnSac, setHsnSac] = useState('')
+  const [description, setDescription] = useState('')
   const [dueDays, setDueDays] = useState('')
   const [status, setStatus] = useState<'draft' | 'sent'>('draft')
   const [invoiceDate, setInvoiceDate] = useState('')
@@ -54,6 +56,8 @@ export function InvoiceForm({
     setTdsPct(String(editingInvoice.tds_pct ?? 0))
     setRetentionPct(String(editingInvoice.retention_pct ?? 0))
     setRetentionReleaseDate(editingInvoice.retention_release_date ?? '')
+    setHsnSac(editingInvoice.hsn_sac ?? '')
+    setDescription(editingInvoice.description ?? '')
     setDueDays(editingInvoice.due_days != null ? String(editingInvoice.due_days) : '')
     setStatus(editingInvoice.status)
     setInvoiceDate(editingInvoice.invoice_date ?? '')
@@ -69,6 +73,8 @@ export function InvoiceForm({
     setTdsPct('0')
     setRetentionPct('0')
     setRetentionReleaseDate('')
+    setHsnSac('')
+    setDescription('')
     setDueDays('')
     setStatus('draft')
     setInvoiceDate('')
@@ -127,6 +133,10 @@ export function InvoiceForm({
         return
       }
     }
+    if (hsnSac.trim() && !/^\d{4}(\d{2}(\d{2})?)?$/.test(hsnSac.trim())) {
+      setFormError('The HSN / SAC code is 4, 6 or 8 digits (for construction and landscaping services it starts with 99).')
+      return
+    }
     setSubmitting(true)
     try {
       const patch = {
@@ -138,6 +148,8 @@ export function InvoiceForm({
         tds_pct: Number(tdsPct) || 0,
         retention_pct: Number(retentionPct) || 0,
         retention_release_date: Number(retentionPct) > 0 ? retentionReleaseDate || null : null,
+        hsn_sac: hsnSac.trim() || null,
+        description: description.trim() || null,
         due_days: dueDays ? Number(dueDays) : null,
         status,
         invoice_date: status === 'sent' ? invoiceDate || todayStr() : null,
@@ -201,6 +213,18 @@ export function InvoiceForm({
             ) : (
               <input type="text" value="— (not sent yet)" disabled />
             )}
+          </div>
+        </div>
+
+        {/* Row 2b: what the invoice is for — printed on the tax invoice */}
+        <div className="field-row">
+          <div className="field field-narrow">
+            <label>HSN / SAC code</label>
+            <input type="text" inputMode="numeric" maxLength={8} placeholder="e.g. 995419" value={hsnSac} onChange={(e) => setHsnSac(e.target.value.replace(/\D/g, ''))} />
+          </div>
+          <div className="field">
+            <label>Description of services</label>
+            <input type="text" placeholder="e.g. Horticulture and landscaping work, RA bill no. 1" value={description} onChange={(e) => setDescription(e.target.value)} />
           </div>
         </div>
 

@@ -3,6 +3,7 @@ import { Button } from '../../components/ui'
 import { useCreateVendorFull, useUpdateVendor } from '../../lib/queries/admin'
 import { useAuth } from '../../lib/auth'
 import { getErrorMessage } from '../../lib/errors'
+import { cleanGstin, isValidGstin, isValidPan, panOfGstin } from '../../lib/gst'
 import type { Database } from '../../types/database'
 
 type Vendor = Database['public']['Tables']['vendors']['Row']
@@ -33,7 +34,8 @@ export function VendorForm({
   )
   const [contactPerson, setContactPerson] = useState(editingVendor?.contact_person ?? '')
   const [phone, setPhone] = useState(editingVendor?.phone ?? '')
-  const [gstpan, setGstpan] = useState(editingVendor?.gstpan ?? '')
+  const [gstin, setGstin] = useState(editingVendor?.gstin ?? '')
+  const [pan, setPan] = useState(editingVendor?.pan ?? '')
   const [address, setAddress] = useState(editingVendor?.address ?? '')
   const [isOneTime, setIsOneTime] = useState(editingVendor?.is_one_time ?? false)
   const [submitting, setSubmitting] = useState(false)
@@ -45,7 +47,8 @@ export function VendorForm({
     setNewCategoryName('')
     setContactPerson('')
     setPhone('')
-    setGstpan('')
+    setGstin('')
+    setPan('')
     setAddress('')
   }
 
@@ -60,6 +63,16 @@ export function VendorForm({
       setFormError('Enter a name for the new category.')
       return
     }
+    const g = cleanGstin(gstin)
+    const p = pan.trim().toUpperCase() || panOfGstin(g)
+    if (g && !isValidGstin(g)) {
+      setFormError('That GSTIN is not valid — it should be 15 characters, like 07ABCDE1234F1Z5.')
+      return
+    }
+    if (p && !isValidPan(p)) {
+      setFormError('That PAN is not valid — it should be 10 characters, like ABCDE1234F.')
+      return
+    }
     setSubmitting(true)
     try {
       const finalCategory = category === NEW_CATEGORY ? newCategoryName.trim() : category
@@ -68,7 +81,8 @@ export function VendorForm({
         category: finalCategory || null,
         contact_person: contactPerson.trim() || null,
         phone: phone.trim() || null,
-        gstpan: gstpan.trim() || null,
+        gstin: g || null,
+        pan: p || null,
         address: address.trim() || null,
       }
       if (editingVendor) {
@@ -125,8 +139,12 @@ export function VendorForm({
           <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} />
         </div>
         <div className="field">
-          <label>GST/PAN</label>
-          <input type="text" value={gstpan} onChange={(e) => setGstpan(e.target.value)} />
+          <label>GSTIN</label>
+          <input type="text" maxLength={15} placeholder="Leave blank if unregistered" value={gstin} onChange={(e) => setGstin(e.target.value.toUpperCase())} />
+        </div>
+        <div className="field">
+          <label>PAN (needed for TDS)</label>
+          <input type="text" maxLength={10} placeholder={panOfGstin(gstin) || 'ABCDE1234F'} value={pan} onChange={(e) => setPan(e.target.value.toUpperCase())} />
         </div>
         <div className="field full">
           <label>Address</label>
