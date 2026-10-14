@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
 import { Button } from '../../components/ui'
 import { fmt2, fmtDate } from '../../lib/calc/format'
-import { matchStatement, type LedgerCandidate, type StatementMatch } from '../../lib/calc/bankMatch'
+import { matchStatement, type ForcedPair, type LedgerCandidate, type StatementMatch } from '../../lib/calc/bankMatch'
 import {
   closingBalance,
   detectMapping,
@@ -14,6 +14,7 @@ import { getErrorMessage } from '../../lib/errors'
 import { toast } from '../../lib/feedback'
 import type { BankLineRow } from '../../lib/queries/books'
 import { ReportExportButtons } from './ReportExportButtons'
+import { BankSplitView } from './BankSplitView'
 import type { ExportSection } from '../../lib/export/report'
 
 const FIELDS: { key: keyof ColumnMapping; label: string }[] = [
@@ -61,11 +62,14 @@ export function BankStatementMatcher({
   const [mapping, setMapping] = useState<ColumnMapping | null>(null)
   const [days, setDays] = useState(7)
   const [picked, setPicked] = useState<Set<string>>(new Set())
+  const [view, setView] = useState<'lists' | 'split'>('lists')
+  // Pairings the user chose by hand (a statement line and the book entry it really is).
+  const [forced, setForced] = useState<ForcedPair[]>([])
 
   const headers = useMemo(() => (rows && headerRow >= 0 ? rows[headerRow].map((c) => String(c ?? '').trim()) : []), [rows, headerRow])
   const lines = useMemo(() => (rows && mapping ? extractLines(rows, headerRow, mapping) : []), [rows, headerRow, mapping])
   const candidates = useMemo<LedgerCandidate[]>(() => ledger.map((l) => ({ ...l, cleared: clearedIds.has(l.id) })), [ledger, clearedIds])
-  const result = useMemo(() => matchStatement(lines, candidates, { days }), [lines, candidates, days])
+  const result = useMemo(() => matchStatement(lines, candidates, { days, forced }), [lines, candidates, days, forced])
   const statementOnlyNet = Math.round(result.statementOnly.reduce((s, l) => s + l.deposit - l.withdrawal, 0) * 100) / 100
 
   // Start with the safe matches ticked; ones that are far apart in date, or could be another entry, are left for a look.
@@ -108,6 +112,7 @@ export function BankStatementMatcher({
       setHeaderRow(at)
       setMapping(map)
       setFileName(file.name)
+      setForced([])
       if (read.length === 0) {
         setReadError('The table was found but no transaction lines could be read. Check the columns below.')
         return
@@ -218,6 +223,42 @@ export function BankStatementMatcher({
               </div>
               <ReportExportButtons title="Bank statement matching" sections={sections} range={null} fileNamePrefix={`Statement_Matching_${bankName}`} />
 
+              <div role="group" aria-label="How to show the results" style={{ display: 'flex', gap: 8, margin: '12px 0' }}>
+                <Button type="button" variant={view === 'lists' ? 'primary' : 'secondary'} onClick={() => setView('lists')} aria-pressed={view === 'lists'}>
+                  Lists
+                </Button>
+                <Button type="button" variant={view === 'split' ? 'primary' : 'secondary'} onClick={() => setView('split')} aria-pressed={view === 'split'}>
+                  Side by side
+                </Button>
+              </div>
+
+              {view === 'split' ? (
+                <>
+                  <BankSplitView
+                    lines={lines}
+                    ledger={candidates}
+                    result={result}
+                    days={days}
+                    picked={picked}
+                    onPick={(id, on) => {
+                      const next = new Set(picked)
+                      if (on) next.add(id)
+                      else next.delete(id)
+                      setPicked(next)
+                    }}
+                    onForce={(statementRow, ledgerId) =>
+                      setForced((cur) => [...cur.filter((f) => f.statementRow !== statementRow && f.ledgerId !== ledgerId), { statementRow, ledgerId }])
+                    }
+                    onUnforce={(statementRow) => setForced((cur) => cur.filter((f) => f.statementRow !== statementRow))}
+                  />
+                  <div style={{ marginTop: 10 }}>
+                    <Button type="button" onClick={() => void tickPicked()} disabled={picked.size === 0 || ticking}>
+                      Tick {picked.size} selected
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
               <h4 style={{ margin: '14px 0 6px', fontSize: 13 }}>Ready to tick ({result.toTick.length})</h4>
               {result.toTick.length === 0 ? (
                 <div className="note">Nothing new to tick.</div>
@@ -309,6 +350,8 @@ export function BankStatementMatcher({
                 head={['Date', 'Entry', 'Amount']}
                 rows={result.booksOnly.map((l) => [fmtDate(l.date), l.description, `${l.deposit > 0 ? '+' : '-'}${fmt2(amountOf(l))}`])}
               />
+                </>
+              )}
             </>
           )}
         </>

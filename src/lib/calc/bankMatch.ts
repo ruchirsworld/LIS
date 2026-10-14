@@ -20,6 +20,14 @@ export interface StatementMatch {
   confidence: 'exact' | 'close' | 'loose'
   /** Another line could equally have been the partner (same amount, same gap). */
   ambiguous: boolean
+  /** Paired by the user, not by the matcher. */
+  forced?: boolean
+}
+
+/** A pairing chosen by hand: this statement line is that ledger line. */
+export interface ForcedPair {
+  statementRow: number
+  ledgerId: string
 }
 
 export interface MatchResult {
@@ -37,7 +45,11 @@ const DAY = 86400000
 const dayNumber = (isoDate: string) => Math.round(Date.UTC(+isoDate.slice(0, 4), +isoDate.slice(5, 7) - 1, +isoDate.slice(8, 10)) / DAY)
 const cents = (n: number) => Math.round(n * 100)
 
-export function matchStatement(lines: StatementLine[], ledger: LedgerCandidate[], opts: { days?: number } = {}): MatchResult {
+export function matchStatement(
+  lines: StatementLine[],
+  ledger: LedgerCandidate[],
+  opts: { days?: number; forced?: ForcedPair[] } = {}
+): MatchResult {
   const days = opts.days ?? 7
   const usedStatement = new Set<number>()
   const usedLedger = new Set<string>()
@@ -45,6 +57,19 @@ export function matchStatement(lines: StatementLine[], ledger: LedgerCandidate[]
 
   const sideOf = (l: { deposit: number; withdrawal: number }) => (l.deposit > 0 ? 'in' : 'out')
   const amountOf = (l: { deposit: number; withdrawal: number }) => cents(l.deposit > 0 ? l.deposit : l.withdrawal)
+
+  // Pairings chosen by hand come first, so the matcher works around them.
+  for (const f of opts.forced ?? []) {
+    const st = lines.find((x) => x.row === f.statementRow)
+    const lg = ledger.find((x) => x.id === f.ledgerId)
+    if (!st || !lg || usedStatement.has(st.row) || usedLedger.has(lg.id)) continue
+    if (sideOf(st) !== sideOf(lg) || amountOf(st) !== amountOf(lg)) continue
+    usedStatement.add(st.row)
+    usedLedger.add(lg.id)
+    const gap = Math.abs(dayNumber(st.date) - dayNumber(lg.date))
+    const match: StatementMatch = { statement: st, ledger: lg, dayGap: gap, confidence: gap === 0 ? 'exact' : gap <= 3 ? 'close' : 'loose', ambiguous: false, forced: true }
+    ;(lg.cleared ? result.alreadyTicked : result.toTick).push(match)
+  }
 
   for (const pass of ['new', 'ticked'] as const) {
     const pool = ledger.filter((l) => (pass === 'new' ? !l.cleared : l.cleared) && !usedLedger.has(l.id))

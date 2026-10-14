@@ -78,4 +78,23 @@ describe('matching a bank statement to the books', () => {
     expect(r.toTick).toHaveLength(0)
     expect(r.booksOnly).toHaveLength(0)
   })
+
+  it('honours a pairing chosen by hand and works around it', () => {
+    // Two 10,000 payments on the statement, one 10,000 entry in the books. The matcher
+    // would pick row 1; the user says it is row 2.
+    const stmt = [s(1, '2026-10-08', 0, 10000, 'NEFT Moin'), s(2, '2026-10-08', 0, 10000, 'NEFT Laavin')]
+    const books = [l('trf', '2026-10-08', 0, 10000)]
+    const auto = matchStatement(stmt, books)
+    expect(auto.toTick[0].statement.row).toBe(1)
+    const hand = matchStatement(stmt, books, { forced: [{ statementRow: 2, ledgerId: 'trf' }] })
+    expect(hand.toTick).toHaveLength(1)
+    expect(hand.toTick[0].statement.row).toBe(2)
+    expect(hand.toTick[0].forced).toBe(true)
+    expect(hand.statementOnly.map((x) => x.row)).toEqual([1])
+  })
+
+  it('ignores a hand pairing whose amounts or sides differ', () => {
+    const r = matchStatement([s(1, '2026-10-08', 0, 10000)], [l('x', '2026-10-08', 0, 9000)], { forced: [{ statementRow: 1, ledgerId: 'x' }] })
+    expect(r.toTick).toHaveLength(0)
+  })
 })
