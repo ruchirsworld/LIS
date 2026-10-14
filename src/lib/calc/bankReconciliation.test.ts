@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { summariseReconciliation, type BankLine } from './bankReconciliation'
+import { bookBalanceAsOf, signoffStatus, summariseReconciliation, type BankLine } from './bankReconciliation'
 
 const lines: BankLine[] = [
   { id: 'a', date: '2026-10-01', description: 'Capital', deposit: 500000, withdrawal: 0 },
@@ -28,5 +28,30 @@ describe('bank reconciliation', () => {
     expect(s.bookBalance).toBe(560000)
     expect(s.unclearedWithdrawals).toBe(0)
     expect(s.difference).toBe(0)
+  })
+})
+
+describe('saved reconciliations', () => {
+  it('works out the books balance on a date', () => {
+    expect(bookBalanceAsOf(lines, '2026-10-05')).toBe(600000)
+    expect(bookBalanceAsOf(lines, '2026-10-31')).toBe(550000)
+    expect(bookBalanceAsOf(lines, '2026-09-30')).toBe(0)
+  })
+
+  it('stays up to date while the books for that date are unchanged', () => {
+    const r = signoffStatus({ statement_date: '2026-10-31', book_balance: 550000 }, lines)
+    expect(r.upToDate).toBe(true)
+  })
+
+  it('goes stale when an entry dated within the period is added or changed afterwards', () => {
+    const changed: BankLine[] = [...lines, { id: 'e', date: '2026-10-20', description: 'Late entry', deposit: 0, withdrawal: 500 }]
+    const r = signoffStatus({ statement_date: '2026-10-31', book_balance: 550000 }, changed)
+    expect(r.upToDate).toBe(false)
+    expect(r.bookBalanceNow).toBe(549500)
+  })
+
+  it('is not affected by entries dated after the sign-off date', () => {
+    const later: BankLine[] = [...lines, { id: 'f', date: '2026-11-15', description: 'Next month', deposit: 1000, withdrawal: 0 }]
+    expect(signoffStatus({ statement_date: '2026-10-31', book_balance: 550000 }, later).upToDate).toBe(true)
   })
 })

@@ -11,11 +11,15 @@ import { useGoTo } from '../../lib/navContext'
 import type { StatementLine } from '../../lib/import/bankStatement'
 import { useBankAccounts, useClients, useExpenseSubHeads, useProjects, useVendors } from '../../lib/queries/masters'
 import { useCreateTransfer } from '../../lib/queries/transfers'
+import { useProfiles } from '../../lib/queries/admin'
+import { useCreateCapitalTx } from '../../lib/queries/capital'
+import { useCreateLoan, useCreateLoanPayment, useLoanPayments, useLoans } from '../../lib/queries/loans'
+import { loanOutstanding } from '../../lib/calc/loans'
 import { useCreateExpense } from '../../lib/queries/expenses'
 import { useCreateVendorBillPayment, useVendorBillPayments, useVendorBills } from '../../lib/queries/purchases'
 import { useCreateInvoicePayment, useInvoicePayments, useInvoices } from '../../lib/queries/invoices'
 
-type Kind = 'transfer' | 'expense' | 'vendor' | 'receipt'
+type Kind = 'transfer' | 'expense' | 'vendor' | 'receipt' | 'capital' | 'loan' | 'loanpay'
 
 const CASH = 'cash'
 const KIND_LABEL: Record<Kind, string> = {
@@ -23,6 +27,9 @@ const KIND_LABEL: Record<Kind, string> = {
   expense: 'Expense (bank charges, site cost ...)',
   vendor: 'Payment to a vendor',
   receipt: 'Receipt from a client',
+  capital: 'Capital (money a partner puts in or takes out)',
+  loan: 'A new loan received',
+  loanpay: 'Repayment of a loan',
 }
 
 /** A form opened from a bank statement line that is not in the books yet. The date, amount, account and
@@ -42,7 +49,7 @@ export function RecordFromStatement({
   const goTo = useGoTo()
   const incoming = line.deposit > 0
   const amount = incoming ? line.deposit : line.withdrawal
-  const kinds: Kind[] = incoming ? ['transfer', 'receipt'] : ['transfer', 'expense', 'vendor']
+  const kinds: Kind[] = incoming ? ['transfer', 'receipt', 'capital', 'loan'] : ['transfer', 'expense', 'vendor', 'capital', 'loanpay']
 
   const { data: banks } = useBankAccounts()
   const { data: clients } = useClients()
@@ -58,6 +65,12 @@ export function RecordFromStatement({
   const createExpense = useCreateExpense()
   const createVendorPayment = useCreateVendorBillPayment()
   const createReceipt = useCreateInvoicePayment()
+  const createCapital = useCreateCapitalTx()
+  const createLoan = useCreateLoan()
+  const createLoanPayment = useCreateLoanPayment()
+  const { data: profiles } = useProfiles()
+  const { data: loans } = useLoans(null)
+  const { data: loanPayments } = useLoanPayments()
 
   const [kind, setKind] = useState<Kind>(kinds[0])
   const [date, setDate] = useState(line.date)
@@ -74,10 +87,26 @@ export function RecordFromStatement({
   const [clientId, setClientId] = useState('')
   const [invoiceId, setInvoiceId] = useState('')
   const [isRelease, setIsRelease] = useState(false)
+  const [partnerId, setPartnerId] = useState('')
+  const [loanType, setLoanType] = useState<'private' | 'bank'>('bank')
+  const [lender, setLender] = useState('')
+  const [roiPct, setRoiPct] = useState('')
+  const [loanId, setLoanId] = useState('')
+  const [interestPart, setInterestPart] = useState('0')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const otherAccounts = [{ id: CASH, name: 'Cash' }, ...(banks ?? []).filter((b) => b.id !== bankAccountId)]
+
+  // Partners are Admin and CXO only; a supervisor is an employee with no stake in capital.
+  const partners = (profiles ?? []).filter((p) => p.role === 'admin' || p.role === 'cxo')
+  const openLoans = useMemo(
+    () =>
+      (loans ?? [])
+        .map((l) => ({ loan: l, outstanding: loanOutstanding(l, (loanPayments ?? []).filter((p) => p.loan_id === l.id)) }))
+        .filter((x) => x.outstanding > 0.01),
+    [loans, loanPayments]
+  )
 
   const openBills = useMemo(
     () =>
@@ -113,6 +142,45 @@ export function RecordFromStatement({
           amount,
           date,
           notes: notes.trim() || null,
+        })
+      } else if (kind === 'capital') {
+        if (!partnerId) throw new Error('Pick the partner.')
+        await createCapital.mutateAsync({
+          partner_id: partnerId,
+          type: incoming ? 'injection' : 'withdrawal',
+          amount,
+          date,
+          notes: notes.trim() || null,
+          payment_mode: 'Bank',
+          bank_account_id: bankAccountId,
+        })
+      } else if (kind === 'loan') {
+        if (!lender.trim()) throw new Error('Write who the loan is from.')
+        await createLoan.mutateAsync({
+          loan_type: loanType,
+          lender: lender.trim(),
+          principal: amount,
+          roi_pct: Number(roiPct) || 0,
+          date_taken: date,
+          notes: notes.trim() || null,
+          payment_mode: 'Bank',
+          bank_account_id: bankAccountId,
+        })
+      } else if (kind === 'loanpay') {
+        if (!loanId) throw new Error('Pick the loan.')
+        const interest = Math.max(0, Number(interestPart) || 0)
+        if (interest > amount) throw new Error('The interest part cannot be more than the amount on the statement.')
+        const principal = round2(amount - interest)
+        const chosen = openLoans.find((x) => x.loan.id === loanId)
+        if (chosen && principal > chosen.outstanding + 0.01) throw new Error(`The principal part (${fmt2(principal)}) is more than what is still owed on this loan (${fmt2(chosen.outstanding)}). Put the extra in the interest part.`)
+        await createLoanPayment.mutateAsync({
+          loan_id: loanId,
+          date,
+          principal_paid: principal,
+          interest_paid: round2(interest),
+          reference: reference.trim() || null,
+          payment_mode: 'Bank',
+          bank_account_id: bankAccountId,
         })
       } else if (kind === 'expense') {
         if (!subHeadId) throw new Error('Pick the type of cost.')
@@ -295,6 +363,82 @@ export function RecordFromStatement({
         </>
       )}
 
+      {kind === 'capital' && (
+        <>
+          <div className="field">
+            <label>Partner</label>
+            <SearchableSelect items={partners} value={partnerId} onChange={setPartnerId} getId={(p) => p.id} getLabel={(p) => p.name} placeholder="— Select partner —" />
+          </div>
+          <div className="note">
+            {incoming ? 'This is recorded as money the partner put into the business.' : 'This is recorded as money the partner took out of the business.'} It does not change profit.
+          </div>
+        </>
+      )}
+
+      {kind === 'loan' && (
+        <>
+          <div className="field">
+            <label htmlFor="rfs-loan-type">Type of loan</label>
+            <select id="rfs-loan-type" value={loanType} onChange={(e) => setLoanType(e.target.value as 'private' | 'bank')}>
+              <option value="bank">Bank loan</option>
+              <option value="private">Private loan</option>
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="rfs-lender">Lender (who gave the money)</label>
+            <input id="rfs-lender" value={lender} onChange={(e) => setLender(e.target.value)} />
+          </div>
+          <div className="field">
+            <label htmlFor="rfs-roi">Interest rate per year, in percent (optional)</label>
+            <input id="rfs-roi" inputMode="decimal" value={roiPct} onChange={(e) => setRoiPct(e.target.value)} />
+          </div>
+          <div className="note">The whole amount on the statement is recorded as the loan taken. Borrowed money is not income.</div>
+        </>
+      )}
+
+      {kind === 'loanpay' && (
+        <>
+          {openLoans.length === 0 ? (
+            <div className="note">
+              There is no loan with money still owed. Record the loan first on the Loans page.{' '}
+              {goTo && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    goTo('loans')
+                    onClose()
+                  }}
+                >
+                  Open Loans
+                </Button>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="field">
+                <label htmlFor="rfs-loan">Which loan?</label>
+                <select id="rfs-loan" value={loanId} onChange={(e) => setLoanId(e.target.value)}>
+                  <option value="">Pick a loan</option>
+                  {openLoans.map(({ loan, outstanding }) => (
+                    <option key={loan.id} value={loan.id}>
+                      {loan.lender} · {loan.display_id} · still owed {fmt2(outstanding)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <label htmlFor="rfs-interest">How much of {fmt2(amount)} was interest?</label>
+                <input id="rfs-interest" inputMode="decimal" value={interestPart} onChange={(e) => setInterestPart(e.target.value)} />
+              </div>
+              <div className="note">
+                The rest, {fmt2(Math.max(0, round2(amount - (Number(interestPart) || 0))))}, reduces what you owe. Only the interest part counts as a cost in the Profit and Loss.
+              </div>
+            </>
+          )}
+        </>
+      )}
+
       {kind === 'receipt' && (
         <>
           <div className="field">
@@ -340,9 +484,9 @@ export function RecordFromStatement({
           <input id="rfs-ref" value={reference} onChange={(e) => setReference(e.target.value)} />
         </div>
       )}
-      {(kind === 'transfer' || kind === 'expense') && (
+      {(kind === 'transfer' || kind === 'expense' || kind === 'capital' || kind === 'loan') && (
         <div className="field">
-          <label htmlFor="rfs-notes">{kind === 'expense' ? 'Description' : 'Note'}</label>
+          <label htmlFor="rfs-notes">{kind === 'expense' ? 'Description' : 'Note (optional)'}</label>
           <input id="rfs-notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
         </div>
       )}

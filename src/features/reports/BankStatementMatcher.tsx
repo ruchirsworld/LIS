@@ -75,6 +75,7 @@ export function BankStatementMatcher({
   onStatementRead,
   onTick,
   ticking,
+  onPendingChange,
 }: {
   bankId: string
   bankName: string
@@ -84,6 +85,8 @@ export function BankStatementMatcher({
   onStatementRead: (info: { lastDate: string; closing: number | null }) => void
   onTick: (ledgerLineIds: string[]) => Promise<void>
   ticking: boolean
+  /** Reports how many matched lines are still waiting to be ticked. */
+  onPendingChange?: (count: number) => void
 }) {
   const goTo = useGoTo()
   const [restored] = useState(() => loadStored(bankId))
@@ -146,6 +149,11 @@ export function BankStatementMatcher({
     toast('info', 'Your statement is kept. Come back through Reports, then Bank reconciliation.')
     goTo(target.tab, { costCenter: target.costCenter, filter: target.filter })
   }
+
+  useEffect(() => {
+    onPendingChange?.(result.toTick.length)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result.toTick.length])
 
   // Start with the safe matches ticked; ones that are far apart in date, or could be another entry, are left for a look.
   useEffect(() => {

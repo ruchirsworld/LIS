@@ -29,6 +29,24 @@ export interface ReconciliationSummary {
 
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100
 
+/** What the books say the account holds on a date: money in less money out, up to and including it. */
+export function bookBalanceAsOf(lines: BankLine[], date: string): number {
+  return round2(lines.filter((l) => l.date <= date).reduce((s, l) => s + l.deposit - l.withdrawal, 0))
+}
+
+export interface SignoffStatus {
+  /** The books for that date still say what they said when it was signed off. */
+  upToDate: boolean
+  /** What the books say now, for that date. */
+  bookBalanceNow: number
+}
+
+/** A saved reconciliation goes stale if entries dated up to its date were added, changed or removed afterwards. */
+export function signoffStatus(signoff: { statement_date: string; book_balance: number }, lines: BankLine[]): SignoffStatus {
+  const bookBalanceNow = bookBalanceAsOf(lines, signoff.statement_date)
+  return { upToDate: Math.abs(bookBalanceNow - Number(signoff.book_balance)) < 0.005, bookBalanceNow }
+}
+
 export function summariseReconciliation(lines: BankLine[], cleared: Set<string>, statementBalance: number, upTo?: string): ReconciliationSummary {
   const counted = upTo ? lines.filter((l) => l.date <= upTo) : lines
   const net = (l: BankLine) => l.deposit - l.withdrawal

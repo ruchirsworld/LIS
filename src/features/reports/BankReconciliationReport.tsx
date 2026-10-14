@@ -8,6 +8,7 @@ import { toast } from '../../lib/feedback'
 import { companyHeaderLine } from '../invoices/ledgerExport'
 import { ReportExportButtons } from './ReportExportButtons'
 import { BankStatementMatcher } from './BankStatementMatcher'
+import { BankSignoff } from './BankSignoff'
 import type { ExportSection } from '../../lib/export/report'
 
 const today = () => new Date().toISOString().slice(0, 10)
@@ -22,6 +23,7 @@ export function BankReconciliationReport() {
   const [statementDate, setStatementDate] = useState(today())
   const [balanceText, setBalanceText] = useState('')
   const [showAll, setShowAll] = useState(false)
+  const [pendingMatches, setPendingMatches] = useState(0)
 
   const selected = bankId ?? accounts?.[0]?.id ?? null
   const { data: lines } = useBankLines(selected)
@@ -115,6 +117,7 @@ export function BankReconciliationReport() {
             if (closing !== null) setBalanceText(String(closing))
           }}
           onTick={(ids) => setCleared.mutateAsync({ lineIds: ids, cleared: true, clearedOn: statementDate })}
+          onPendingChange={setPendingMatches}
         />
       )}
 
@@ -149,6 +152,20 @@ export function BankReconciliationReport() {
                 ? 'The books and the bank statement agree.'
                 : `Difference to explain: ${fmt2(summary.difference)}`}
           </div>
+
+          {lines && (
+            <BankSignoff
+              key={selected}
+              bankId={selected}
+              bankName={accountName}
+              statementDate={statementDate}
+              balanceText={balanceText}
+              statementBalance={statementBalance}
+              summary={summary}
+              ledger={lines}
+              pendingMatches={pendingMatches}
+            />
+          )}
 
           <ReportExportButtons title="Bank reconciliation" sections={sections} range={null} headerNote={companyHeaderLine(company)} fileNamePrefix={`Bank_Reconciliation_${accountName}`} />
 

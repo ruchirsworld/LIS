@@ -140,6 +140,56 @@ export type Database = {
           },
         ]
       }
+      bank_reconciliation_signoffs: {
+        Row: {
+          bank_account_id: string
+          book_balance: number
+          completed_at: string
+          completed_by: string | null
+          difference: number
+          id: string
+          note: string | null
+          statement_balance: number
+          statement_date: string
+          uncleared_deposits: number
+          uncleared_withdrawals: number
+        }
+        Insert: {
+          bank_account_id: string
+          book_balance: number
+          completed_at?: string
+          completed_by?: string | null
+          difference?: number
+          id?: string
+          note?: string | null
+          statement_balance: number
+          statement_date: string
+          uncleared_deposits?: number
+          uncleared_withdrawals?: number
+        }
+        Update: {
+          bank_account_id?: string
+          book_balance?: number
+          completed_at?: string
+          completed_by?: string | null
+          difference?: number
+          id?: string
+          note?: string | null
+          statement_balance?: number
+          statement_date?: string
+          uncleared_deposits?: number
+          uncleared_withdrawals?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_reconciliation_signoffs_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bank_reconciliations: {
         Row: {
           bank_account_id: string

@@ -351,3 +351,48 @@ export function useSetBankLineCleared(bankAccountId: string | null) {
   })
 }
 
+// ── Saved sign-offs of a bank reconciliation ─────────────────────────────
+
+export type BankSignoff = Database['public']['Tables']['bank_reconciliation_signoffs']['Row']
+type BankSignoffInsert = Database['public']['Tables']['bank_reconciliation_signoffs']['Insert']
+
+export function useBankSignoffs(bankAccountId: string | null) {
+  return useQuery({
+    queryKey: ['bank_signoffs', bankAccountId],
+    enabled: !!bankAccountId,
+    queryFn: async (): Promise<BankSignoff[]> => {
+      const { data, error } = await supabase
+        .from('bank_reconciliation_signoffs')
+        .select('*')
+        .eq('bank_account_id', bankAccountId as string)
+        .order('statement_date', { ascending: false })
+      if (error) throw error
+      return data
+    },
+  })
+}
+
+/** Saves a sign-off. One per account and statement date: saving again for the same date replaces it. */
+export function useSaveBankSignoff() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (row: BankSignoffInsert) => {
+      const { error } = await supabase.from('bank_reconciliation_signoffs').upsert(row, { onConflict: 'bank_account_id,statement_date' })
+      if (error) throw error
+    },
+    meta: { quiet: true },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['bank_signoffs'] }),
+  })
+}
+
+export function useDeleteBankSignoff() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('bank_reconciliation_signoffs').delete().eq('id', id)
+      if (error) throw error
+    },
+    meta: { quiet: true },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['bank_signoffs'] }),
+  })
+}
