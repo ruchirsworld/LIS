@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
 import { Button } from '../../components/ui'
 import { fmt2, fmtDate } from '../../lib/calc/format'
+import { useGoTo } from '../../lib/navContext'
+import { resolveEntryTarget } from '../../lib/entryTarget'
+import { RecordFromStatement } from './RecordFromStatement'
 import { matchStatement, type ForcedPair, type LedgerCandidate, type StatementMatch } from '../../lib/calc/bankMatch'
 import {
   closingBalance,
@@ -8,7 +11,9 @@ import {
   extractLines,
   findHeaderRow,
   parseCsv,
+  parseStatementDate,
   type ColumnMapping,
+  type StatementLine,
 } from '../../lib/import/bankStatement'
 import { getErrorMessage } from '../../lib/errors'
 import { toast } from '../../lib/feedback'
@@ -28,6 +33,29 @@ const FIELDS: { key: keyof ColumnMapping; label: string }[] = [
   { key: 'balance', label: 'Balance' },
 ]
 
+// The statement is kept for the session, so going to another screen to enter or change something does not lose it.
+interface StoredStatement {
+  fileName: string
+  rows: unknown[][]
+  headerRow: number
+  mapping: ColumnMapping
+  days: number
+  forced: ForcedPair[]
+}
+const storeKeyOf = (bankId: string) => `lis.bankStatement.${bankId}`
+function loadStored(bankId: string): StoredStatement | null {
+  try {
+    const raw = sessionStorage.getItem(storeKeyOf(bankId))
+    return raw ? (JSON.parse(raw) as StoredStatement) : null
+  } catch {
+    return null
+  }
+}
+/** Dates read from Excel become plain YYYY-MM-DD text, so they survive being saved and read back. */
+function plainCells(table: unknown[][]): unknown[][] {
+  return table.map((row) => row.map((c) => (c instanceof Date ? parseStatementDate(c) ?? '' : c)))
+}
+
 const amountOf = (l: { deposit: number; withdrawal: number }) => (l.deposit > 0 ? l.deposit : l.withdrawal)
 const sideOf = (l: { deposit: number }) => (l.deposit > 0 ? 'In' : 'Out')
 
@@ -40,6 +68,7 @@ function matchNote(m: StatementMatch): string {
 
 /** Upload the bank's statement; the lines are matched to the books and the matches can be ticked in one go. */
 export function BankStatementMatcher({
+  bankId,
   bankName,
   ledger,
   clearedIds,
@@ -47,6 +76,7 @@ export function BankStatementMatcher({
   onTick,
   ticking,
 }: {
+  bankId: string
   bankName: string
   ledger: BankLineRow[]
   clearedIds: Set<string>
@@ -55,22 +85,67 @@ export function BankStatementMatcher({
   onTick: (ledgerLineIds: string[]) => Promise<void>
   ticking: boolean
 }) {
-  const [fileName, setFileName] = useState('')
+  const goTo = useGoTo()
+  const [restored] = useState(() => loadStored(bankId))
+  const [fileName, setFileName] = useState(restored?.fileName ?? '')
   const [readError, setReadError] = useState<string | null>(null)
-  const [rows, setRows] = useState<unknown[][] | null>(null)
-  const [headerRow, setHeaderRow] = useState(-1)
-  const [mapping, setMapping] = useState<ColumnMapping | null>(null)
-  const [days, setDays] = useState(7)
+  const [rows, setRows] = useState<unknown[][] | null>(restored?.rows ?? null)
+  const [headerRow, setHeaderRow] = useState(restored?.headerRow ?? -1)
+  const [mapping, setMapping] = useState<ColumnMapping | null>(restored?.mapping ?? null)
+  const [days, setDays] = useState(restored?.days ?? 7)
+  const [recording, setRecording] = useState<StatementLine | null>(null)
   const [picked, setPicked] = useState<Set<string>>(new Set())
   const [view, setView] = useState<'lists' | 'split'>('lists')
   // Pairings the user chose by hand (a statement line and the book entry it really is).
-  const [forced, setForced] = useState<ForcedPair[]>([])
+  const [forced, setForced] = useState<ForcedPair[]>(restored?.forced ?? [])
 
   const headers = useMemo(() => (rows && headerRow >= 0 ? rows[headerRow].map((c) => String(c ?? '').trim()) : []), [rows, headerRow])
   const lines = useMemo(() => (rows && mapping ? extractLines(rows, headerRow, mapping) : []), [rows, headerRow, mapping])
   const candidates = useMemo<LedgerCandidate[]>(() => ledger.map((l) => ({ ...l, cleared: clearedIds.has(l.id) })), [ledger, clearedIds])
   const result = useMemo(() => matchStatement(lines, candidates, { days, forced }), [lines, candidates, days, forced])
   const statementOnlyNet = Math.round(result.statementOnly.reduce((s, l) => s + l.deposit - l.withdrawal, 0) * 100) / 100
+
+  // Keep the statement for this session.
+  useEffect(() => {
+    try {
+      if (!rows || !mapping) {
+        sessionStorage.removeItem(storeKeyOf(bankId))
+        return
+      }
+      const json = JSON.stringify({ fileName, rows, headerRow, mapping, days, forced } satisfies StoredStatement)
+      if (json.length < 4_000_000) sessionStorage.setItem(storeKeyOf(bankId), json)
+    } catch {
+      // Storage full or blocked: the statement just will not survive leaving the page.
+    }
+  }, [bankId, fileName, rows, headerRow, mapping, days, forced])
+
+  // When the page is opened again with a kept statement, tell the page its date and closing balance.
+  useEffect(() => {
+    if (restored && lines.length > 0) {
+      const last = lines.reduce((m, l) => (l.date > m ? l.date : m), lines[0].date)
+      onStatementRead({ lastDate: last, closing: closingBalance(lines)?.balance ?? null })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function removeStatement() {
+    setRows(null)
+    setMapping(null)
+    setHeaderRow(-1)
+    setFileName('')
+    setForced([])
+    setReadError(null)
+  }
+
+  async function openEntry(l: { sourceTable?: string | null; sourceId?: string | null; date: string }) {
+    const target = await resolveEntryTarget(l.sourceTable, l.sourceId, l.date)
+    if (!target || !goTo) {
+      toast('info', `I cannot open this one directly. Look for it dated ${fmtDate(l.date)} in its own screen.`)
+      return
+    }
+    toast('info', 'Your statement is kept. Come back through Reports, then Bank reconciliation.')
+    goTo(target.tab, { costCenter: target.costCenter, filter: target.filter })
+  }
 
   // Start with the safe matches ticked; ones that are far apart in date, or could be another entry, are left for a look.
   useEffect(() => {
@@ -107,6 +182,7 @@ export function BankStatementMatcher({
         return
       }
       const map = detectMapping(table[at].map((c) => String(c ?? '').trim()))
+      table = plainCells(table)
       const read = extractLines(table, at, map)
       setRows(table)
       setHeaderRow(at)
@@ -209,6 +285,9 @@ export function BankStatementMatcher({
           {lines.length > 0 && (
             <>
               <div className="note" style={{ fontWeight: 600 }}>
+                <button type="button" className="btn link" style={{ float: 'right', padding: '0 0 0 12px' }} onClick={removeStatement}>
+                  Remove this statement
+                </button>
                 {fileName}: {lines.length} line{lines.length === 1 ? '' : 's'}, {fmtDate(lines.reduce((m, l) => (l.date < m ? l.date : m), lines[0].date))} to{' '}
                 {fmtDate(lines.reduce((m, l) => (l.date > m ? l.date : m), lines[0].date))}. {result.toTick.length + result.alreadyTicked.length} match your books
                 ({result.alreadyTicked.length} already ticked), {result.statementOnly.length} are on the statement only, {result.booksOnly.length} are in your books only.
@@ -250,6 +329,8 @@ export function BankStatementMatcher({
                       setForced((cur) => [...cur.filter((f) => f.statementRow !== statementRow && f.ledgerId !== ledgerId), { statementRow, ledgerId }])
                     }
                     onUnforce={(statementRow) => setForced((cur) => cur.filter((f) => f.statementRow !== statementRow))}
+                    onRecord={setRecording}
+                    onOpen={(l) => void openEntry(l)}
                   />
                   <div style={{ marginTop: 10 }}>
                     <Button type="button" onClick={() => void tickPicked()} disabled={picked.size === 0 || ticking}>
@@ -305,6 +386,11 @@ export function BankStatementMatcher({
                             <td>
                               {fmtDate(m.ledger.date)}
                               <div className="retention-note">{m.ledger.description}</div>
+                              {m.ledger.sourceTable && (
+                                <button type="button" className="btn link" style={{ padding: 0, fontSize: 12 }} onClick={() => void openEntry(m.ledger)}>
+                                  Open this entry
+                                </button>
+                              )}
                             </td>
                             <td className="amt">
                               {sideOf(m.statement) === 'In' ? '+' : '-'}
@@ -339,6 +425,11 @@ export function BankStatementMatcher({
                 empty="Every statement line is in your books."
                 head={['Date', 'Description', 'Amount']}
                 rows={result.statementOnly.map((l) => [fmtDate(l.date), l.description || l.reference, `${l.deposit > 0 ? '+' : '-'}${fmt2(amountOf(l))}`])}
+                actions={(i) => (
+                  <button type="button" className="btn" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => setRecording(result.statementOnly[i])}>
+                    Record this
+                  </button>
+                )}
               />
 
               <h4 style={{ margin: '16px 0 6px', fontSize: 13 }}>In your books, not on the statement ({result.booksOnly.length})</h4>
@@ -349,6 +440,13 @@ export function BankStatementMatcher({
                 empty="Everything in your books for this period is on the statement."
                 head={['Date', 'Entry', 'Amount']}
                 rows={result.booksOnly.map((l) => [fmtDate(l.date), l.description, `${l.deposit > 0 ? '+' : '-'}${fmt2(amountOf(l))}`])}
+                actions={(i) =>
+                  result.booksOnly[i].sourceTable ? (
+                    <button type="button" className="btn secondary" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => void openEntry(result.booksOnly[i])}>
+                      Open this entry
+                    </button>
+                  ) : null
+                }
               />
                 </>
               )}
@@ -356,11 +454,12 @@ export function BankStatementMatcher({
           )}
         </>
       )}
+      {recording && <RecordFromStatement line={recording} bankAccountId={bankId} bankName={bankName} onClose={() => setRecording(null)} />}
     </div>
   )
 }
 
-function PileTable({ head, rows, empty }: { head: string[]; rows: string[][]; empty: string }) {
+function PileTable({ head, rows, empty, actions }: { head: string[]; rows: string[][]; empty: string; actions?: (index: number) => React.ReactNode }) {
   return (
     <div className="table-scroll">
       <table className="data">
@@ -371,12 +470,13 @@ function PileTable({ head, rows, empty }: { head: string[]; rows: string[][]; em
                 {h}
               </th>
             ))}
+            {actions && <th />}
           </tr>
         </thead>
         <tbody>
           {rows.length === 0 && (
             <tr>
-              <td colSpan={head.length} className="empty-row">
+              <td colSpan={head.length + (actions ? 1 : 0)} className="empty-row">
                 {empty}
               </td>
             </tr>
@@ -388,6 +488,7 @@ function PileTable({ head, rows, empty }: { head: string[]; rows: string[][]; em
                   {c}
                 </td>
               ))}
+              {actions && <td style={{ textAlign: 'right' }}>{actions(i)}</td>}
             </tr>
           ))}
         </tbody>

@@ -51,6 +51,8 @@ export function BankSplitView({
   onPick,
   onForce,
   onUnforce,
+  onRecord,
+  onOpen,
 }: {
   lines: StatementLine[]
   ledger: LedgerCandidate[]
@@ -60,6 +62,10 @@ export function BankSplitView({
   onPick: (ledgerId: string, on: boolean) => void
   onForce: (statementRow: number, ledgerId: string) => void
   onUnforce: (statementRow: number) => void
+  /** Enter a statement line that is not in the books. */
+  onRecord?: (line: StatementLine) => void
+  /** Go to the screen that holds a line in the books. */
+  onOpen?: (line: LedgerCandidate) => void
 }) {
   const [onlyProblems, setOnlyProblems] = useState(false)
   const [sel, setSel] = useState<{ side: Side; ref: number | string } | null>(null)
@@ -154,6 +160,9 @@ export function BankSplitView({
       isIn(selectedRow) === isIn(r) &&
       amountOf(selectedRow) === amountOf(r) &&
       !(partner && partner.side === r.side && partner.ref === r.ref)
+    const showRecord = r.side === 'bank' && r.status === 'only' && !!onRecord
+    const bookLine = r.side === 'books' ? ledger.find((l) => l.id === r.ref) : undefined
+    const showOpen = !!onOpen && !!bookLine?.sourceTable
     const statementRow = r.side === 'bank' ? (r.ref as number) : selectedRow?.side === 'bank' ? (selectedRow.ref as number) : null
     const ledgerId = r.side === 'books' ? (r.ref as string) : selectedRow?.side === 'books' ? (selectedRow.ref as string) : null
 
@@ -190,8 +199,32 @@ export function BankSplitView({
           {isIn(r) ? '+' : '-'}
           {fmt2(isIn(r) ? r.deposit : r.withdrawal)}
         </span>
-        {(canPair || r.match?.forced) && (
+        {(canPair || r.match?.forced || showRecord || showOpen) && (
           <span className="sv-actions">
+            {showRecord && (
+              <button
+                type="button"
+                className="btn"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onRecord?.(lines.find((l) => l.row === r.ref) as StatementLine)
+                }}
+              >
+                Record this
+              </button>
+            )}
+            {showOpen && bookLine && (
+              <button
+                type="button"
+                className="btn secondary"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onOpen?.(bookLine)
+                }}
+              >
+                Open this entry
+              </button>
+            )}
             {canPair && statementRow !== null && ledgerId !== null && (
               <button
                 type="button"

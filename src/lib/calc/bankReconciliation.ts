@@ -9,6 +9,9 @@ export interface BankLine {
   deposit: number
   /** Money out (a payment, a withdrawal). */
   withdrawal: number
+  /** The kind of record this line came from (an expense, a transfer ...) and its id, so it can be opened. */
+  sourceTable?: string | null
+  sourceId?: string | null
 }
 
 export interface ReconciliationSummary {

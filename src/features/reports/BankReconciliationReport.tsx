@@ -104,6 +104,8 @@ export function BankReconciliationReport() {
 
       {selected && lines && (
         <BankStatementMatcher
+          key={selected}
+          bankId={selected}
           bankName={accountName}
           ledger={lines}
           clearedIds={cleared}

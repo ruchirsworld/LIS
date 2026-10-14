@@ -280,6 +280,8 @@ export interface BankLineRow {
   description: string
   deposit: number
   withdrawal: number
+  sourceTable: string | null
+  sourceId: string | null
 }
 
 /** Every ledger line posted to one bank account, oldest first. */
@@ -292,15 +294,24 @@ export function useBankLines(bankAccountId: string | null) {
       if (accountError) throw accountError
       const { data, error } = await supabase
         .from('journal_lines')
-        .select('id, debit, credit, journal_entries!inner(date, description)')
+        .select('id, debit, credit, journal_entries!inner(date, description, source_table, source_id)')
         .eq('gl_account_id', account.id)
         .eq('bank_account_id', bankAccountId as string)
       if (error) throw error
       return (data ?? [])
         .map((row) => {
-          const entry = row.journal_entries as unknown as { date: string; description: string } | { date: string; description: string }[]
+          type Entry = { date: string; description: string; source_table: string | null; source_id: string | null }
+          const entry = row.journal_entries as unknown as Entry | Entry[]
           const e = Array.isArray(entry) ? entry[0] : entry
-          return { id: row.id, date: e?.date ?? '', description: e?.description ?? '', deposit: Number(row.debit || 0), withdrawal: Number(row.credit || 0) }
+          return {
+            id: row.id,
+            date: e?.date ?? '',
+            description: e?.description ?? '',
+            deposit: Number(row.debit || 0),
+            withdrawal: Number(row.credit || 0),
+            sourceTable: e?.source_table ?? null,
+            sourceId: e?.source_id ?? null,
+          }
         })
         .sort((a, b) => a.date.localeCompare(b.date))
     },
