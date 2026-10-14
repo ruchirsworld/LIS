@@ -56,6 +56,12 @@ export function StaffForm({
       setFormError('Staff name is required.')
       return
     }
+    // An end date before the start date makes the person count as "never employed":
+    // they drop off the attendance list and their pay comes out as nothing.
+    if (endDate && endDate < startDate) {
+      setFormError('The end date cannot be before the start date. Check the month and year.')
+      return
+    }
     setSubmitting(true)
     try {
       const patch = {
