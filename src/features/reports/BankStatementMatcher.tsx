@@ -4,7 +4,7 @@ import { fmt2, fmtDate } from '../../lib/calc/format'
 import { useGoTo } from '../../lib/navContext'
 import { resolveEntryTarget } from '../../lib/entryTarget'
 import { RecordFromStatement } from './RecordFromStatement'
-import { matchStatement, type ForcedPair, type LedgerCandidate, type StatementMatch } from '../../lib/calc/bankMatch'
+import { ledgerIdsOf, ledgerTotalOf, matchStatement, type ForcedPair, type LedgerCandidate, type StatementMatch } from '../../lib/calc/bankMatch'
 import {
   closingBalance,
   detectMapping,
@@ -61,8 +61,10 @@ const sideOf = (l: { deposit: number }) => (l.deposit > 0 ? 'In' : 'Out')
 
 function matchNote(m: StatementMatch): string {
   const parts: string[] = []
+  if (m.extra?.length) parts.push(`one payment for ${m.extra.length + 1} entries in your books`)
+  if (m.extraStatements?.length) parts.push(`${m.extraStatements.length + 1} payments on the statement, one entry in your books`)
   parts.push(m.dayGap === 0 ? 'same day' : `${m.dayGap} day${m.dayGap === 1 ? '' : 's'} apart`)
-  if (m.ambiguous) parts.push('another entry has the same amount, check it')
+  if (m.ambiguous) parts.push(m.extra?.length || m.extraStatements?.length ? 'they add up, but check these belong together' : 'another entry has the same amount, check it')
   return parts.join(', ')
 }
 
@@ -211,8 +213,10 @@ export function BankStatementMatcher({
 
   async function tickPicked() {
     try {
-      await onTick([...picked])
-      toast('success', `${picked.size} line${picked.size === 1 ? '' : 's'} ticked off against the statement.`)
+      // A lump-sum match is ticked as a whole: every entry in it.
+      const ids = result.toTick.filter((m) => picked.has(m.ledger.id)).flatMap(ledgerIdsOf)
+      await onTick(ids)
+      toast('success', `${ids.length} line${ids.length === 1 ? '' : 's'} ticked off against the statement.`)
     } catch (err) {
       toast('error', getErrorMessage(err, 'Could not save the ticks.'))
     }
@@ -225,11 +229,11 @@ export function BankStatementMatcher({
           columns: ['Statement date', 'Statement text', 'In', 'Out', 'Books date', 'Books entry'],
           rows: [...result.toTick, ...result.alreadyTicked].map((m) => [
             fmtDate(m.statement.date),
-            m.statement.description,
-            m.statement.deposit,
-            m.statement.withdrawal,
+            [m.statement, ...(m.extraStatements ?? [])].map((s) => s.description).join(' + '),
+            [m.statement, ...(m.extraStatements ?? [])].reduce((t, s) => t + s.deposit, 0),
+            [m.statement, ...(m.extraStatements ?? [])].reduce((t, s) => t + s.withdrawal, 0),
             fmtDate(m.ledger.date),
-            m.ledger.description,
+            [m.ledger, ...(m.extra ?? [])].map((l) => l.description).join(' + '),
           ]),
           numericColumns: [2, 3],
           decimals: 2,
@@ -373,7 +377,7 @@ export function BankStatementMatcher({
                       </thead>
                       <tbody>
                         {result.toTick.map((m) => (
-                          <tr key={m.ledger.id}>
+                          <tr key={m.ledger.id + '|' + m.statement.row}>
                             <td>
                               <input
                                 type="checkbox"
@@ -388,21 +392,35 @@ export function BankStatementMatcher({
                               />
                             </td>
                             <td>
-                              {fmtDate(m.statement.date)}
-                              <div className="retention-note">{m.statement.description}</div>
+                              {[m.statement, ...(m.extraStatements ?? [])].map((s) => (
+                                <div key={s.row}>
+                                  {fmtDate(s.date)}
+                                  <div className="retention-note">
+                                    {m.extraStatements?.length ? `${fmt2(amountOf(s))} ` : ''}
+                                    {s.description}
+                                  </div>
+                                </div>
+                              ))}
                             </td>
                             <td>
-                              {fmtDate(m.ledger.date)}
-                              <div className="retention-note">{m.ledger.description}</div>
-                              {m.ledger.sourceTable && (
-                                <button type="button" className="btn link" style={{ padding: 0, fontSize: 12 }} onClick={() => void openEntry(m.ledger)}>
-                                  Open this entry
-                                </button>
-                              )}
+                              {[m.ledger, ...(m.extra ?? [])].map((l) => (
+                                <div key={l.id}>
+                                  {fmtDate(l.date)}
+                                  <div className="retention-note">
+                                    {m.extra?.length ? `${fmt2(amountOf(l))} ` : ''}
+                                    {l.description}
+                                  </div>
+                                  {l.sourceTable && (
+                                    <button type="button" className="btn link" style={{ padding: 0, fontSize: 12 }} onClick={() => void openEntry(l)}>
+                                      Open this entry
+                                    </button>
+                                  )}
+                                </div>
+                              ))}
                             </td>
                             <td className="amt">
                               {sideOf(m.statement) === 'In' ? '+' : '-'}
-                              {fmt2(amountOf(m.statement))}
+                              {fmt2(ledgerTotalOf(m))}
                             </td>
                             <td style={{ color: m.ambiguous || m.confidence === 'loose' ? 'var(--amber)' : undefined }}>{matchNote(m)}</td>
                           </tr>

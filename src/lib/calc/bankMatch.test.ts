@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { matchStatement, type LedgerCandidate } from './bankMatch'
+import { ledgerIdsOf, ledgerTotalOf, matchStatement, statementRowsOf, type LedgerCandidate } from './bankMatch'
 import type { StatementLine } from '../import/bankStatement'
 
 const s = (row: number, date: string, deposit: number, withdrawal: number, description = ''): StatementLine => ({
@@ -96,5 +96,67 @@ describe('matching a bank statement to the books', () => {
   it('ignores a hand pairing whose amounts or sides differ', () => {
     const r = matchStatement([s(1, '2026-10-08', 0, 10000)], [l('x', '2026-10-08', 0, 9000)], { forced: [{ statementRow: 1, ledgerId: 'x' }] })
     expect(r.toTick).toHaveLength(0)
+  })
+
+  it('matches one transfer to the several entries it settled', () => {
+    // A traveller repaid 1,200 + 300 + 500 = 2,000 in one transfer; each expense is its own entry in the books.
+    const settled = (id: string, amount: number): LedgerCandidate => ({ ...l(id, '2026-10-12', 0, amount), sourceTable: 'expense_reimbursements' })
+    const r = matchStatement([s(1, '2026-10-12', 0, 2000, 'NEFT TRAVELLER')], [settled('r1', 1200), settled('r2', 300), settled('r3', 500), l('other', '2026-10-12', 0, 777)])
+    expect(r.toTick).toHaveLength(1)
+    expect(ledgerIdsOf(r.toTick[0]).sort()).toEqual(['r1', 'r2', 'r3'])
+    expect(ledgerTotalOf(r.toTick[0])).toBe(2000)
+    expect(r.toTick[0].ambiguous).toBe(false)
+    expect(r.statementOnly).toHaveLength(0)
+    expect(r.booksOnly.map((x) => x.id)).toEqual(['other'])
+  })
+
+  it('finds a combination that adds up, and flags it for a look', () => {
+    const r = matchStatement(
+      [s(1, '2026-10-12', 0, 1500)],
+      [l('a', '2026-10-10', 0, 1000), l('b', '2026-10-11', 0, 500), l('c', '2026-10-12', 0, 4000)]
+    )
+    expect(r.toTick).toHaveLength(1)
+    expect(ledgerIdsOf(r.toTick[0]).sort()).toEqual(['a', 'b'])
+    expect(r.toTick[0].ambiguous).toBe(true)
+  })
+
+  it('does not group entries that do not add up, or mix ticked and new ones', () => {
+    expect(matchStatement([s(1, '2026-10-12', 0, 1600)], [l('a', '2026-10-12', 0, 1000), l('b', '2026-10-12', 0, 500)]).toTick).toHaveLength(0)
+    const mixed = matchStatement([s(1, '2026-10-12', 0, 1500)], [l('a', '2026-10-12', 0, 1000, true), l('b', '2026-10-12', 0, 500)])
+    expect(mixed.toTick).toHaveLength(0)
+    expect(mixed.alreadyTicked).toHaveLength(0)
+  })
+
+  it('recognises a lump-sum match ticked on an earlier visit', () => {
+    const r = matchStatement([s(1, '2026-10-12', 0, 1500)], [l('a', '2026-10-12', 0, 1000, true), l('b', '2026-10-12', 0, 500, true)])
+    expect(r.alreadyTicked).toHaveLength(1)
+    expect(ledgerIdsOf(r.alreadyTicked[0]).sort()).toEqual(['a', 'b'])
+  })
+
+  it('still prefers a single entry of the same amount over a combination', () => {
+    const r = matchStatement([s(1, '2026-10-12', 0, 1500)], [l('whole', '2026-10-12', 0, 1500), l('a', '2026-10-12', 0, 1000), l('b', '2026-10-12', 0, 500)])
+    expect(r.toTick[0].ledger.id).toBe('whole')
+    expect(r.toTick[0].extra).toBeUndefined()
+  })
+
+  it('matches several statement lines to the one entry the books hold for them', () => {
+    // Paid to a contractor in three instalments on one day; the books have the whole 5,000 as one entry.
+    const r = matchStatement(
+      [s(1, '2026-10-12', 0, 2000), s(2, '2026-10-12', 0, 2000), s(3, '2026-10-12', 0, 1000), s(4, '2026-10-14', 0, 99)],
+      [l('whole', '2026-10-12', 0, 5000)]
+    )
+    expect(r.toTick).toHaveLength(1)
+    expect(r.toTick[0].ledger.id).toBe('whole')
+    expect(statementRowsOf(r.toTick[0]).sort()).toEqual([1, 2, 3])
+    expect(r.toTick[0].ambiguous).toBe(false)
+    expect(r.statementOnly.map((x) => x.row)).toEqual([4])
+    expect(r.booksOnly).toHaveLength(0)
+  })
+
+  it('flags statement lines on different days that add up to one entry', () => {
+    const r = matchStatement([s(1, '2026-10-10', 0, 3000), s(2, '2026-10-13', 0, 2000)], [l('whole', '2026-10-12', 0, 5000)])
+    expect(r.toTick).toHaveLength(1)
+    expect(statementRowsOf(r.toTick[0]).sort()).toEqual([1, 2])
+    expect(r.toTick[0].ambiguous).toBe(true)
   })
 })

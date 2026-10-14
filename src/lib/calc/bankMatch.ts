@@ -22,6 +22,46 @@ export interface StatementMatch {
   ambiguous: boolean
   /** Paired by the user, not by the matcher. */
   forced?: boolean
+  /** When one statement line is the total of several entries in the books (a lump-sum payment
+   * that settled several bills or expenses), the other entries; `ledger` is then the first. */
+  extra?: LedgerCandidate[]
+  /** The reverse: the books hold one entry for what the bank shows as several payments; the other
+   * statement lines, with `statement` being the first. */
+  extraStatements?: StatementLine[]
+}
+
+/** Every statement line a match covers: one normally, several when the books record them as one entry. */
+export function statementRowsOf(m: StatementMatch): number[] {
+  return [m.statement.row, ...(m.extraStatements ?? []).map((s) => s.row)]
+}
+
+/** Every ledger line a match covers: one normally, several for a lump-sum match. */
+export function ledgerIdsOf(m: StatementMatch): string[] {
+  return [m.ledger.id, ...(m.extra ?? []).map((l) => l.id)]
+}
+
+/** The total of the ledger lines a match covers, on the side of the statement line. */
+export function ledgerTotalOf(m: StatementMatch): number {
+  const all = [m.ledger, ...(m.extra ?? [])]
+  return Math.round(all.reduce((s, l) => s + (l.deposit > 0 ? l.deposit : l.withdrawal), 0) * 100) / 100
+}
+
+/** The entries that add up to the target, by DFS with pruning. Null when none do (or the search is too big). */
+function findSubset(items: { id: string; c: number }[], target: number): string[] | null {
+  const sorted = [...items].sort((a, b) => b.c - a.c)
+  const suffix: number[] = new Array(sorted.length + 1).fill(0)
+  for (let i = sorted.length - 1; i >= 0; i--) suffix[i] = suffix[i + 1] + sorted[i].c
+  let budget = 150000
+  const chosen: string[] = []
+  const dfs = (i: number, remaining: number): boolean => {
+    if (remaining === 0) return chosen.length >= 2
+    if (i >= sorted.length || remaining < 0 || suffix[i] < remaining || budget-- <= 0) return false
+    chosen.push(sorted[i].id)
+    if (dfs(i + 1, remaining - sorted[i].c)) return true
+    chosen.pop()
+    return dfs(i + 1, remaining)
+  }
+  return dfs(0, target) ? [...chosen] : null
 }
 
 /** A pairing chosen by hand: this statement line is that ledger line. */
@@ -104,6 +144,101 @@ export function matchStatement(
         dayGap: c.gap,
         confidence: c.gap === 0 ? 'exact' : c.gap <= 3 ? 'close' : 'loose',
         ambiguous: rivals(c),
+      }
+      ;(pass === 'new' ? result.toTick : result.alreadyTicked).push(match)
+    }
+  }
+
+  // A statement line that is the total of several entries: one transfer that settled a number of
+  // bills or expenses, each recorded as its own entry. First entries recorded on one day by one
+  // screen (a settlement), which is a confident match; then any combination that adds up (flagged).
+  for (const pass of ['new', 'ticked'] as const) {
+    for (const s of lines) {
+      if (usedStatement.has(s.row)) continue
+      const target = amountOf(s)
+      const pool = ledger.filter(
+        (l) => (pass === 'new' ? !l.cleared : l.cleared) && !usedLedger.has(l.id) && sideOf(l) === sideOf(s) && Math.abs(dayNumber(l.date) - dayNumber(s.date)) <= days
+      )
+      if (pool.length < 2) continue
+
+      let picked: LedgerCandidate[] | null = null
+      let ambiguous = false
+      const byDay = new Map<string, LedgerCandidate[]>()
+      for (const l of pool) {
+        const key = `${l.date}|${l.sourceTable ?? ''}`
+        byDay.set(key, [...(byDay.get(key) ?? []), l])
+      }
+      for (const group of byDay.values()) {
+        if (group.length >= 2 && group.reduce((t, l) => t + amountOf(l), 0) === target) {
+          picked = group
+          break
+        }
+      }
+      if (!picked && pool.length <= 25) {
+        const ids = findSubset(pool.map((l) => ({ id: l.id, c: amountOf(l) })), target)
+        if (ids) {
+          picked = pool.filter((l) => ids.includes(l.id))
+          ambiguous = true
+        }
+      }
+      if (!picked) continue
+
+      picked.sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id))
+      const gap = Math.min(...picked.map((l) => Math.abs(dayNumber(l.date) - dayNumber(s.date))))
+      usedStatement.add(s.row)
+      picked.forEach((l) => usedLedger.add(l.id))
+      const match: StatementMatch = {
+        statement: s,
+        ledger: picked[0],
+        extra: picked.slice(1),
+        dayGap: gap,
+        confidence: gap === 0 ? 'exact' : gap <= 3 ? 'close' : 'loose',
+        ambiguous,
+      }
+      ;(pass === 'new' ? result.toTick : result.alreadyTicked).push(match)
+    }
+  }
+
+  // The reverse: an entry in the books that the bank shows as several payments (a cost entered once
+  // that was paid in instalments, or a receipt entered as one that came in parts). Several statement
+  // lines on one day that add up is a confident match; any other combination is flagged.
+  for (const pass of ['new', 'ticked'] as const) {
+    for (const l of ledger) {
+      if ((pass === 'new') === l.cleared || usedLedger.has(l.id)) continue
+      const target = amountOf(l)
+      const pool = lines.filter((s) => !usedStatement.has(s.row) && sideOf(s) === sideOf(l) && Math.abs(dayNumber(l.date) - dayNumber(s.date)) <= days)
+      if (pool.length < 2) continue
+
+      let picked: StatementLine[] | null = null
+      let ambiguous = false
+      const byDay = new Map<string, StatementLine[]>()
+      for (const s of pool) byDay.set(s.date, [...(byDay.get(s.date) ?? []), s])
+      for (const group of byDay.values()) {
+        if (group.length >= 2 && group.reduce((t, s) => t + amountOf(s), 0) === target) {
+          picked = group
+          break
+        }
+      }
+      if (!picked && pool.length <= 25) {
+        const rows = findSubset(pool.map((s) => ({ id: String(s.row), c: amountOf(s) })), target)
+        if (rows) {
+          picked = pool.filter((s) => rows.includes(String(s.row)))
+          ambiguous = true
+        }
+      }
+      if (!picked) continue
+
+      picked.sort((a, b) => a.date.localeCompare(b.date) || a.row - b.row)
+      const gap = Math.min(...picked.map((s) => Math.abs(dayNumber(l.date) - dayNumber(s.date))))
+      picked.forEach((s) => usedStatement.add(s.row))
+      usedLedger.add(l.id)
+      const match: StatementMatch = {
+        statement: picked[0],
+        extraStatements: picked.slice(1),
+        ledger: l,
+        dayGap: gap,
+        confidence: gap === 0 ? 'exact' : gap <= 3 ? 'close' : 'loose',
+        ambiguous,
       }
       ;(pass === 'new' ? result.toTick : result.alreadyTicked).push(match)
     }

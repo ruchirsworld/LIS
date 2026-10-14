@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { fmt2, fmtDate } from '../../lib/calc/format'
 import { activateProps } from '../../lib/a11y'
-import type { LedgerCandidate, MatchResult, StatementMatch } from '../../lib/calc/bankMatch'
+import { ledgerIdsOf, statementRowsOf, type LedgerCandidate, type MatchResult, type StatementMatch } from '../../lib/calc/bankMatch'
 import type { StatementLine } from '../../lib/import/bankStatement'
 import './BankSplitView.css'
 
@@ -33,10 +33,21 @@ const LABEL: Record<Side, Record<Exclude<Status, 'match' | 'check' | 'ticked'>, 
   books: { only: 'Not on the statement', quiet: 'Not on this statement' },
 }
 
+/** When one line on a side is the total of several on the other, say so. */
+function groupNote(row: Row): string {
+  const m = row.match
+  if (!m) return ''
+  if (row.side === 'bank' && m.extra?.length) return `, the total of ${m.extra.length + 1} entries in your books`
+  if (row.side === 'books' && m.extraStatements?.length) return `, the total of ${m.extraStatements.length + 1} statement lines`
+  if (row.side === 'bank' && m.extraStatements?.length) return `, one of ${m.extraStatements.length + 1} statement lines`
+  if (row.side === 'books' && m.extra?.length) return `, one of ${m.extra.length + 1} entries`
+  return ''
+}
+
 function statusText(row: Row): string {
-  if (row.status === 'match') return `Matches #${row.pairNo}${row.match?.forced ? ' (paired by you)' : ''}`
-  if (row.status === 'check') return `Matches #${row.pairNo}, check it`
-  if (row.status === 'ticked') return `Matches #${row.pairNo}, already ticked`
+  if (row.status === 'match') return `Matches #${row.pairNo}${row.match?.forced ? ' (paired by you)' : ''}${groupNote(row)}`
+  if (row.status === 'check') return `Matches #${row.pairNo}${groupNote(row)}, check it`
+  if (row.status === 'ticked') return `Matches #${row.pairNo}${groupNote(row)}, already ticked`
   return LABEL[row.side][row.status]
 }
 
@@ -77,8 +88,8 @@ export function BankSplitView({
     const byStatement = new Map<number, { m: StatementMatch; no: number }>()
     const byLedger = new Map<string, { m: StatementMatch; no: number }>()
     matches.forEach((m, i) => {
-      byStatement.set(m.statement.row, { m, no: i + 1 })
-      byLedger.set(m.ledger.id, { m, no: i + 1 })
+      statementRowsOf(m).forEach((row) => byStatement.set(row, { m, no: i + 1 }))
+      ledgerIdsOf(m).forEach((id) => byLedger.set(id, { m, no: i + 1 }))
     })
     const statusOfMatch = (m: StatementMatch): Status => (m.ledger.cleared ? 'ticked' : m.ambiguous || m.confidence === 'loose' ? 'check' : 'match')
 
@@ -120,27 +131,29 @@ export function BankSplitView({
           status: hit ? statusOfMatch(hit.m) : booksOnly.has(l.id) ? 'only' : 'quiet',
           pairNo: hit?.no ?? null,
           match: hit?.m ?? null,
-          selectableForTick: !!hit && !hit.m.ledger.cleared,
+          // One tick covers every entry of a lump-sum match, so only its first entry has the box.
+          selectableForTick: !!hit && !hit.m.ledger.cleared && hit.m.ledger.id === l.id,
         }
       })
 
-    const partner = (side: Side, ref: number | string): { side: Side; ref: number | string } | null => {
+    // Everything on the other side that goes with this line (several for a lump-sum match).
+    const partner = (side: Side, ref: number | string): { side: Side; ref: number | string }[] => {
       if (side === 'bank') {
         const hit = byStatement.get(ref as number)
-        return hit ? { side: 'books', ref: hit.m.ledger.id } : null
+        return hit ? ledgerIdsOf(hit.m).map((id) => ({ side: 'books' as const, ref: id })) : []
       }
       const hit = byLedger.get(ref as string)
-      return hit ? { side: 'bank', ref: hit.m.statement.row } : null
+      return hit ? statementRowsOf(hit.m).map((row) => ({ side: 'bank' as const, ref: row })) : []
     }
     return { bankRows: bank, bookRows: books, partnerOf: partner }
   }, [lines, ledger, result, days])
 
-  const partner = sel ? partnerOf(sel.side, sel.ref) : null
+  const partners = useMemo(() => (sel ? partnerOf(sel.side, sel.ref) : []), [sel, partnerOf])
   const domId = (side: Side, ref: number | string) => `sv-${side}-${ref}`
 
   // Bring the matching row on the other side into view when a row is chosen.
   useEffect(() => {
-    if (partner) document.getElementById(domId(partner.side, partner.ref))?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    if (partners[0]) document.getElementById(domId(partners[0].side, partners[0].ref))?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
   }, [sel]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const selectedRow = sel ? [...bankRows, ...bookRows].find((r) => r.side === sel.side && r.ref === sel.ref) ?? null : null
@@ -152,14 +165,18 @@ export function BankSplitView({
 
   function renderRow(r: Row) {
     const isSel = !!sel && sel.side === r.side && sel.ref === r.ref
-    const isPartner = !!partner && partner.side === r.side && partner.ref === r.ref
+    const isPartner = partners.some((p) => p.side === r.side && p.ref === r.ref)
     // The other side's rows with the same amount and direction can be paired with the chosen row.
     const canPair =
       !!selectedRow &&
       selectedRow.side !== r.side &&
       isIn(selectedRow) === isIn(r) &&
       amountOf(selectedRow) === amountOf(r) &&
-      !(partner && partner.side === r.side && partner.ref === r.ref)
+      !isPartner &&
+      !r.match?.extra?.length &&
+      !r.match?.extraStatements?.length &&
+      !selectedRow.match?.extra?.length &&
+      !selectedRow.match?.extraStatements?.length
     const showRecord = r.side === 'bank' && r.status === 'only' && !!onRecord
     const bookLine = r.side === 'books' ? ledger.find((l) => l.id === r.ref) : undefined
     const showOpen = !!onOpen && !!bookLine?.sourceTable

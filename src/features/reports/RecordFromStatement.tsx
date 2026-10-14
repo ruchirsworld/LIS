@@ -17,17 +17,20 @@ import { TRIP_QUICK_CATEGORIES } from '../../lib/tripQuickCategories'
 import { useCreateCapitalTx } from '../../lib/queries/capital'
 import { useCreateLoan, useCreateLoanPayment, useLoanPayments, useLoans } from '../../lib/queries/loans'
 import { loanOutstanding } from '../../lib/calc/loans'
-import { useCreateExpense } from '../../lib/queries/expenses'
+import { useCreateExpense, useCreateExpenseReimbursement } from '../../lib/queries/expenses'
+import { allocateSettlement } from '../../lib/calc/expenses'
+import { useReimbursementDue } from '../dashboard/useReimbursementDue'
 import { useCreateVendorBillPayment, useVendorBillPayments, useVendorBills } from '../../lib/queries/purchases'
 import { useCreateInvoicePayment, useInvoicePayments, useInvoices } from '../../lib/queries/invoices'
 
-type Kind = 'transfer' | 'expense' | 'trip' | 'vendor' | 'receipt' | 'capital' | 'loan' | 'loanpay'
+type Kind = 'transfer' | 'expense' | 'trip' | 'reimbursement' | 'vendor' | 'receipt' | 'capital' | 'loan' | 'loanpay'
 
 const CASH = 'cash'
 const KIND_LABEL: Record<Kind, string> = {
   transfer: 'Transfer between my accounts',
   expense: 'Expense (bank charges, site cost ...)',
   trip: 'Trip expense (fuel, meals, tickets, lodging ...)',
+  reimbursement: 'Reimbursement to an employee (money they paid out of pocket)',
   vendor: 'Payment to a vendor',
   receipt: 'Receipt from a client',
   capital: 'Capital (money a partner puts in or takes out)',
@@ -52,7 +55,7 @@ export function RecordFromStatement({
   const goTo = useGoTo()
   const incoming = line.deposit > 0
   const amount = incoming ? line.deposit : line.withdrawal
-  const kinds: Kind[] = incoming ? ['transfer', 'receipt', 'capital', 'loan'] : ['transfer', 'expense', 'trip', 'vendor', 'capital', 'loanpay']
+  const kinds: Kind[] = incoming ? ['transfer', 'receipt', 'capital', 'loan'] : ['transfer', 'expense', 'trip', 'reimbursement', 'vendor', 'capital', 'loanpay']
 
   const { data: banks } = useBankAccounts()
   const { data: clients } = useClients()
@@ -71,6 +74,8 @@ export function RecordFromStatement({
   const createCapital = useCreateCapitalTx()
   const createLoan = useCreateLoan()
   const createLoanPayment = useCreateLoanPayment()
+  const createReimbursement = useCreateExpenseReimbursement()
+  const dueRows = useReimbursementDue()
   const { data: profiles } = useProfiles()
   const { data: loans } = useLoans(null)
   const { data: loanPayments } = useLoanPayments()
@@ -89,10 +94,12 @@ export function RecordFromStatement({
   const [vendorId, setVendorId] = useState('')
   const [billId, setBillId] = useState('')
   const [clientId, setClientId] = useState('')
-  const [invoiceId, setInvoiceId] = useState('')
+  // What part of the payment goes to each invoice (typed amounts), so one transfer can settle several invoices.
+  const [invAlloc, setInvAlloc] = useState<Record<string, string>>({})
   const [isRelease, setIsRelease] = useState(false)
   const [partnerId, setPartnerId] = useState('')
   const [tripId, setTripId] = useState('')
+  const [reimbUserId, setReimbUserId] = useState('')
   const [tripCategory, setTripCategory] = useState('')
   const [loanType, setLoanType] = useState<'private' | 'bank'>('bank')
   const [lender, setLender] = useState('')
@@ -108,6 +115,10 @@ export function RecordFromStatement({
   const partners = (profiles ?? []).filter((p) => p.role === 'admin' || p.role === 'cxo')
   // Open trips first, then the closed ones, so the current trip is easy to find.
   const tripOptions = useMemo(() => [...(trips ?? [])].sort((a, b) => (a.status === b.status ? b.start_date.localeCompare(a.start_date) : a.status === 'open' ? -1 : 1)), [trips])
+  // People the firm owes money to, and (for the one chosen) the entries that money is for, oldest first.
+  const owedPeople = dueRows.filter((r) => r.userId)
+  const owed = owedPeople.find((r) => r.userId === reimbUserId) ?? null
+  const reimbAllocations = owed ? allocateSettlement(amount, owed.outstanding) : []
   const openLoans = useMemo(
     () =>
       (loans ?? [])
@@ -132,9 +143,26 @@ export function RecordFromStatement({
           const pays = (invoicePayments ?? []).filter((p) => p.invoice_id === i.id)
           return { inv: i, due: dueAmount(i, pays), held: retentionHeld(i, pays) }
         })
-        .filter((x) => x.due > 0.01 || x.held > 0.01),
+        .filter((x) => x.due > 0.01 || x.held > 0.01)
+        .sort((a, b) => (a.inv.invoice_date ?? '').localeCompare(b.inv.invoice_date ?? '')),
     [invoices, invoicePayments, clientId]
   )
+  const allocated = round2(Object.values(invAlloc).reduce((t, v) => t + (Number(v) || 0), 0))
+  const leftToAllocate = round2(amount - allocated)
+  /** Fill the invoices oldest first until the payment is used up. */
+  function fillOldestFirst() {
+    let left = amount
+    const next: Record<string, string> = {}
+    for (const { inv, due, held } of openInvoices) {
+      const cap = isRelease ? held : due
+      const part = Math.min(left, cap)
+      if (part > 0.005) {
+        next[inv.id] = String(round2(part))
+        left = round2(left - part)
+      }
+    }
+    setInvAlloc(next)
+  }
 
   async function save() {
     setError(null)
@@ -172,6 +200,20 @@ export function RecordFromStatement({
           bank_account_id: bankAccountId,
           remarks: notes.trim() ? notes.trim().slice(0, 200) : null,
         })
+      } else if (kind === 'reimbursement') {
+        if (!owed) throw new Error('Pick the person who is being repaid.')
+        if (amount > owed.due + 0.005) throw new Error(`The statement amount (${fmt2(amount)}) is more than the ${fmt2(owed.due)} owed to ${owed.name}. If part of it is something else, record that separately.`)
+        // One reimbursement per expense it settles, oldest first, like the Settle button on the dashboard.
+        for (const alloc of allocateSettlement(amount, owed.outstanding)) {
+          await createReimbursement.mutateAsync({
+            ...(alloc.source === 'vendor_payment' ? { vendor_bill_payment_id: alloc.expenseId } : { expense_id: alloc.expenseId }),
+            date,
+            amount: alloc.amount,
+            reference: reference.trim() || null,
+            payment_mode: 'Bank',
+            bank_account_id: bankAccountId,
+          })
+        }
       } else if (kind === 'capital') {
         if (!partnerId) throw new Error('Pick the partner.')
         await createCapital.mutateAsync({
@@ -245,17 +287,32 @@ export function RecordFromStatement({
           paid_by: null,
         })
       } else {
-        if (!invoiceId) throw new Error('Pick the invoice this payment is for.')
-        await createReceipt.mutateAsync({
-          invoice_id: invoiceId,
-          date,
-          amount,
-          reference: reference.trim() || null,
-          payment_mode: 'Bank',
-          bank_account_id: bankAccountId,
-          is_retention_release: isRelease,
-          gst_component: 0,
-        })
+        const parts = openInvoices.map((x) => ({ ...x, part: round2(Number(invAlloc[x.inv.id]) || 0) })).filter((x) => x.part > 0)
+        if (parts.length === 0) throw new Error('Say which invoice this payment is for, and how much of it.')
+        if (Math.abs(leftToAllocate) > 0.005) {
+          throw new Error(
+            leftToAllocate > 0
+              ? `${fmt2(leftToAllocate)} of the ${fmt2(amount)} is not given to any invoice yet.`
+              : `The invoices add up to ${fmt2(allocated)}, which is ${fmt2(-leftToAllocate)} more than the statement amount.`
+          )
+        }
+        for (const x of parts) {
+          const cap = isRelease ? x.held : x.due
+          if (x.part > cap + 0.005) throw new Error(`${x.inv.invoice_number || x.inv.display_id}: ${fmt2(x.part)} is more than the ${fmt2(cap)} that can still be received on it.`)
+        }
+        // One payment entry per invoice, all dated the day the money arrived.
+        for (const x of parts) {
+          await createReceipt.mutateAsync({
+            invoice_id: x.inv.id,
+            date,
+            amount: x.part,
+            reference: reference.trim() || null,
+            payment_mode: 'Bank',
+            bank_account_id: bankAccountId,
+            is_retention_release: isRelease,
+            gst_component: 0,
+          })
+        }
       }
       // The new entry should appear in this account's books straight away so it can be matched.
       await qc.invalidateQueries({ queryKey: ['bank_lines'] })
@@ -375,6 +432,44 @@ export function RecordFromStatement({
             </select>
           </div>
           <div className="note">It is recorded against the trip and its project, as paid from {bankName}.</div>
+        </>
+      )}
+
+      {kind === 'reimbursement' && (
+        <>
+          {owedPeople.length === 0 ? (
+            <div className="note">Nobody is owed a reimbursement right now. A cost counts as owed when it was entered as "reimbursable" (paid by a person from their own pocket).</div>
+          ) : (
+            <>
+              <div className="field">
+                <label htmlFor="rfs-reimb-user">Who is being repaid?</label>
+                <select id="rfs-reimb-user" value={reimbUserId} onChange={(e) => setReimbUserId(e.target.value)}>
+                  <option value="">Pick a person</option>
+                  {owedPeople.map((r) => (
+                    <option key={r.userId} value={r.userId ?? ''}>
+                      {r.name} · owed {fmt2(r.due)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {owed && (
+                <div className="note">
+                  {fmt2(amount)} is split over {reimbAllocations.length} entr{reimbAllocations.length === 1 ? 'y' : 'ies'}, oldest first
+                  {amount < owed.due - 0.005 ? `, and ${fmt2(owed.due - amount)} is still owed after this` : ', which clears everything owed to them'}.
+                  <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+                    {reimbAllocations.map((a) => {
+                      const d = owed.details.find((x) => x.id === a.expenseId)
+                      return (
+                        <li key={a.expenseId}>
+                          {d ? `${fmtDate(d.date)} · ${d.description}` : 'Entry'} · {fmt2(a.amount)}
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </div>
+              )}
+            </>
+          )}
         </>
       )}
 
@@ -511,7 +606,7 @@ export function RecordFromStatement({
               value={clientId}
               onChange={(v) => {
                 setClientId(v)
-                setInvoiceId('')
+                setInvAlloc({})
               }}
               getId={(c) => c.id}
               getLabel={(c) => c.name}
@@ -520,17 +615,51 @@ export function RecordFromStatement({
           {clientId && openInvoices.length === 0 && <div className="note">This client has no invoice that is due or holding retention. Check that the invoice is marked Sent.</div>}
           {openInvoices.length > 0 && (
             <>
-              <div className="field">
-                <label htmlFor="rfs-inv">Which invoice is this payment for?</label>
-                <select id="rfs-inv" value={invoiceId} onChange={(e) => setInvoiceId(e.target.value)}>
-                  <option value="">Pick an invoice</option>
-                  {openInvoices.map(({ inv, due, held }) => (
-                    <option key={inv.id} value={inv.id}>
-                      {inv.invoice_number || inv.display_id} · due {fmt2(due)}
-                      {held > 0.01 ? ` · retention held ${fmt2(held)}` : ''}
-                    </option>
-                  ))}
-                </select>
+              <div className="note" style={{ marginTop: 0 }}>
+                Which invoice or invoices is this payment for? If one transfer paid several invoices, give each its part. The parts must add up to {fmt2(amount)}.
+              </div>
+              <div className="table-scroll">
+                <table className="data">
+                  <thead>
+                    <tr>
+                      <th>Invoice</th>
+                      <th style={{ textAlign: 'right' }}>{isRelease ? 'Retention held' : 'Still due'}</th>
+                      <th style={{ textAlign: 'right' }}>This payment</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {openInvoices.map(({ inv, due, held }) => (
+                      <tr key={inv.id}>
+                        <td>
+                          {inv.invoice_number || inv.display_id}
+                          {inv.invoice_date && <div className="retention-note">{fmtDate(inv.invoice_date)}</div>}
+                        </td>
+                        <td className="amt">{fmt2(isRelease ? held : due)}</td>
+                        <td style={{ textAlign: 'right' }}>
+                          <input
+                            aria-label={`Part of the payment for ${inv.invoice_number || inv.display_id}`}
+                            inputMode="decimal"
+                            style={{ width: 110, textAlign: 'right' }}
+                            value={invAlloc[inv.id] ?? ''}
+                            onChange={(e) => setInvAlloc({ ...invAlloc, [inv.id]: e.target.value })}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', margin: '6px 0', fontSize: 13, flexWrap: 'wrap' }}>
+                <Button type="button" variant="secondary" onClick={fillOldestFirst}>
+                  Fill oldest first
+                </Button>
+                <span style={{ color: Math.abs(leftToAllocate) < 0.005 ? 'var(--green)' : 'var(--amber)' }}>
+                  {Math.abs(leftToAllocate) < 0.005
+                    ? 'All of the payment is given to invoices.'
+                    : leftToAllocate > 0
+                      ? `${fmt2(leftToAllocate)} still to give to an invoice.`
+                      : `${fmt2(-leftToAllocate)} too much.`}
+                </span>
               </div>
               <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, margin: '4px 0 10px' }}>
                 <input type="checkbox" checked={isRelease} onChange={(e) => setIsRelease(e.target.checked)} />
