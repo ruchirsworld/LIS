@@ -7,6 +7,7 @@ import { getErrorMessage } from '../../lib/errors'
 import { toast } from '../../lib/feedback'
 import { companyHeaderLine } from '../invoices/ledgerExport'
 import { ReportExportButtons } from './ReportExportButtons'
+import { BankStatementMatcher } from './BankStatementMatcher'
 import type { ExportSection } from '../../lib/export/report'
 
 const today = () => new Date().toISOString().slice(0, 10)
@@ -34,6 +35,7 @@ export function BankReconciliationReport() {
     [lines, cleared, statementBalance, statementDate]
   )
 
+  const accountName = accounts?.find((a) => a.id === selected)?.name ?? ''
   const visible = (lines ?? []).filter((l) => l.date <= statementDate && (showAll || !cleared.has(l.id)))
   const agrees = balanceText.trim() !== '' && Math.abs(summary.difference) < 0.01
 
@@ -45,7 +47,6 @@ export function BankReconciliationReport() {
     }
   }
 
-  const accountName = accounts?.find((a) => a.id === selected)?.name ?? ''
   const sections: ExportSection[] = [
     {
       title: `Bank reconciliation - ${accountName} - as on ${fmtDate(statementDate)}`,
@@ -100,6 +101,20 @@ export function BankReconciliationReport() {
       </div>
 
       {!accounts?.length && <div className="empty-row">No bank accounts yet. Add one in Settings.</div>}
+
+      {selected && lines && (
+        <BankStatementMatcher
+          bankName={accountName}
+          ledger={lines}
+          clearedIds={cleared}
+          ticking={setCleared.isPending}
+          onStatementRead={({ lastDate, closing }) => {
+            setStatementDate(lastDate)
+            if (closing !== null) setBalanceText(String(closing))
+          }}
+          onTick={(ids) => setCleared.mutateAsync({ lineIds: ids, cleared: true, clearedOn: statementDate })}
+        />
+      )}
 
       {selected && (
         <>
