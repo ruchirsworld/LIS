@@ -12,6 +12,8 @@ import type { StatementLine } from '../../lib/import/bankStatement'
 import { useBankAccounts, useClients, useExpenseSubHeads, useProjects, useVendors } from '../../lib/queries/masters'
 import { useCreateTransfer } from '../../lib/queries/transfers'
 import { useProfiles } from '../../lib/queries/admin'
+import { useTrips } from '../../lib/queries/trips'
+import { TRIP_QUICK_CATEGORIES } from '../../lib/tripQuickCategories'
 import { useCreateCapitalTx } from '../../lib/queries/capital'
 import { useCreateLoan, useCreateLoanPayment, useLoanPayments, useLoans } from '../../lib/queries/loans'
 import { loanOutstanding } from '../../lib/calc/loans'
@@ -19,12 +21,13 @@ import { useCreateExpense } from '../../lib/queries/expenses'
 import { useCreateVendorBillPayment, useVendorBillPayments, useVendorBills } from '../../lib/queries/purchases'
 import { useCreateInvoicePayment, useInvoicePayments, useInvoices } from '../../lib/queries/invoices'
 
-type Kind = 'transfer' | 'expense' | 'vendor' | 'receipt' | 'capital' | 'loan' | 'loanpay'
+type Kind = 'transfer' | 'expense' | 'trip' | 'vendor' | 'receipt' | 'capital' | 'loan' | 'loanpay'
 
 const CASH = 'cash'
 const KIND_LABEL: Record<Kind, string> = {
   transfer: 'Transfer between my accounts',
   expense: 'Expense (bank charges, site cost ...)',
+  trip: 'Trip expense (fuel, meals, tickets, lodging ...)',
   vendor: 'Payment to a vendor',
   receipt: 'Receipt from a client',
   capital: 'Capital (money a partner puts in or takes out)',
@@ -49,7 +52,7 @@ export function RecordFromStatement({
   const goTo = useGoTo()
   const incoming = line.deposit > 0
   const amount = incoming ? line.deposit : line.withdrawal
-  const kinds: Kind[] = incoming ? ['transfer', 'receipt', 'capital', 'loan'] : ['transfer', 'expense', 'vendor', 'capital', 'loanpay']
+  const kinds: Kind[] = incoming ? ['transfer', 'receipt', 'capital', 'loan'] : ['transfer', 'expense', 'trip', 'vendor', 'capital', 'loanpay']
 
   const { data: banks } = useBankAccounts()
   const { data: clients } = useClients()
@@ -71,6 +74,7 @@ export function RecordFromStatement({
   const { data: profiles } = useProfiles()
   const { data: loans } = useLoans(null)
   const { data: loanPayments } = useLoanPayments()
+  const { data: trips } = useTrips()
 
   const [kind, setKind] = useState<Kind>(kinds[0])
   const [date, setDate] = useState(line.date)
@@ -88,6 +92,8 @@ export function RecordFromStatement({
   const [invoiceId, setInvoiceId] = useState('')
   const [isRelease, setIsRelease] = useState(false)
   const [partnerId, setPartnerId] = useState('')
+  const [tripId, setTripId] = useState('')
+  const [tripCategory, setTripCategory] = useState('')
   const [loanType, setLoanType] = useState<'private' | 'bank'>('bank')
   const [lender, setLender] = useState('')
   const [roiPct, setRoiPct] = useState('')
@@ -100,6 +106,8 @@ export function RecordFromStatement({
 
   // Partners are Admin and CXO only; a supervisor is an employee with no stake in capital.
   const partners = (profiles ?? []).filter((p) => p.role === 'admin' || p.role === 'cxo')
+  // Open trips first, then the closed ones, so the current trip is easy to find.
+  const tripOptions = useMemo(() => [...(trips ?? [])].sort((a, b) => (a.status === b.status ? b.start_date.localeCompare(a.start_date) : a.status === 'open' ? -1 : 1)), [trips])
   const openLoans = useMemo(
     () =>
       (loans ?? [])
@@ -142,6 +150,27 @@ export function RecordFromStatement({
           amount,
           date,
           notes: notes.trim() || null,
+        })
+      } else if (kind === 'trip') {
+        const trip = (trips ?? []).find((t) => t.id === tripId)
+        if (!trip) throw new Error('Pick the trip.')
+        const subHead = (subHeads ?? []).find((s) => s.code === tripCategory)
+        if (!subHead) throw new Error('Pick what the money was spent on.')
+        const label = TRIP_QUICK_CATEGORIES.flatMap((c) => c.options ?? []).find((o) => o.subHeadCode === tripCategory)?.label ?? subHead.name
+        await createExpense.mutateAsync({
+          description: label,
+          amount,
+          gst_pct: 0,
+          date,
+          cost_center: trip.cost_center || 'Trips',
+          project_id: trip.project_id,
+          sub_head_id: subHead.id,
+          trip_id: trip.id,
+          reimbursable: false,
+          paid_from_imprest: false,
+          payment_mode: 'Bank',
+          bank_account_id: bankAccountId,
+          remarks: notes.trim() ? notes.trim().slice(0, 200) : null,
         })
       } else if (kind === 'capital') {
         if (!partnerId) throw new Error('Pick the partner.')
@@ -315,6 +344,40 @@ export function RecordFromStatement({
         </>
       )}
 
+      {kind === 'trip' && (
+        <>
+          <div className="field">
+            <label htmlFor="rfs-trip">Which trip?</label>
+            <select id="rfs-trip" value={tripId} onChange={(e) => setTripId(e.target.value)}>
+              <option value="">Pick a trip</option>
+              {tripOptions.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name} · {t.display_id}
+                  {t.status === 'open' ? '' : ' (closed)'}
+                </option>
+              ))}
+            </select>
+          </div>
+          {tripOptions.length === 0 && <div className="note">There are no trips yet. Create the trip first on the Expenses page, under Trips.</div>}
+          <div className="field">
+            <label htmlFor="rfs-trip-cat">What was it spent on?</label>
+            <select id="rfs-trip-cat" value={tripCategory} onChange={(e) => setTripCategory(e.target.value)}>
+              <option value="">Pick one</option>
+              {TRIP_QUICK_CATEGORIES.map((group) => (
+                <optgroup key={group.label} label={group.label}>
+                  {(group.options ?? []).map((o) => (
+                    <option key={`${group.label}-${o.label}`} value={o.subHeadCode}>
+                      {o.label}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+          <div className="note">It is recorded against the trip and its project, as paid from {bankName}.</div>
+        </>
+      )}
+
       {kind === 'vendor' && (
         <>
           <div className="field">
@@ -484,7 +547,7 @@ export function RecordFromStatement({
           <input id="rfs-ref" value={reference} onChange={(e) => setReference(e.target.value)} />
         </div>
       )}
-      {(kind === 'transfer' || kind === 'expense' || kind === 'capital' || kind === 'loan') && (
+      {(kind === 'transfer' || kind === 'expense' || kind === 'trip' || kind === 'capital' || kind === 'loan') && (
         <div className="field">
           <label htmlFor="rfs-notes">{kind === 'expense' ? 'Description' : 'Note (optional)'}</label>
           <input id="rfs-notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
