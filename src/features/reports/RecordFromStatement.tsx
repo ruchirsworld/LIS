@@ -20,10 +20,10 @@ import { loanOutstanding } from '../../lib/calc/loans'
 import { useCreateExpense, useCreateExpenseReimbursement } from '../../lib/queries/expenses'
 import { allocateSettlement } from '../../lib/calc/expenses'
 import { useReimbursementDue } from '../dashboard/useReimbursementDue'
-import { useCreateVendorBillPayment, useVendorBillPayments, useVendorBills } from '../../lib/queries/purchases'
+import { useCreateVendorAdvance, useCreateVendorBillPayment, useVendorBillPayments, useVendorBills } from '../../lib/queries/purchases'
 import { useCreateInvoicePayment, useInvoicePayments, useInvoices } from '../../lib/queries/invoices'
 
-type Kind = 'transfer' | 'expense' | 'trip' | 'reimbursement' | 'vendor' | 'receipt' | 'capital' | 'loan' | 'loanpay'
+type Kind = 'transfer' | 'expense' | 'trip' | 'reimbursement' | 'vendor' | 'vendoradvance' | 'receipt' | 'capital' | 'loan' | 'loanpay'
 
 const CASH = 'cash'
 const KIND_LABEL: Record<Kind, string> = {
@@ -31,7 +31,8 @@ const KIND_LABEL: Record<Kind, string> = {
   expense: 'Expense (bank charges, site cost ...)',
   trip: 'Trip expense (fuel, meals, tickets, lodging ...)',
   reimbursement: 'Reimbursement to an employee (money they paid out of pocket)',
-  vendor: 'Payment to a vendor',
+  vendor: 'Payment to a vendor (against a bill)',
+  vendoradvance: 'Advance to a vendor (no bill yet)',
   receipt: 'Receipt from a client',
   capital: 'Capital (money a partner puts in or takes out)',
   loan: 'A new loan received',
@@ -55,7 +56,7 @@ export function RecordFromStatement({
   const goTo = useGoTo()
   const incoming = line.deposit > 0
   const amount = incoming ? line.deposit : line.withdrawal
-  const kinds: Kind[] = incoming ? ['transfer', 'receipt', 'capital', 'loan'] : ['transfer', 'expense', 'trip', 'reimbursement', 'vendor', 'capital', 'loanpay']
+  const kinds: Kind[] = incoming ? ['transfer', 'receipt', 'capital', 'loan'] : ['transfer', 'expense', 'trip', 'reimbursement', 'vendor', 'vendoradvance', 'capital', 'loanpay']
 
   const { data: banks } = useBankAccounts()
   const { data: clients } = useClients()
@@ -70,6 +71,7 @@ export function RecordFromStatement({
   const createTransfer = useCreateTransfer()
   const createExpense = useCreateExpense()
   const createVendorPayment = useCreateVendorBillPayment()
+  const createVendorAdvance = useCreateVendorAdvance()
   const createReceipt = useCreateInvoicePayment()
   const createCapital = useCreateCapitalTx()
   const createLoan = useCreateLoan()
@@ -274,6 +276,17 @@ export function RecordFromStatement({
           payment_mode: 'Bank',
           bank_account_id: bankAccountId,
           remarks: reference.trim() ? `Bank ref ${reference.trim()}` : null,
+        })
+      } else if (kind === 'vendoradvance') {
+        if (!vendorId) throw new Error('Pick the vendor.')
+        await createVendorAdvance.mutateAsync({
+          vendor_id: vendorId,
+          date,
+          amount,
+          reference: reference.trim() || null,
+          notes: notes.trim() || null,
+          payment_mode: 'Bank',
+          bank_account_id: bankAccountId,
         })
       } else if (kind === 'vendor') {
         if (!billId) throw new Error('Pick the bill this payment is for.')
@@ -490,7 +503,11 @@ export function RecordFromStatement({
           </div>
           {vendorId && openBills.length === 0 && (
             <div className="note">
-              This vendor has no unpaid bill. Record the bill first in Procurements (it needs the bill date, the type of cost and the amount), then come back.{' '}
+              This vendor has no unpaid bill. If this money was paid before the bill, record it as an advance: it is set against the vendor&rsquo;s bills automatically, oldest first, when they are entered.{' '}
+              <Button type="button" onClick={() => setKind('vendoradvance')}>
+                Record as an advance
+              </Button>{' '}
+              Or record the bill first in Procurements (it needs the bill date, the type of cost and the amount), then come back.{' '}
               {goTo && (
                 <Button
                   type="button"
@@ -518,6 +535,19 @@ export function RecordFromStatement({
               </select>
             </div>
           )}
+        </>
+      )}
+
+      {kind === 'vendoradvance' && (
+        <>
+          <div className="field">
+            <label>Vendor</label>
+            <SearchableSelect items={vendors} value={vendorId} onChange={setVendorId} getId={(v) => v.id} getLabel={(v) => v.name} />
+          </div>
+          <div className="note">
+            Recorded as money paid to the vendor ahead of a bill, not as a cost. When you enter their bill, the oldest advance is set against it automatically and only the rest is left to pay.
+            {vendors && vendors.length > 0 ? '' : ' There are no vendors yet. Add the vendor first in Procurements.'}
+          </div>
         </>
       )}
 
@@ -676,7 +706,7 @@ export function RecordFromStatement({
           <input id="rfs-ref" value={reference} onChange={(e) => setReference(e.target.value)} />
         </div>
       )}
-      {(kind === 'transfer' || kind === 'expense' || kind === 'trip' || kind === 'capital' || kind === 'loan') && (
+      {(kind === 'transfer' || kind === 'expense' || kind === 'trip' || kind === 'vendoradvance' || kind === 'capital' || kind === 'loan') && (
         <div className="field">
           <label htmlFor="rfs-notes">{kind === 'expense' ? 'Description' : 'Note (optional)'}</label>
           <input id="rfs-notes" value={notes} onChange={(e) => setNotes(e.target.value)} />

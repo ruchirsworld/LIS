@@ -2347,8 +2347,73 @@ export type Database = {
           },
         ]
       }
+      vendor_advances: {
+        Row: {
+          amount: number
+          bank_account_id: string | null
+          created_at: string
+          created_by: string | null
+          date: string
+          display_id: string | null
+          id: string
+          notes: string | null
+          payment_mode: string
+          reference: string | null
+          vendor_id: string
+        }
+        Insert: {
+          amount: number
+          bank_account_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          date: string
+          display_id?: string | null
+          id?: string
+          notes?: string | null
+          payment_mode?: string
+          reference?: string | null
+          vendor_id: string
+        }
+        Update: {
+          amount?: number
+          bank_account_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          display_id?: string | null
+          id?: string
+          notes?: string | null
+          payment_mode?: string
+          reference?: string | null
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_advances_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_advances_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_advances_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vendor_bill_payments: {
         Row: {
+          advance_id: string | null
           amount: number
           bank_account_id: string | null
           bill_id: string
@@ -2362,6 +2427,7 @@ export type Database = {
           reference: string | null
         }
         Insert: {
+          advance_id?: string | null
           amount: number
           bank_account_id?: string | null
           bill_id: string
@@ -2375,6 +2441,7 @@ export type Database = {
           reference?: string | null
         }
         Update: {
+          advance_id?: string | null
           amount?: number
           bank_account_id?: string | null
           bill_id?: string

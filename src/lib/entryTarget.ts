@@ -23,6 +23,7 @@ export function baseTarget(sourceTable: string | null | undefined, date: string)
       return { tab: 'transfers' }
     case 'vendor_bills':
     case 'vendor_bill_payments':
+    case 'vendor_advances':
       return { tab: 'purchases', filter: day }
     case 'invoices':
     case 'invoice_notes':

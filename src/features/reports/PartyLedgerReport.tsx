@@ -28,7 +28,8 @@ const PARTY_CONFIG: Record<
   // Accounts Payable / Loans Payable / Partner Capital are all credit-normal
   // — flipping the sign makes the running balance read as "what we owe them"
   // (or "net capital in", for partners) as a positive number, not negative.
-  vendor: { glAccountCode: '2010', partyColumn: 'vendor_id', balanceSign: -1, balanceLabel: 'Amount due', pickerLabel: 'Vendor' },
+  // A vendor's account is payables plus any advance paid to them (an advance reads as a negative amount due).
+  vendor: { glAccountCode: ['2010', '1075'], partyColumn: 'vendor_id', balanceSign: -1, balanceLabel: 'Amount due', pickerLabel: 'Vendor' },
   loan: { glAccountCode: '2040', partyColumn: 'loan_id', balanceSign: -1, balanceLabel: 'Outstanding', pickerLabel: 'Lender' },
   partner: { glAccountCode: '3010', partyColumn: 'partner_id', balanceSign: -1, balanceLabel: 'Net capital', pickerLabel: 'Partner' },
   // Site Imprest and Salary Advance are both debit-normal assets — same

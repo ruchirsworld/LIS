@@ -3,6 +3,7 @@ import { ModuleHeader } from '../../components/ui'
 import { useAuth } from '../../lib/auth'
 import { VendorBillForm } from './VendorBillForm'
 import { PaymentRecordsTable } from './PaymentRecordsTable'
+import { VendorAdvanceSection } from './VendorAdvanceSection'
 import { VendorBillTable } from './VendorBillTable'
 import { ImportFileBlock } from '../admin/DataImportSection'
 import { downloadVendorBillsImportTemplate } from '../../lib/import/vendorBillsTemplate'
@@ -20,6 +21,7 @@ export function PurchasesPage() {
     <div>
       <ModuleHeader>Procurements</ModuleHeader>
       <VendorBillForm editingBill={editingBill} onDoneEditing={() => setEditingBill(null)} />
+      <VendorAdvanceSection />
       <PaymentRecordsTable />
       <VendorBillTable onEdit={setEditingBill} />
 

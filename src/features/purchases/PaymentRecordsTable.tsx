@@ -123,14 +123,20 @@ export function PaymentRecordsTable() {
                     <td>{bill?.display_id ?? '—'}</td>
                     <td className="amt">{fmt(p.amount)}</td>
                     <td>{p.reference ?? '—'}</td>
-                    <td>{p.payment_mode ?? '—'}</td>
+                    <td>{p.payment_mode === 'Advance' ? 'From advance' : p.payment_mode ?? '—'}</td>
                     <td>
-                      <RowMenu
-                        items={[
-                          { label: 'Edit', onClick: () => setEditingPayment(p) },
-                          { label: 'Remove', onClick: () => deletePayment.mutate(p.id) },
-                        ]}
-                      />
+                      {p.payment_mode === 'Advance' ? (
+                        <span className="retention-note" title="Made automatically from an advance. To change it, change the advance or the bill.">
+                          Automatic
+                        </span>
+                      ) : (
+                        <RowMenu
+                          items={[
+                            { label: 'Edit', onClick: () => setEditingPayment(p) },
+                            { label: 'Remove', onClick: () => deletePayment.mutate(p.id) },
+                          ]}
+                        />
+                      )}
                     </td>
                   </tr>
                   {editingPayment?.id === p.id && bill && (

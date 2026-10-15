@@ -70,4 +70,17 @@ describe('balance sheet', () => {
     expect(lines.find((l) => l.label === 'Profit brought forward')?.cur).toBe(200)
     expect(lines.find((l) => l.label === 'Profit for the year')?.cur).toBe(100)
   })
+
+  it('shows money paid to vendors ahead of their bills as its own asset line', () => {
+    const ledger = [
+      acc('1020', 'asset', 'Bank', 50000, 20000),
+      acc('1075', 'asset', 'Advances to Suppliers', 20000, 0),
+      acc('3010', 'equity', "Partners' capital", 0, 50000),
+    ]
+    const { lines, totals } = buildBalanceSheet(ledger, [], { cur: 0, prev: 0 })
+    expect(lines.find((l) => l.label === 'Advances to suppliers')?.cur).toBe(20000)
+    expect(lines.find((l) => l.label === 'Other assets')).toBeUndefined()
+    expect(totals.assets.cur).toBe(50000)
+    expect(totals.funds.cur).toBe(50000)
+  })
 })
