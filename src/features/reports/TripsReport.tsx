@@ -2,6 +2,8 @@ import { useTrips, useUpdateTrip, useDeleteTrip } from '../../lib/queries/trips'
 import { useProfiles } from '../../lib/queries/admin'
 import { useProjects } from '../../lib/queries/masters'
 import { useExpenses } from '../../lib/queries/expenses'
+import { useBankAccounts } from '../../lib/queries/masters'
+import { SpendBySource, spendExportSection } from '../trips/SpendBySource'
 import { fmt, fmtDate } from '../../lib/calc/format'
 import type { DateRange } from '../../lib/calc/reportPeriod'
 import { ReportExportButtons } from './ReportExportButtons'
@@ -16,6 +18,7 @@ export function TripsReport({ range }: { range: DateRange | null }) {
   const { data: profiles } = useProfiles()
   const { data: projects } = useProjects()
   const { data: expenses } = useExpenses(null)
+  const { data: banks } = useBankAccounts()
   const updateTrip = useUpdateTrip()
   const deleteTrip = useDeleteTrip()
 
@@ -34,6 +37,9 @@ export function TripsReport({ range }: { range: DateRange | null }) {
       patch: { status: currentStatus === 'closed' ? 'open' : 'closed', end_date: currentStatus === 'closed' ? null : todayStr() },
     })
   }
+
+  const rangedTripIds = new Set(rangedTrips.map((t) => t.id))
+  const rangedExpenses = (expenses ?? []).filter((e) => e.trip_id && rangedTripIds.has(e.trip_id))
 
   const sections: ExportSection[] = [
     {
@@ -54,11 +60,13 @@ export function TripsReport({ range }: { range: DateRange | null }) {
         ]
       }),
     },
+    spendExportSection('Spent via', rangedExpenses, banks ?? []),
   ]
 
   return (
     <div className="report-panel">
       <ReportExportButtons title="Trips" sections={sections} range={range} />
+      <SpendBySource expenses={rangedExpenses} label="All trips shown, spent via" />
       <div className="table-scroll" style={{ marginTop: 16 }}>
         <table className="data">
           <thead>

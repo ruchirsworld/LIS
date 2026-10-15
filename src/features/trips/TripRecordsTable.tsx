@@ -13,11 +13,12 @@ import { usePagination } from '../../lib/usePagination'
 import { useTrips, useUpdateTrip, useDeleteTrip } from '../../lib/queries/trips'
 import { useExpenses, useDeleteExpense } from '../../lib/queries/expenses'
 import { useProfiles } from '../../lib/queries/admin'
-import { useProjects, useExpenseSubHeads } from '../../lib/queries/masters'
+import { useBankAccounts, useProjects, useExpenseSubHeads } from '../../lib/queries/masters'
 import { useAuth } from '../../lib/auth'
 import { fmt, fmtDate } from '../../lib/calc/format'
 import { getErrorMessage } from '../../lib/errors'
 import { ExpenseForm } from '../expenses/ExpenseForm'
+import { SpendBySource, spendExportSection } from './SpendBySource'
 import { PeriodFilterToggle } from '../../components/PeriodFilterToggle'
 import type { DateRange } from '../../lib/calc/period'
 import type { ExportSection } from '../../lib/export/report'
@@ -161,6 +162,7 @@ export function TripRecordsTable() {
   const { data: profiles } = useProfiles()
   const { data: projects } = useProjects()
   const { data: subHeads } = useExpenseSubHeads()
+  const { data: banks } = useBankAccounts()
   const deleteTrip = useDeleteTrip()
   const deleteExpense = useDeleteExpense()
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -229,6 +231,9 @@ export function TripRecordsTable() {
   const rangeFilteredTrips = (trips ?? []).filter(
     (t) => (!range?.from || t.start_date >= range.from) && (!range?.to || t.start_date <= range.to)
   )
+  // Everything spent on the trips shown, for the summary by account.
+  const shownTripIds = new Set(rangeFilteredTrips.map((t) => t.id))
+  const shownExpenses = (expenses ?? []).filter((e) => e.trip_id && shownTripIds.has(e.trip_id))
   const { sorted, sortKey, direction, toggleSort } = useSort(
     rangeFilteredTrips,
     {
@@ -260,6 +265,7 @@ export function TripRecordsTable() {
         tripTotal(t.id),
       ]),
     },
+    spendExportSection('Spent via', shownExpenses, banks ?? []),
   ]
 
   return (
@@ -272,6 +278,8 @@ export function TripRecordsTable() {
         </div>
         <ReportExportButtons title="Trip records" sections={exportSections} range={range} iconOnly style={{ marginTop: 0 }} />
       </div>
+
+      <SpendBySource expenses={shownExpenses} label="All trips shown, spent via" />
 
       <TableScroll>
         <table className="data">
@@ -402,6 +410,8 @@ export function TripRecordsTable() {
                         {tripExpenses.length === 0 ? (
                           <div className="empty-state">No entries on this trip.</div>
                         ) : (
+                          <>
+                          <SpendBySource expenses={tripExpenses} style={{ marginTop: 0 }} />
                           <table className="data">
                             <thead>
                               <tr>
@@ -458,6 +468,7 @@ export function TripRecordsTable() {
                               ))}
                             </tbody>
                           </table>
+                          </>
                         )}
                       </td>
                     </tr>

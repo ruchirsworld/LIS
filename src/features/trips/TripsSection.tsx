@@ -5,7 +5,7 @@ import { Modal } from '../../components/Modal'
 import { useAuth } from '../../lib/auth'
 import { useTrips, useCreateTrip, useUpdateTrip } from '../../lib/queries/trips'
 import { useProfiles } from '../../lib/queries/admin'
-import { useProjects } from '../../lib/queries/masters'
+import { useBankAccounts, useProjects } from '../../lib/queries/masters'
 import { useExpenses } from '../../lib/queries/expenses'
 import { useExpenseSubHeads } from '../../lib/queries/masters'
 import { fmt, fmtDate } from '../../lib/calc/format'
@@ -14,6 +14,7 @@ import { ExpenseForm } from '../expenses/ExpenseForm'
 import { ReimbursementRecordsTable } from '../expenses/ReimbursementRecordsTable'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import { TripRecordsTable } from './TripRecordsTable'
+import { SpendBySource, spendExportSection } from './SpendBySource'
 import type { ExportSection } from '../../lib/export/report'
 
 function todayStr() {
@@ -27,6 +28,7 @@ export function TripsSection() {
   const { data: projects } = useProjects()
   const { data: expenses } = useExpenses(null)
   const { data: subHeads } = useExpenseSubHeads()
+  const { data: banks } = useBankAccounts()
   const createTrip = useCreateTrip()
   const updateTrip = useUpdateTrip()
 
@@ -124,6 +126,7 @@ export function TripsSection() {
           columns: ['Date', 'Description', 'Sub-head', 'Amount'],
           rows: expandedTripExpenses.map((e) => [fmtDate(e.date), e.description, subHeadName(e.sub_head_id), e.amount]),
         },
+        spendExportSection(`${expandedTrip.name} — spent via`, expandedTripExpenses, banks ?? []),
       ]
     : []
 
@@ -246,6 +249,8 @@ export function TripsSection() {
             {expandedTripExpenses.length === 0 ? (
               <div className="empty-state">No entries yet — add one above.</div>
             ) : (
+              <>
+              <SpendBySource expenses={expandedTripExpenses} />
               <div className="table-scroll">
                 <table className="data">
                   <thead>
@@ -278,6 +283,7 @@ export function TripsSection() {
                   </tfoot>
                 </table>
               </div>
+              </>
             )}
           </details>
         </>
