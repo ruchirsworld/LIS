@@ -72,6 +72,13 @@ export function useDeleteVendorBill() {
   })
 }
 
+/** What has already been paid or set off against a bill. An advance held for the vendor is set against a new bill the moment it is saved. */
+export async function fetchBillPaid(billId: string): Promise<number> {
+  const { data, error } = await supabase.from('vendor_bill_payments').select('amount').eq('bill_id', billId)
+  if (error) throw error
+  return (data ?? []).reduce((s, p) => s + Number(p.amount || 0), 0)
+}
+
 export function useVendorBillPayments() {
   return useQuery({
     queryKey: ['vendor_bill_payments'],

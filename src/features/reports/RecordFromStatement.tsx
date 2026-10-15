@@ -3,10 +3,11 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '../../components/ui'
 import { Modal } from '../../components/Modal'
 import { SearchableSelect } from '../../components/SearchableSelect'
-import { billDue } from '../../lib/calc/vendorBills'
+import { billBaseFromPaid, billDue, billPayable } from '../../lib/calc/vendorBills'
 import { dueAmount, retentionHeld, round2 } from '../../lib/calc/invoices'
-import { fmt2, fmtDate } from '../../lib/calc/format'
+import { fmt2, fmtDate, parseINR } from '../../lib/calc/format'
 import { getErrorMessage } from '../../lib/errors'
+import { toast } from '../../lib/feedback'
 import { useGoTo } from '../../lib/navContext'
 import type { StatementLine } from '../../lib/import/bankStatement'
 import { useBankAccounts, useClients, useExpenseSubHeads, useProjects, useVendors } from '../../lib/queries/masters'
@@ -20,10 +21,12 @@ import { loanOutstanding } from '../../lib/calc/loans'
 import { useCreateExpense, useCreateExpenseReimbursement } from '../../lib/queries/expenses'
 import { allocateSettlement } from '../../lib/calc/expenses'
 import { useReimbursementDue } from '../dashboard/useReimbursementDue'
-import { useCreateVendorAdvance, useCreateVendorBillPayment, useVendorBillPayments, useVendorBills } from '../../lib/queries/purchases'
+import { fetchBillPaid, useCreateVendorAdvance, useCreateVendorBill, useCreateVendorBillPayment, useVendorBillPayments, useVendorBills } from '../../lib/queries/purchases'
+import { AddVendorModal } from '../purchases/AddVendorModal'
+import { TDS_SECTIONS } from '../purchases/tdsSections'
 import { useCreateInvoicePayment, useInvoicePayments, useInvoices } from '../../lib/queries/invoices'
 
-type Kind = 'transfer' | 'expense' | 'trip' | 'reimbursement' | 'vendor' | 'vendoradvance' | 'receipt' | 'capital' | 'loan' | 'loanpay'
+type Kind = 'transfer' | 'expense' | 'trip' | 'reimbursement' | 'vendor' | 'vendorbill' | 'vendoradvance' | 'receipt' | 'capital' | 'loan' | 'loanpay'
 
 const CASH = 'cash'
 const KIND_LABEL: Record<Kind, string> = {
@@ -32,6 +35,7 @@ const KIND_LABEL: Record<Kind, string> = {
   trip: 'Trip expense (fuel, meals, tickets, lodging ...)',
   reimbursement: 'Reimbursement to an employee (money they paid out of pocket)',
   vendor: 'Payment to a vendor (against a bill)',
+  vendorbill: 'Vendor bill and payment (the bill is not entered yet)',
   vendoradvance: 'Advance to a vendor (no bill yet)',
   receipt: 'Receipt from a client',
   capital: 'Capital (money a partner puts in or takes out)',
@@ -56,7 +60,7 @@ export function RecordFromStatement({
   const goTo = useGoTo()
   const incoming = line.deposit > 0
   const amount = incoming ? line.deposit : line.withdrawal
-  const kinds: Kind[] = incoming ? ['transfer', 'receipt', 'capital', 'loan'] : ['transfer', 'expense', 'trip', 'reimbursement', 'vendor', 'vendoradvance', 'capital', 'loanpay']
+  const kinds: Kind[] = incoming ? ['transfer', 'receipt', 'capital', 'loan'] : ['transfer', 'expense', 'trip', 'reimbursement', 'vendor', 'vendorbill', 'vendoradvance', 'capital', 'loanpay']
 
   const { data: banks } = useBankAccounts()
   const { data: clients } = useClients()
@@ -72,6 +76,7 @@ export function RecordFromStatement({
   const createExpense = useCreateExpense()
   const createVendorPayment = useCreateVendorBillPayment()
   const createVendorAdvance = useCreateVendorAdvance()
+  const createVendorBill = useCreateVendorBill()
   const createReceipt = useCreateInvoicePayment()
   const createCapital = useCreateCapitalTx()
   const createLoan = useCreateLoan()
@@ -102,6 +107,16 @@ export function RecordFromStatement({
   const [partnerId, setPartnerId] = useState('')
   const [tripId, setTripId] = useState('')
   const [reimbUserId, setReimbUserId] = useState('')
+  // A bill made from this payment.
+  const [showAddVendor, setShowAddVendor] = useState(false)
+  const [billDate, setBillDate] = useState(line.date)
+  const [billSubHeadId, setBillSubHeadId] = useState('')
+  const [billGst, setBillGst] = useState('0')
+  const [billTdsKey, setBillTdsKey] = useState('')
+  const [partOfBigger, setPartOfBigger] = useState(false)
+  const [billValue, setBillValue] = useState('')
+  const [vendorInvNo, setVendorInvNo] = useState('')
+  const [vendorInvDate, setVendorInvDate] = useState('')
   const [tripCategory, setTripCategory] = useState('')
   const [loanType, setLoanType] = useState<'private' | 'bank'>('bank')
   const [lender, setLender] = useState('')
@@ -121,6 +136,19 @@ export function RecordFromStatement({
   const owedPeople = dueRows.filter((r) => r.userId)
   const owed = owedPeople.find((r) => r.userId === reimbUserId) ?? null
   const reimbAllocations = owed ? allocateSettlement(amount, owed.outstanding) : []
+  // The bill this payment belongs to: its value before GST is worked back from the payment, unless it is only part of a bigger bill.
+  const billVendor = (vendors ?? []).find((v) => v.id === vendorId)
+  const billIsSupervisor = billVendor?.category === 'Supervisor'
+  const billGstN = billIsSupervisor ? 0 : Number(billGst) || 0
+  const billTds = billIsSupervisor ? undefined : TDS_SECTIONS.find((t) => t.value === billTdsKey)
+  const billTdsN = billTds?.pct ?? 0
+  const procSubHeads = ['20.1', '20.7', '20.6', '20.4'].map((code) => (subHeads ?? []).find((s) => s.code === code)).filter((s): s is NonNullable<typeof s> => !!s)
+  // A contractor's bill is Sub-Contract; anything else defaults to Project Materials, as on the bill form.
+  const billSubHeadEffective = billSubHeadId || procSubHeads.find((s) => s.code === (billVendor?.category === 'Contractor' ? '20.6' : '20.1'))?.id || ''
+  const fromPayment = billBaseFromPaid(amount, billGstN, billTdsN)
+  const billBase = partOfBigger ? parseINR(billValue) : fromPayment.base
+  const billPayableN = round2(billPayable({ amount: billBase, gst_pct: billGstN, tds_pct: billTdsN }))
+  const billStillDue = round2(billPayableN - amount)
   const openLoans = useMemo(
     () =>
       (loans ?? [])
@@ -277,6 +305,64 @@ export function RecordFromStatement({
           bank_account_id: bankAccountId,
           remarks: reference.trim() ? `Bank ref ${reference.trim()}` : null,
         })
+      } else if (kind === 'vendorbill') {
+        if (!vendorId) throw new Error('Pick the vendor, or add a new one.')
+        if (!projectId) throw new Error('Pick the project this bill is for.')
+        if (!billSubHeadEffective) throw new Error('Pick the type of purchase.')
+        if (!billDate) throw new Error('Pick the bill date.')
+        if (!notes.trim()) throw new Error('Write what was bought, as a short description.')
+        if (billBase <= 0) throw new Error('Enter the bill value.')
+        if (amount - billPayableN > 0.05) {
+          throw new Error(`The bill comes to ${fmt2(billPayableN)} after GST and TDS, which is less than the ${fmt2(amount)} paid. Check the bill value, GST and TDS.`)
+        }
+        const project = (projects ?? []).find((p) => p.id === projectId)
+        const bill = await createVendorBill.mutateAsync({
+          vendor_id: vendorId,
+          sub_head_id: billSubHeadEffective,
+          description: notes.trim(),
+          remarks: null,
+          client_id: project?.client_id ?? null,
+          project_id: projectId,
+          date: billDate,
+          amount: billBase,
+          gst_pct: billGstN,
+          qty: null,
+          rate: null,
+          other_cost: 0,
+          tds_pct: billTdsN,
+          tds_section: billTds?.section || null,
+          vendor_invoice_no: vendorInvNo.trim() || null,
+          vendor_invoice_date: vendorInvDate || null,
+          receipt_path: null,
+        })
+        // An advance already held for this vendor is set against the bill as it is saved, so only what is still due is paid
+        // from the bank; anything beyond that stays with the vendor as a new advance.
+        const due = round2(billPayableN - (await fetchBillPaid(bill.id)))
+        const pay = amount - due <= 0.05 ? amount : Math.min(amount, Math.max(0, due))
+        if (pay > 0.004) {
+          await createVendorPayment.mutateAsync({
+            bill_id: bill.id,
+            date,
+            amount: pay,
+            reference: reference.trim() || null,
+            payment_mode: 'Bank',
+            bank_account_id: bankAccountId,
+            paid_by: null,
+          })
+        }
+        const left = round2(amount - pay)
+        if (left > 0.004) {
+          await createVendorAdvance.mutateAsync({
+            vendor_id: vendorId,
+            date,
+            amount: left,
+            reference: reference.trim() || null,
+            notes: `Left over after bill ${bill.display_id ?? ''}`.trim(),
+            payment_mode: 'Bank',
+            bank_account_id: bankAccountId,
+          })
+          toast('info', `${fmt2(left)} of this payment is held as an advance for the vendor, because an earlier advance already covered part of the bill.`)
+        }
       } else if (kind === 'vendoradvance') {
         if (!vendorId) throw new Error('Pick the vendor.')
         await createVendorAdvance.mutateAsync({
@@ -507,7 +593,10 @@ export function RecordFromStatement({
               <Button type="button" onClick={() => setKind('vendoradvance')}>
                 Record as an advance
               </Button>{' '}
-              Or record the bill first in Procurements (it needs the bill date, the type of cost and the amount), then come back.{' '}
+              Or make the bill now and record this payment against it.{' '}
+              <Button type="button" onClick={() => setKind('vendorbill')}>
+                Make the bill and payment
+              </Button>{' '}
               {goTo && (
                 <Button
                   type="button"
@@ -535,6 +624,93 @@ export function RecordFromStatement({
               </select>
             </div>
           )}
+        </>
+      )}
+
+      {kind === 'vendorbill' && (
+        <>
+          <div className="field">
+            <label>Vendor</label>
+            <SearchableSelect items={vendors} value={vendorId} onChange={setVendorId} getId={(v) => v.id} getLabel={(v) => v.name} getSearchValue={(v) => `${v.name} ${v.phone ?? ''}`} />
+            <button type="button" className="btn link" style={{ padding: 0, fontSize: 12, marginTop: 4 }} onClick={() => setShowAddVendor(true)}>
+              + Add a new vendor
+            </button>
+          </div>
+          <div className="field">
+            <label>Project</label>
+            <SearchableSelect items={(projects ?? []).filter((p) => p.status === 'active')} value={projectId} onChange={setProjectId} getId={(p) => p.id} getLabel={(p) => p.name} />
+          </div>
+          <div className="field">
+            <label htmlFor="rfs-bill-subhead">Type of purchase</label>
+            <select id="rfs-bill-subhead" value={billSubHeadEffective} onChange={(e) => setBillSubHeadId(e.target.value)}>
+              {procSubHeads.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="rfs-bill-date">Bill date</label>
+            <input id="rfs-bill-date" type="date" value={billDate} onChange={(e) => setBillDate(e.target.value)} />
+          </div>
+          <div className="field">
+            <label htmlFor="rfs-bill-invno">Vendor&rsquo;s invoice number (optional)</label>
+            <input id="rfs-bill-invno" value={vendorInvNo} onChange={(e) => setVendorInvNo(e.target.value)} />
+          </div>
+          <div className="field">
+            <label htmlFor="rfs-bill-invdate">Vendor&rsquo;s invoice date (optional)</label>
+            <input id="rfs-bill-invdate" type="date" value={vendorInvDate} onChange={(e) => setVendorInvDate(e.target.value)} />
+          </div>
+          {!billIsSupervisor && (
+            <>
+              <div className="field">
+                <label htmlFor="rfs-bill-gst">GST on the bill</label>
+                <select id="rfs-bill-gst" value={billGst} onChange={(e) => setBillGst(e.target.value)}>
+                  <option value="0">No GST</option>
+                  <option value="5">5 percent</option>
+                  <option value="12">12 percent</option>
+                  <option value="18">18 percent</option>
+                  <option value="28">28 percent</option>
+                </select>
+              </div>
+              <div className="field">
+                <label htmlFor="rfs-bill-tds">TDS you held back (optional)</label>
+                <select id="rfs-bill-tds" value={billTdsKey} onChange={(e) => setBillTdsKey(e.target.value)}>
+                  {TDS_SECTIONS.filter((t) => t.value !== 'other').map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
+          {billGstN > 0 && billVendor && !billVendor.gstin && (
+            <div className="note">This vendor has no GST number on file, so the GST on this bill cannot be claimed as input credit. Add it in Settings when you have it.</div>
+          )}
+          <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, margin: '4px 0 10px' }}>
+            <input type="checkbox" checked={partOfBigger} onChange={(e) => setPartOfBigger(e.target.checked)} />
+            This payment is only part of a bigger bill
+          </label>
+          {partOfBigger && (
+            <div className="field">
+              <label htmlFor="rfs-bill-value">Whole bill value before GST (₹)</label>
+              <input id="rfs-bill-value" inputMode="decimal" value={billValue} onChange={(e) => setBillValue(e.target.value)} />
+            </div>
+          )}
+          <div className="note">
+            {partOfBigger ? 'The bill' : 'The bill, worked back from this payment,'} is {fmt2(billBase)}
+            {billGstN > 0 ? ` plus ${billGstN} percent GST` : ''}
+            {billTdsN > 0 ? ` less ${billTdsN} percent TDS` : ''}, so you owe {fmt2(billPayableN)}. Paid now: {fmt2(amount)}.{' '}
+            {billStillDue > 0.004
+              ? `${fmt2(billStillDue)} is still due on the bill.`
+              : partOfBigger || Math.abs(billStillDue) < 0.005
+                ? 'The bill is fully paid.'
+                : `The bill is ${fmt2(-billStillDue)} short of the payment.`}
+            {!partOfBigger && !fromPayment.exact ? ' Taxes are rounded to the paisa, so it is a few paise off the statement.' : ''}
+          </div>
+          <div className="note">Any advance already paid to this vendor is set against the new bill first, so the bank is only charged what is left.</div>
         </>
       )}
 
@@ -706,9 +882,9 @@ export function RecordFromStatement({
           <input id="rfs-ref" value={reference} onChange={(e) => setReference(e.target.value)} />
         </div>
       )}
-      {(kind === 'transfer' || kind === 'expense' || kind === 'trip' || kind === 'vendoradvance' || kind === 'capital' || kind === 'loan') && (
+      {(kind === 'transfer' || kind === 'expense' || kind === 'trip' || kind === 'vendorbill' || kind === 'vendoradvance' || kind === 'capital' || kind === 'loan') && (
         <div className="field">
-          <label htmlFor="rfs-notes">{kind === 'expense' ? 'Description' : 'Note (optional)'}</label>
+          <label htmlFor="rfs-notes">{kind === 'expense' ? 'Description' : kind === 'vendorbill' ? 'What was bought' : 'Note (optional)'}</label>
           <input id="rfs-notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
         </div>
       )}
@@ -729,6 +905,15 @@ export function RecordFromStatement({
           {saving ? 'Saving…' : 'Save'}
         </Button>
       </div>
+      {showAddVendor && (
+        <AddVendorModal
+          onClose={() => setShowAddVendor(false)}
+          onCreated={(v) => {
+            setVendorId(v.id)
+            setShowAddVendor(false)
+          }}
+        />
+      )}
     </Modal>
   )
 }
