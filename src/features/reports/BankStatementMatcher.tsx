@@ -4,7 +4,17 @@ import { fmt2, fmtDate } from '../../lib/calc/format'
 import { useGoTo } from '../../lib/navContext'
 import { resolveEntryTarget } from '../../lib/entryTarget'
 import { RecordFromStatement } from './RecordFromStatement'
-import { ledgerIdsOf, ledgerTotalOf, matchStatement, statementRowsOf, type ForcedPair, type LedgerCandidate, type StatementMatch } from '../../lib/calc/bankMatch'
+import { EditEntryModal } from './EditEntryModal'
+import {
+  ledgerIdsOf,
+  ledgerKeysOf,
+  matchStatement,
+  statementRowsOf,
+  type ForcedPair,
+  type LedgerCandidate,
+  type ManualGroup,
+  type StatementMatch,
+} from '../../lib/calc/bankMatch'
 import {
   closingBalance,
   detectMapping,
@@ -17,7 +27,6 @@ import {
 } from '../../lib/import/bankStatement'
 import { getErrorMessage } from '../../lib/errors'
 import { confirmAction, toast } from '../../lib/feedback'
-import { ChangeMatchModal } from './ChangeMatchModal'
 import type { BankLineRow } from '../../lib/queries/books'
 import { ReportExportButtons } from './ReportExportButtons'
 import { BankSplitView } from './BankSplitView'
@@ -41,9 +50,12 @@ interface StoredStatement {
   headerRow: number
   mapping: ColumnMapping
   days: number
-  forced: ForcedPair[]
+  /** Matches made by hand (several lines against one, or one against one). */
+  groups?: ManualGroup[]
   /** Pairs the user unmatched: the matcher never joins these again. */
   forbidden?: ForcedPair[]
+  /** Older versions kept one-to-one pairings here. */
+  forced?: ForcedPair[]
 }
 const storeKeyOf = (bankId: string) => `lis.bankStatement.${bankId}`
 function loadStored(bankId: string): StoredStatement | null {
@@ -61,19 +73,8 @@ function plainCells(table: unknown[][]): unknown[][] {
 
 /** The system's label, then what the person typed on the entry. */
 const labelOf = (l: { description: string; detail?: string }) => (l.detail ? `${l.description} — ${l.detail}` : l.description)
-const amountOf = (l: { deposit: number; withdrawal: number }) => (l.deposit > 0 ? l.deposit : l.withdrawal)
-const sideOf = (l: { deposit: number }) => (l.deposit > 0 ? 'In' : 'Out')
 
-function matchNote(m: StatementMatch): string {
-  const parts: string[] = []
-  if (m.extra?.length) parts.push(`one payment for ${m.extra.length + 1} entries in your books`)
-  if (m.extraStatements?.length) parts.push(`${m.extraStatements.length + 1} payments on the statement, one entry in your books`)
-  parts.push(m.dayGap === 0 ? 'same day' : `${m.dayGap} day${m.dayGap === 1 ? '' : 's'} apart`)
-  if (m.ambiguous) parts.push(m.extra?.length || m.extraStatements?.length ? 'they add up, but check these belong together' : 'another entry has the same amount, check it')
-  return parts.join(', ')
-}
-
-/** Upload the bank's statement; the lines are matched to the books and the matches can be ticked in one go. */
+/** Upload the bank's statement; the lines are matched to the books side by side. */
 export function BankStatementMatcher({
   bankId,
   bankName,
@@ -92,7 +93,7 @@ export function BankStatementMatcher({
   /** Called with the statement's last date and closing balance when a file is read. */
   onStatementRead: (info: { lastDate: string; closing: number | null }) => void
   onTick: (ledgerLineIds: string[]) => Promise<void>
-  /** Takes the tick off entries again (when a match that was already ticked is changed). */
+  /** Takes the tick off entries again (when a match that was already ticked is broken). */
   onUntick: (ledgerLineIds: string[]) => Promise<void>
   ticking: boolean
   /** Reports how many matched lines are still waiting to be ticked. */
@@ -105,20 +106,26 @@ export function BankStatementMatcher({
   const [rows, setRows] = useState<unknown[][] | null>(restored?.rows ?? null)
   const [headerRow, setHeaderRow] = useState(restored?.headerRow ?? -1)
   const [mapping, setMapping] = useState<ColumnMapping | null>(restored?.mapping ?? null)
-  const [days, setDays] = useState(restored?.days ?? 7)
+  // Only entries on the same day are matched on their own, unless the user widens this.
+  const [days, setDays] = useState(restored?.days ?? 0)
   const [recording, setRecording] = useState<StatementLine | null>(null)
-  const [picked, setPicked] = useState<Set<string>>(new Set())
-  const [view, setView] = useState<'lists' | 'split'>('lists')
-  // Pairings the user chose by hand (a statement line and the book entry it really is).
-  const [forced, setForced] = useState<ForcedPair[]>(restored?.forced ?? [])
+  const [editing, setEditing] = useState<LedgerCandidate | null>(null)
+  const [groups, setGroups] = useState<ManualGroup[]>(
+    () => restored?.groups ?? (restored?.forced ?? []).map((f) => ({ statementRows: [f.statementRow], ledgerKeys: [f.ledgerId] }))
+  )
   const [forbidden, setForbidden] = useState<ForcedPair[]>(restored?.forbidden ?? [])
-  const [changing, setChanging] = useState<StatementMatch | null>(null)
+  // Lines ticked for a hand match.
+  const [selectedBank, setSelectedBank] = useState<Set<number>>(new Set())
+  const [selectedBooks, setSelectedBooks] = useState<Set<string>>(new Set())
 
   const headers = useMemo(() => (rows && headerRow >= 0 ? rows[headerRow].map((c) => String(c ?? '').trim()) : []), [rows, headerRow])
   const lines = useMemo(() => (rows && mapping ? extractLines(rows, headerRow, mapping) : []), [rows, headerRow, mapping])
   const candidates = useMemo<LedgerCandidate[]>(() => ledger.map((l) => ({ ...l, cleared: clearedIds.has(l.id) })), [ledger, clearedIds])
-  const result = useMemo(() => matchStatement(lines, candidates, { days, forced, forbidden }), [lines, candidates, days, forced, forbidden])
+  const result = useMemo(() => matchStatement(lines, candidates, { days, groups, forbidden }), [lines, candidates, days, groups, forbidden])
   const statementOnlyNet = Math.round(result.statementOnly.reduce((s, l) => s + l.deposit - l.withdrawal, 0) * 100) / 100
+  const matchCount = result.toTick.length + result.alreadyTicked.length
+  const groupCount = [...result.toTick, ...result.alreadyTicked].filter((m) => m.extra?.length || m.extraStatements?.length).length
+  const toTickCount = result.toTick.reduce((n, m) => n + ledgerIdsOf(m).length, 0)
 
   // Keep the statement for this session.
   useEffect(() => {
@@ -127,12 +134,12 @@ export function BankStatementMatcher({
         sessionStorage.removeItem(storeKeyOf(bankId))
         return
       }
-      const json = JSON.stringify({ fileName, rows, headerRow, mapping, days, forced, forbidden } satisfies StoredStatement)
+      const json = JSON.stringify({ fileName, rows, headerRow, mapping, days, groups, forbidden } satisfies StoredStatement)
       if (json.length < 4_000_000) sessionStorage.setItem(storeKeyOf(bankId), json)
     } catch {
       // Storage full or blocked: the statement just will not survive leaving the page.
     }
-  }, [bankId, fileName, rows, headerRow, mapping, days, forced, forbidden])
+  }, [bankId, fileName, rows, headerRow, mapping, days, groups, forbidden])
 
   // When the page is opened again with a kept statement, tell the page its date and closing balance.
   useEffect(() => {
@@ -143,23 +150,55 @@ export function BankStatementMatcher({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  useEffect(() => {
+    onPendingChange?.(result.toTick.length)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result.toTick.length])
+
+  function clearSelection() {
+    setSelectedBank(new Set())
+    setSelectedBooks(new Set())
+  }
+
   function removeStatement() {
     setRows(null)
     setMapping(null)
     setHeaderRow(-1)
     setFileName('')
-    setForced([])
+    setGroups([])
     setForbidden([])
+    clearSelection()
     setReadError(null)
   }
 
-  /** A wrong match: break it. The statement line and the entry both go back to "not matched", and they are not paired again. */
-  async function unmatch(m: StatementMatch, andClose = false) {
+  const toggle = <T,>(set: Set<T>, value: T) => {
+    const next = new Set(set)
+    if (next.has(value)) next.delete(value)
+    else next.add(value)
+    return next
+  }
+
+  /** Join the lines ticked on both sides into one match. The two sides already add up (the screen checks). */
+  function matchSelected() {
+    const statementRows = [...selectedBank]
+    const ledgerKeys = [...selectedBooks]
+    // A line can only be in one match, so any hand match it was in before gives way.
+    setGroups((cur) => [
+      ...cur.filter((g) => !g.statementRows.some((r) => statementRows.includes(r)) && !g.ledgerKeys.some((k) => ledgerKeys.includes(k))),
+      { statementRows, ledgerKeys },
+    ])
+    setForbidden((cur) => cur.filter((f) => !(statementRows.includes(f.statementRow) && ledgerKeys.includes(f.ledgerId))))
+    clearSelection()
+  }
+
+  /** A wrong match: break it. The statement lines and the entries go back to "no match", and are not joined again. */
+  async function unmatch(m: StatementMatch) {
     const ledgerIds = ledgerIdsOf(m)
-    const rows = statementRowsOf(m)
-    if (m.ledger.cleared) {
+    const keys = ledgerKeysOf(m)
+    const statementRows = statementRowsOf(m)
+    if ([m.ledger, ...(m.extra ?? [])].some((l) => l.cleared)) {
       const ok = await confirmAction({
-        title: 'Unmatch this line?',
+        title: 'Unmatch this?',
         message: 'It was already ticked off. Unmatching also takes the tick off, so the entry counts as not on the statement again.',
         confirmLabel: 'Unmatch',
         danger: true,
@@ -172,32 +211,8 @@ export function BankStatementMatcher({
         return
       }
     }
-    setForced((cur) => cur.filter((f) => !rows.includes(f.statementRow) && !ledgerIds.includes(f.ledgerId)))
-    setForbidden((cur) => [...cur, ...rows.flatMap((r) => ledgerIds.map((id) => ({ statementRow: r, ledgerId: id })))])
-    if (andClose) setChanging(null)
-  }
-
-  /** The statement line really is another entry: pair them, and keep the old partner from coming back. */
-  async function changeMatch(m: StatementMatch, ledgerId: string) {
-    if (m.ledger.cleared) {
-      const ok = await confirmAction({
-        title: 'Change this match?',
-        message: 'The old entry was already ticked off. Changing the match takes that tick off.',
-        confirmLabel: 'Change it',
-      })
-      if (!ok) return
-      try {
-        await onUntick(ledgerIdsOf(m))
-      } catch (err) {
-        toast('error', getErrorMessage(err, 'Could not take the tick off.'))
-        return
-      }
-    }
-    const row = m.statement.row
-    const oldIds = ledgerIdsOf(m)
-    setForbidden((cur) => [...cur.filter((f) => !(f.statementRow === row && f.ledgerId === ledgerId)), ...oldIds.map((id) => ({ statementRow: row, ledgerId: id }))])
-    setForced((cur) => [...cur.filter((f) => f.statementRow !== row && f.ledgerId !== ledgerId), { statementRow: row, ledgerId }])
-    setChanging(null)
+    setGroups((cur) => cur.filter((g) => !g.statementRows.some((r) => statementRows.includes(r)) && !g.ledgerKeys.some((k) => keys.includes(k))))
+    setForbidden((cur) => [...cur, ...statementRows.flatMap((r) => keys.map((k) => ({ statementRow: r, ledgerId: k })))])
   }
 
   async function openEntry(l: { sourceTable?: string | null; sourceId?: string | null; date: string }) {
@@ -209,16 +224,6 @@ export function BankStatementMatcher({
     toast('info', 'Your statement is kept. Come back through Reports, then Bank reconciliation.')
     goTo(target.tab, { costCenter: target.costCenter, filter: target.filter })
   }
-
-  useEffect(() => {
-    onPendingChange?.(result.toTick.length)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [result.toTick.length])
-
-  // Start with the safe matches ticked; ones that are far apart in date, or could be another entry, are left for a look.
-  useEffect(() => {
-    setPicked(new Set(result.toTick.filter((m) => !m.ambiguous && m.confidence !== 'loose').map((m) => m.ledger.id)))
-  }, [result])
 
   async function onFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -256,8 +261,9 @@ export function BankStatementMatcher({
       setHeaderRow(at)
       setMapping(map)
       setFileName(file.name)
-      setForced([])
+      setGroups([])
       setForbidden([])
+      clearSelection()
       if (read.length === 0) {
         setReadError('The table was found but no transaction lines could be read. Check the columns below.')
         return
@@ -270,12 +276,11 @@ export function BankStatementMatcher({
     }
   }
 
-  async function tickPicked() {
+  async function tickAll() {
     try {
-      // A lump-sum match is ticked as a whole: every entry in it.
-      const ids = result.toTick.filter((m) => picked.has(m.ledger.id)).flatMap(ledgerIdsOf)
+      const ids = result.toTick.flatMap(ledgerIdsOf)
       await onTick(ids)
-      toast('success', `${ids.length} line${ids.length === 1 ? '' : 's'} ticked off against the statement.`)
+      toast('success', `${ids.length} entr${ids.length === 1 ? 'y' : 'ies'} ticked off against the statement.`)
     } catch (err) {
       toast('error', getErrorMessage(err, 'Could not save the ticks.'))
     }
@@ -318,8 +323,8 @@ export function BankStatementMatcher({
     <div style={{ margin: '4px 0 16px' }}>
       <h3 style={{ margin: '0 0 6px', fontSize: 15 }}>Match with the bank statement</h3>
       <div className="note" style={{ marginTop: 0 }}>
-        Download the statement for {bankName || 'this account'} from net banking as Excel or CSV (not PDF) and choose it here. Each line is matched to your books
-        by amount and date, and you can tick the matches in one go.
+        Download the statement for {bankName || 'this account'} from net banking as Excel or CSV (not PDF) and choose it here. Lines with the same amount on the same day are matched
+        for you and shown in green. Lines with no match are red.
       </div>
       <input type="file" accept=".xlsx,.xls,.csv,.txt" onChange={(e) => void onFile(e)} aria-label="Bank statement file" />
       {readError && (
@@ -360,318 +365,65 @@ export function BankStatementMatcher({
                   Remove this statement
                 </button>
                 {fileName}: {lines.length} line{lines.length === 1 ? '' : 's'}, {fmtDate(lines.reduce((m, l) => (l.date < m ? l.date : m), lines[0].date))} to{' '}
-                {fmtDate(lines.reduce((m, l) => (l.date > m ? l.date : m), lines[0].date))}. {result.toTick.length + result.alreadyTicked.length} match your books
-                ({result.alreadyTicked.length} already ticked), {result.statementOnly.length} are on the statement only, {result.booksOnly.length} are in your books only.
+                {fmtDate(lines.reduce((m, l) => (l.date > m ? l.date : m), lines[0].date))}. {matchCount} matched{groupCount > 0 ? ` (${groupCount} of them groups)` : ''},{' '}
+                {result.statementOnly.length} on the statement only, {result.booksOnly.length} in your books only.
               </div>
-              <div className="field" style={{ maxWidth: 260 }}>
-                <label htmlFor="match-days">Match dates that are within</label>
+              <div className="field" style={{ maxWidth: 300 }}>
+                <label htmlFor="match-days">Match on their own when the dates are</label>
                 <select id="match-days" value={days} onChange={(e) => setDays(Number(e.target.value))}>
-                  <option value={3}>3 days of each other</option>
-                  <option value={7}>7 days of each other</option>
-                  <option value={15}>15 days of each other</option>
+                  <option value={0}>the same day</option>
+                  <option value={1}>within 1 day of each other</option>
+                  <option value={3}>within 3 days of each other</option>
+                  <option value={7}>within 7 days of each other</option>
                 </select>
               </div>
               <ReportExportButtons title="Bank statement matching" sections={sections} range={null} fileNamePrefix={`Statement_Matching_${bankName}`} />
 
-              <div role="group" aria-label="How to show the results" style={{ display: 'flex', gap: 8, margin: '12px 0' }}>
-                <Button type="button" variant={view === 'lists' ? 'primary' : 'secondary'} onClick={() => setView('lists')} aria-pressed={view === 'lists'}>
-                  Lists
-                </Button>
-                <Button type="button" variant={view === 'split' ? 'primary' : 'secondary'} onClick={() => setView('split')} aria-pressed={view === 'split'}>
-                  Side by side
-                </Button>
-              </div>
-
-              {view === 'split' ? (
-                <>
-                  <BankSplitView
-                    lines={lines}
-                    ledger={candidates}
-                    result={result}
-                    days={days}
-                    picked={picked}
-                    onPick={(id, on) => {
-                      const next = new Set(picked)
-                      if (on) next.add(id)
-                      else next.delete(id)
-                      setPicked(next)
-                    }}
-                    onForce={(statementRow, ledgerId) =>
-                      setForced((cur) => [...cur.filter((f) => f.statementRow !== statementRow && f.ledgerId !== ledgerId), { statementRow, ledgerId }])
-                    }
-                    onUnforce={(statementRow) => setForced((cur) => cur.filter((f) => f.statementRow !== statementRow))}
-                    onRecord={setRecording}
-                    onOpen={(l) => void openEntry(l)}
-                    onChangeMatch={setChanging}
-                    onUnmatch={(m) => void unmatch(m)}
-                  />
-                  <div style={{ marginTop: 10 }}>
-                    <Button type="button" onClick={() => void tickPicked()} disabled={picked.size === 0 || ticking}>
-                      Tick {picked.size} selected
-                    </Button>
-                  </div>
-                </>
-              ) : (
-                <>
-              <h4 style={{ margin: '14px 0 6px', fontSize: 13 }}>Ready to tick ({result.toTick.length})</h4>
-              {result.toTick.length === 0 ? (
-                <div className="note">Nothing new to tick.</div>
-              ) : (
-                <>
-                  <div className="table-scroll">
-                    <table className="data">
-                      <thead>
-                        <tr>
-                          <th style={{ width: 36 }}>
-                            <input
-                              type="checkbox"
-                              aria-label="Select all matches"
-                              checked={picked.size === result.toTick.length}
-                              onChange={(e) => setPicked(e.target.checked ? new Set(result.toTick.map((m) => m.ledger.id)) : new Set())}
-                            />
-                          </th>
-                          <th>Statement</th>
-                          <th>In your books</th>
-                          <th style={{ textAlign: 'right' }}>Amount</th>
-                          <th>How close</th>
-                          <th></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {result.toTick.map((m) => (
-                          <tr key={m.ledger.id + '|' + m.statement.row}>
-                            <td>
-                              <input
-                                type="checkbox"
-                                aria-label={`Tick ${m.ledger.description}`}
-                                checked={picked.has(m.ledger.id)}
-                                onChange={(e) => {
-                                  const next = new Set(picked)
-                                  if (e.target.checked) next.add(m.ledger.id)
-                                  else next.delete(m.ledger.id)
-                                  setPicked(next)
-                                }}
-                              />
-                            </td>
-                            <td>
-                              {[m.statement, ...(m.extraStatements ?? [])].map((s) => (
-                                <div key={s.row}>
-                                  {fmtDate(s.date)}
-                                  <div className="retention-note">
-                                    {m.extraStatements?.length ? `${fmt2(amountOf(s))} ` : ''}
-                                    {s.description}
-                                  </div>
-                                </div>
-                              ))}
-                            </td>
-                            <td>
-                              {[m.ledger, ...(m.extra ?? [])].map((l) => (
-                                <div key={l.id}>
-                                  {fmtDate(l.date)}
-                                  <div className="retention-note">
-                                    {m.extra?.length ? `${fmt2(amountOf(l))} ` : ''}
-                                    {l.description}
-                                    {l.detail && <div style={{ color: 'var(--ink)' }}>{l.detail}</div>}
-                                  </div>
-                                  {l.sourceTable && (
-                                    <button type="button" className="btn link" style={{ padding: 0, fontSize: 12 }} onClick={() => void openEntry(l)}>
-                                      Open this entry
-                                    </button>
-                                  )}
-                                </div>
-                              ))}
-                            </td>
-                            <td className="amt">
-                              {sideOf(m.statement) === 'In' ? '+' : '-'}
-                              {fmt2(ledgerTotalOf(m))}
-                            </td>
-                            <td style={{ color: m.ambiguous || m.confidence === 'loose' ? 'var(--amber)' : undefined }}>{matchNote(m)}</td>
-                            <td>
-                              <MatchActions m={m} onChange={setChanging} onUnmatch={(x) => void unmatch(x)} />
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  <div style={{ marginTop: 10 }}>
-                    <Button type="button" onClick={() => void tickPicked()} disabled={picked.size === 0 || ticking}>
-                      Tick {picked.size} selected
-                    </Button>
-                  </div>
-                </>
-              )}
-
-              {result.alreadyTicked.length > 0 && (
-                <details style={{ marginTop: 14 }}>
-                  <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>Already ticked ({result.alreadyTicked.length}). Open to change one that is wrong.</summary>
-                  <div className="table-scroll">
-                    <table className="data">
-                      <thead>
-                        <tr>
-                          <th>Statement</th>
-                          <th>In your books</th>
-                          <th style={{ textAlign: 'right' }}>Amount</th>
-                          <th></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {result.alreadyTicked.map((m) => (
-                          <tr key={m.ledger.id + '|' + m.statement.row}>
-                            <td>
-                              {fmtDate(m.statement.date)}
-                              <div className="retention-note">{m.statement.description}</div>
-                            </td>
-                            <td>
-                              {fmtDate(m.ledger.date)}
-                              <div className="retention-note">
-                                {[m.ledger, ...(m.extra ?? [])].map((l) => (
-                                  <div key={l.id}>
-                                    {l.description}
-                                    {l.detail && <div style={{ color: 'var(--ink)' }}>{l.detail}</div>}
-                                  </div>
-                                ))}
-                              </div>
-                            </td>
-                            <td className="amt">
-                              {sideOf(m.statement) === 'In' ? '+' : '-'}
-                              {fmt2(ledgerTotalOf(m))}
-                            </td>
-                            <td>
-                              <MatchActions m={m} onChange={setChanging} onUnmatch={(x) => void unmatch(x)} />
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </details>
-              )}
-
-              <h4 style={{ margin: '16px 0 6px', fontSize: 13 }}>On the statement, not in your books ({result.statementOnly.length})</h4>
-              <div className="note" style={{ marginTop: 0 }}>
-                Usually bank charges, interest, or a payment or receipt that has not been entered yet. Enter these in the app, then upload again.
-                {result.statementOnly.length > 0 && (
-                  <>
-                    {' '}
-                    Together they come to <strong>{statementOnlyNet >= 0 ? '+' : '-'}{fmt2(Math.abs(statementOnlyNet))}</strong>. After you tick the matches, that is the difference
-                    you should still see below; once these are entered, it should be nil.
-                  </>
-                )}
-              </div>
-              <PileTable
-                empty="Every statement line is in your books."
-                head={['Date', 'Description', 'Amount']}
-                rows={result.statementOnly.map((l) => [fmtDate(l.date), l.description || l.reference, `${l.deposit > 0 ? '+' : '-'}${fmt2(amountOf(l))}`])}
-                actions={(i) => (
-                  <button type="button" className="btn" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => setRecording(result.statementOnly[i])}>
-                    Record this
-                  </button>
-                )}
+              <BankSplitView
+                lines={lines}
+                ledger={candidates}
+                result={result}
+                days={days}
+                selectedBank={selectedBank}
+                selectedBooks={selectedBooks}
+                onToggleBank={(row) => setSelectedBank((cur) => toggle(cur, row))}
+                onToggleBooks={(key) => setSelectedBooks((cur) => toggle(cur, key))}
+                onClearSelection={clearSelection}
+                onMatchSelected={matchSelected}
+                onUnmatch={(m) => void unmatch(m)}
+                onRecord={setRecording}
+                onEdit={setEditing}
               />
 
-              <h4 style={{ margin: '16px 0 6px', fontSize: 13 }}>In your books, not on the statement ({result.booksOnly.length})</h4>
-              <div className="note" style={{ marginTop: 0 }}>
-                Usually a cheque or transfer that has not cleared yet. If it is old, check it.
+              <div style={{ marginTop: 12, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                <Button type="button" onClick={() => void tickAll()} disabled={result.toTick.length === 0 || ticking}>
+                  Tick {toTickCount} matched entr{toTickCount === 1 ? 'y' : 'ies'}
+                </Button>
+                <span className="note" style={{ margin: 0 }}>
+                  Look through the green and yellow lines first, and unmatch any that are wrong.
+                </span>
               </div>
-              <PileTable
-                empty="Everything in your books for this period is on the statement."
-                head={['Date', 'Entry', 'Amount']}
-                rows={result.booksOnly.map((l) => [
-                  fmtDate(l.date),
-                  <>
-                    {l.description}
-                    {l.detail && <div className="retention-note" style={{ color: 'var(--ink)' }}>{l.detail}</div>}
-                  </>,
-                  `${l.deposit > 0 ? '+' : '-'}${fmt2(amountOf(l))}`,
-                ])}
-                actions={(i) =>
-                  result.booksOnly[i].sourceTable ? (
-                    <button type="button" className="btn secondary" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => void openEntry(result.booksOnly[i])}>
-                      Open this entry
-                    </button>
-                  ) : null
-                }
-              />
-                </>
+              <details style={{ marginTop: 8 }}>
+                <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>What does ticking do?</summary>
+                <div className="note">
+                  The matching you see here is only a suggestion on your screen. A <strong>tick</strong> is the saved mark that says &ldquo;this entry in my books has been confirmed on the
+                  bank statement&rdquo;. It matters for three reasons. First, the check below counts every entry that is not ticked as not yet cleared by the bank, so ticking is what makes the
+                  balance in your books agree with the balance on the statement. Second, next time you reconcile, ticked entries are left out, so you only look at what is new. Third,
+                  &ldquo;Done: save this reconciliation&rdquo; records the ticks as proof that the account was checked. Press the button once the green and yellow lines are right.
+                </div>
+              </details>
+              {result.statementOnly.length > 0 && (
+                <div className="note">
+                  The red lines on the statement come to <strong>{statementOnlyNet >= 0 ? '+' : '-'}{fmt2(Math.abs(statementOnlyNet))}</strong>. After you tick the matches, that is the difference
+                  you should still see below. Once they are recorded or matched, it should be nil.
+                </div>
               )}
             </>
           )}
         </>
       )}
-      {changing && (
-        <ChangeMatchModal
-          match={changing}
-          options={candidates.filter(
-            (l) =>
-              sideOf(l) === sideOf(changing.statement) &&
-              Math.round(amountOf(l) * 100) === Math.round(amountOf(changing.statement) * 100) &&
-              !ledgerIdsOf(changing).includes(l.id)
-          )}
-          matchedElsewhere={(id) => {
-            const other = [...result.toTick, ...result.alreadyTicked].find((x) => x.statement.row !== changing.statement.row && ledgerIdsOf(x).includes(id))
-            return other ? `${fmtDate(other.statement.date)} ${other.statement.description}` : null
-          }}
-          onPick={(id) => void changeMatch(changing, id)}
-          onUnmatch={() => void unmatch(changing, true)}
-          onClose={() => setChanging(null)}
-        />
-      )}
       {recording && <RecordFromStatement line={recording} bankAccountId={bankId} bankName={bankName} onClose={() => setRecording(null)} />}
-    </div>
-  )
-}
-
-function MatchActions({ m, onChange, onUnmatch }: { m: StatementMatch; onChange: (m: StatementMatch) => void; onUnmatch: (m: StatementMatch) => void }) {
-  const single = !m.extra?.length && !m.extraStatements?.length
-  return (
-    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-      {single && (
-        <button type="button" className="btn secondary" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => onChange(m)}>
-          Change
-        </button>
-      )}
-      <button type="button" className="btn secondary" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => onUnmatch(m)}>
-        Unmatch
-      </button>
-    </div>
-  )
-}
-
-function PileTable({ head, rows, empty, actions }: { head: string[]; rows: React.ReactNode[][]; empty: string; actions?: (index: number) => React.ReactNode }) {
-  return (
-    <div className="table-scroll">
-      <table className="data">
-        <thead>
-          <tr>
-            {head.map((h, i) => (
-              <th key={h} style={i === head.length - 1 ? { textAlign: 'right' } : undefined}>
-                {h}
-              </th>
-            ))}
-            {actions && <th />}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.length === 0 && (
-            <tr>
-              <td colSpan={head.length + (actions ? 1 : 0)} className="empty-row">
-                {empty}
-              </td>
-            </tr>
-          )}
-          {rows.map((r, i) => (
-            <tr key={i}>
-              {r.map((c, j) => (
-                <td key={j} className={j === r.length - 1 ? 'amt' : undefined}>
-                  {c}
-                </td>
-              ))}
-              {actions && <td style={{ textAlign: 'right' }}>{actions(i)}</td>}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {editing && <EditEntryModal line={editing} onClose={() => setEditing(null)} onOpenScreen={() => void openEntry(editing)} />}
     </div>
   )
 }

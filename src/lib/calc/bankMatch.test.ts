@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ledgerIdsOf, ledgerTotalOf, matchStatement, statementRowsOf, type LedgerCandidate } from './bankMatch'
+import { ledgerIdsOf, ledgerKey, ledgerTotalOf, matchStatement, statementRowsOf, type LedgerCandidate } from './bankMatch'
 import type { StatementLine } from '../import/bankStatement'
 
 const s = (row: number, date: string, deposit: number, withdrawal: number, description = ''): StatementLine => ({
@@ -182,5 +182,41 @@ describe('matching a bank statement to the books', () => {
     expect(matchStatement(stmt, books).toTick).toHaveLength(1)
     const r = matchStatement(stmt, books, { forbidden: [{ statementRow: 1, ledgerId: 'a' }] })
     expect(r.toTick).toHaveLength(0)
+  })
+
+  it('names an entry by its record, so a re-posted line keeps its matches', () => {
+    expect(ledgerKey({ id: 'line1', sourceTable: 'expenses', sourceId: 'e9' })).toBe('expenses|e9')
+    expect(ledgerKey({ id: 'line1' })).toBe('line1')
+    // the same forbidden pair, written with the record's key, still holds after the line gets a new id
+    const books = [{ ...l('newid', '2026-10-12', 0, 500), sourceTable: 'expenses', sourceId: 'e9' }]
+    const r = matchStatement([s(1, '2026-10-12', 0, 500)], books, { forbidden: [{ statementRow: 1, ledgerId: 'expenses|e9' }] })
+    expect(r.toTick).toHaveLength(0)
+  })
+
+  it('keeps a group made by hand: several statement lines against one entry', () => {
+    const stmt = [s(1, '2026-10-01', 0, 300), s(2, '2026-10-09', 0, 200)]
+    const books = [l('a', '2026-10-20', 0, 500)]
+    // too far apart for the matcher to join them itself
+    expect(matchStatement(stmt, books, { days: 0 }).toTick).toHaveLength(0)
+    const r = matchStatement(stmt, books, { days: 0, groups: [{ statementRows: [1, 2], ledgerKeys: ['a'] }] })
+    expect(r.toTick).toHaveLength(1)
+    expect(statementRowsOf(r.toTick[0]).sort()).toEqual([1, 2])
+    expect(r.toTick[0].forced).toBe(true)
+    expect(r.statementOnly).toHaveLength(0)
+  })
+
+  it('keeps a group made by hand: one statement line against several entries', () => {
+    const r = matchStatement([s(1, '2026-10-01', 0, 500)], [l('a', '2026-10-05', 0, 300), l('b', '2026-10-30', 0, 200)], {
+      days: 0,
+      groups: [{ statementRows: [1], ledgerKeys: ['a', 'b'] }],
+    })
+    expect(r.toTick).toHaveLength(1)
+    expect(ledgerIdsOf(r.toTick[0]).sort()).toEqual(['a', 'b'])
+  })
+
+  it('ignores a hand-made group whose amounts do not add up or sides differ', () => {
+    const stmt = [s(1, '2026-10-01', 0, 500)]
+    expect(matchStatement(stmt, [l('a', '2026-10-01', 0, 400)], { days: 0, groups: [{ statementRows: [1], ledgerKeys: ['a'] }] }).toTick).toHaveLength(0)
+    expect(matchStatement(stmt, [l('a', '2026-10-01', 500, 0)], { days: 0, groups: [{ statementRows: [1], ledgerKeys: ['a'] }] }).toTick).toHaveLength(0)
   })
 })

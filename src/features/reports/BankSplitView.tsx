@@ -1,95 +1,99 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Button } from '../../components/ui'
 import { fmt2, fmtDate } from '../../lib/calc/format'
 import { activateProps } from '../../lib/a11y'
-import { ledgerIdsOf, statementRowsOf, type LedgerCandidate, type MatchResult, type StatementMatch } from '../../lib/calc/bankMatch'
+import { ledgerKey, ledgerKeysOf, statementRowsOf, type LedgerCandidate, type MatchResult, type StatementMatch } from '../../lib/calc/bankMatch'
 import type { StatementLine } from '../../lib/import/bankStatement'
 import './BankSplitView.css'
 
-type Status = 'match' | 'check' | 'ticked' | 'only' | 'quiet'
+// green = matched one to one, yellow = several lines matched with one on the other side (a group),
+// red = no match, grey = in your books but outside this statement's dates.
+type Status = 'match' | 'group' | 'only' | 'quiet'
 type Side = 'bank' | 'books'
 
 interface Row {
   key: string
   side: Side
-  /** Statement row number, or ledger line id. */
+  /** Statement row number, or the books entry's key. */
   ref: number | string
   date: string
   text: string
-  /** What the person typed on a books entry. */
   detail?: string
   deposit: number
   withdrawal: number
   status: Status
   pairNo: number | null
   match: StatementMatch | null
-  selectableForTick: boolean
+  /** The books line, for the actions that need it. */
+  line?: LedgerCandidate
 }
 
 const DAY = 86400000
 const dayNo = (d: string) => Math.round(Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10)) / DAY)
-const amountOf = (r: { deposit: number; withdrawal: number }) => Math.round((r.deposit > 0 ? r.deposit : r.withdrawal) * 100)
+const cents = (n: number) => Math.round(n * 100)
+const amountOf = (r: { deposit: number; withdrawal: number }) => (r.deposit > 0 ? r.deposit : r.withdrawal)
 const isIn = (r: { deposit: number }) => r.deposit > 0
 
-const LABEL: Record<Side, Record<Exclude<Status, 'match' | 'check' | 'ticked'>, string>> = {
-  bank: { only: 'Not in your books', quiet: '' },
-  books: { only: 'Not on the statement', quiet: 'Not on this statement' },
-}
-
-/** When one line on a side is the total of several on the other, say so. */
-function groupNote(row: Row): string {
-  const m = row.match
-  if (!m) return ''
-  if (row.side === 'bank' && m.extra?.length) return `, the total of ${m.extra.length + 1} entries in your books`
-  if (row.side === 'books' && m.extraStatements?.length) return `, the total of ${m.extraStatements.length + 1} statement lines`
-  if (row.side === 'bank' && m.extraStatements?.length) return `, one of ${m.extraStatements.length + 1} statement lines`
-  if (row.side === 'books' && m.extra?.length) return `, one of ${m.extra.length + 1} entries`
-  return ''
-}
+const isGroup = (m: StatementMatch) => !!m.extra?.length || !!m.extraStatements?.length
 
 function statusText(row: Row): string {
-  if (row.status === 'match') return `Matches #${row.pairNo}${row.match?.forced ? ' (paired by you)' : ''}${groupNote(row)}`
-  if (row.status === 'check') return `Matches #${row.pairNo}${groupNote(row)}, check it`
-  if (row.status === 'ticked') return `Matches #${row.pairNo}${groupNote(row)}, already ticked`
-  return LABEL[row.side][row.status]
+  const m = row.match
+  if (!m) return row.status === 'only' ? (row.side === 'bank' ? 'Not in your books' : 'Not on the statement') : 'Outside this statement'
+  const parts: string[] = []
+  if (isGroup(m)) {
+    const mine = row.side === 'bank' ? 1 + (m.extraStatements?.length ?? 0) : 1 + (m.extra?.length ?? 0)
+    const other = row.side === 'bank' ? 1 + (m.extra?.length ?? 0) : 1 + (m.extraStatements?.length ?? 0)
+    parts.push(mine > 1 ? `Group #${row.pairNo}: one of ${mine} that add up to the ${other > 1 ? `${other} on the other side` : 'one on the other side'}` : `Group #${row.pairNo}: the total of ${other} on the other side`)
+  } else {
+    parts.push(`Matched #${row.pairNo}`)
+  }
+  if (m.forced) parts.push('matched by you')
+  else if (m.dayGap > 0) parts.push(`dates ${m.dayGap} day${m.dayGap === 1 ? '' : 's'} apart`)
+  if (m.ambiguous) parts.push(isGroup(m) ? 'check these belong together' : 'another entry has the same amount, check it')
+  if (m.ledger.cleared) parts.push('ticked')
+  return parts.join(' · ')
 }
 
-/** The bank statement on the left, the books on the right: matched pairs share a colour and number,
- * and the lines in question stand out on each side. */
+/** The bank statement on the left, the books on the right. Green lines are matched, yellow lines are groups (several lines
+ * against one), red lines have no match. Tick the boxes on red lines on either side and press "Match these together". */
 export function BankSplitView({
   lines,
   ledger,
   result,
   days,
-  picked,
-  onPick,
-  onForce,
-  onUnforce,
-  onRecord,
-  onOpen,
-  onChangeMatch,
+  selectedBank,
+  selectedBooks,
+  onToggleBank,
+  onToggleBooks,
+  onClearSelection,
+  onMatchSelected,
   onUnmatch,
+  onRecord,
+  onEdit,
 }: {
   lines: StatementLine[]
   ledger: LedgerCandidate[]
   result: MatchResult
   days: number
-  picked: Set<string>
-  onPick: (ledgerId: string, on: boolean) => void
-  onForce: (statementRow: number, ledgerId: string) => void
-  onUnforce: (statementRow: number) => void
-  /** Enter a statement line that is not in the books. */
-  onRecord?: (line: StatementLine) => void
-  /** Go to the screen that holds a line in the books. */
-  onOpen?: (line: LedgerCandidate) => void
-  /** Choose a different entry for a matched line. */
-  onChangeMatch?: (m: StatementMatch) => void
+  /** Statement rows chosen for a hand match. */
+  selectedBank: Set<number>
+  /** Books entries (by key) chosen for a hand match. */
+  selectedBooks: Set<string>
+  onToggleBank: (row: number) => void
+  onToggleBooks: (key: string) => void
+  onClearSelection: () => void
+  onMatchSelected: () => void
   /** Break a match that is wrong. */
-  onUnmatch?: (m: StatementMatch) => void
+  onUnmatch: (m: StatementMatch) => void
+  /** Enter a statement line that is not in the books. */
+  onRecord: (line: StatementLine) => void
+  /** Change an entry in the books without leaving this screen. */
+  onEdit: (line: LedgerCandidate) => void
 }) {
   const [onlyProblems, setOnlyProblems] = useState(false)
   const [sel, setSel] = useState<{ side: Side; ref: number | string } | null>(null)
 
-  const { bankRows, bookRows, partnerOf } = useMemo(() => {
+  const { bankRows, bookRows, partnerOf, counts } = useMemo(() => {
     const matches = [...result.toTick, ...result.alreadyTicked].sort(
       (a, b) => a.statement.date.localeCompare(b.statement.date) || a.statement.row - b.statement.row
     )
@@ -97,9 +101,9 @@ export function BankSplitView({
     const byLedger = new Map<string, { m: StatementMatch; no: number }>()
     matches.forEach((m, i) => {
       statementRowsOf(m).forEach((row) => byStatement.set(row, { m, no: i + 1 }))
-      ledgerIdsOf(m).forEach((id) => byLedger.set(id, { m, no: i + 1 }))
+      ledgerKeysOf(m).forEach((k) => byLedger.set(k, { m, no: i + 1 }))
     })
-    const statusOfMatch = (m: StatementMatch): Status => (m.ledger.cleared ? 'ticked' : m.ambiguous || m.confidence === 'loose' ? 'check' : 'match')
+    const statusOfMatch = (m: StatementMatch): Status => (isGroup(m) ? 'group' : 'match')
 
     const bank: Row[] = [...lines]
       .sort((a, b) => a.date.localeCompare(b.date) || a.row - b.row)
@@ -116,7 +120,6 @@ export function BankSplitView({
           status: hit ? statusOfMatch(hit.m) : 'only',
           pairNo: hit?.no ?? null,
           match: hit?.m ?? null,
-          selectableForTick: false,
         }
       })
 
@@ -124,14 +127,14 @@ export function BankSplitView({
     const last = lines.length ? lines.reduce((m, l) => (l.date > m ? l.date : m), lines[0].date) : ''
     const booksOnly = new Set(result.booksOnly.map((l) => l.id))
     const books: Row[] = ledger
-      .filter((l) => byLedger.has(l.id) || (first && dayNo(l.date) >= dayNo(first) - days && dayNo(l.date) <= dayNo(last)))
+      .filter((l) => byLedger.has(ledgerKey(l)) || (first && dayNo(l.date) >= dayNo(first) - days && dayNo(l.date) <= dayNo(last)) || booksOnly.has(l.id))
       .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id))
       .map((l) => {
-        const hit = byLedger.get(l.id)
+        const hit = byLedger.get(ledgerKey(l))
         return {
           key: `books-${l.id}`,
           side: 'books' as const,
-          ref: l.id,
+          ref: ledgerKey(l),
           date: l.date,
           text: l.description,
           detail: l.detail,
@@ -140,74 +143,75 @@ export function BankSplitView({
           status: hit ? statusOfMatch(hit.m) : booksOnly.has(l.id) ? 'only' : 'quiet',
           pairNo: hit?.no ?? null,
           match: hit?.m ?? null,
-          // One tick covers every entry of a lump-sum match, so only its first entry has the box.
-          selectableForTick: !!hit && !hit.m.ledger.cleared && hit.m.ledger.id === l.id,
+          line: l,
         }
       })
 
-    // Everything on the other side that goes with this line (several for a lump-sum match).
+    // Everything on the other side that goes with this line (several for a group).
     const partner = (side: Side, ref: number | string): { side: Side; ref: number | string }[] => {
       if (side === 'bank') {
         const hit = byStatement.get(ref as number)
-        return hit ? ledgerIdsOf(hit.m).map((id) => ({ side: 'books' as const, ref: id })) : []
+        return hit ? ledgerKeysOf(hit.m).map((k) => ({ side: 'books' as const, ref: k })) : []
       }
       const hit = byLedger.get(ref as string)
       return hit ? statementRowsOf(hit.m).map((row) => ({ side: 'bank' as const, ref: row })) : []
     }
-    return { bankRows: bank, bookRows: books, partnerOf: partner }
+    const tally = (rows: Row[]) => ({
+      matched: new Set(rows.filter((r) => r.status === 'match').map((r) => r.pairNo)).size,
+      groups: new Set(rows.filter((r) => r.status === 'group').map((r) => r.pairNo)).size,
+      red: rows.filter((r) => r.status === 'only').length,
+    })
+    return { bankRows: bank, bookRows: books, partnerOf: partner, counts: { bank: tally(bank), books: tally(books) } }
   }, [lines, ledger, result, days])
 
   const partners = useMemo(() => (sel ? partnerOf(sel.side, sel.ref) : []), [sel, partnerOf])
-  const domId = (side: Side, ref: number | string) => `sv-${side}-${ref}`
+  const domId = (side: Side, ref: number | string) => `sv-${side}-${String(ref).replace(/[^A-Za-z0-9_-]/g, '_')}`
 
-  // Bring the matching row on the other side into view when a row is chosen.
+  // Bring the matching rows on the other side into view when a row is chosen.
   useEffect(() => {
     if (partners[0]) document.getElementById(domId(partners[0].side, partners[0].ref))?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
   }, [sel]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const selectedRow = sel ? [...bankRows, ...bookRows].find((r) => r.side === sel.side && r.ref === sel.ref) ?? null : null
-  const problem = (r: Row) => r.status === 'only' || r.status === 'check'
-  const shown = (rows: Row[]) => (onlyProblems ? rows.filter(problem) : rows)
-  const counts = (rows: Row[]) => ({ ok: rows.filter((r) => r.status === 'match' || r.status === 'ticked').length, bad: rows.filter(problem).length })
-  const bankCount = counts(bankRows)
-  const bookCount = counts(bookRows)
+  const shown = (rows: Row[]) => (onlyProblems ? rows.filter((r) => r.status === 'only') : rows)
+
+  // What has been chosen for a hand match, and whether it adds up.
+  const chosenBank = bankRows.filter((r) => selectedBank.has(r.ref as number))
+  const chosenBooks = bookRows.filter((r) => selectedBooks.has(r.ref as string))
+  const bankTotal = chosenBank.reduce((s, r) => s + cents(amountOf(r)), 0)
+  const booksTotal = chosenBooks.reduce((s, r) => s + cents(amountOf(r)), 0)
+  const allRows = [...chosenBank, ...chosenBooks]
+  const sameDirection = allRows.length > 0 && allRows.every((r) => isIn(r) === isIn(allRows[0]))
+  const chosenCount = chosenBank.length + chosenBooks.length
+  let matchProblem: string | null = null
+  if (chosenCount === 0) matchProblem = null
+  else if (chosenBank.length === 0 || chosenBooks.length === 0) matchProblem = 'Tick at least one line on each side.'
+  else if (!sameDirection) matchProblem = 'Money in and money out cannot be matched together.'
+  else if (bankTotal !== booksTotal) matchProblem = `The two sides differ by ${fmt2(Math.abs(bankTotal - booksTotal) / 100)}. They must add up to the same amount.`
+  const canMatch = chosenCount > 0 && !matchProblem
 
   function renderRow(r: Row) {
     const isSel = !!sel && sel.side === r.side && sel.ref === r.ref
     const isPartner = partners.some((p) => p.side === r.side && p.ref === r.ref)
-    // The other side's rows with the same amount and direction can be paired with the chosen row.
-    const canPair =
-      !!selectedRow &&
-      selectedRow.side !== r.side &&
-      isIn(selectedRow) === isIn(r) &&
-      amountOf(selectedRow) === amountOf(r) &&
-      !isPartner &&
-      !r.match?.extra?.length &&
-      !r.match?.extraStatements?.length &&
-      !selectedRow.match?.extra?.length &&
-      !selectedRow.match?.extraStatements?.length
-    const showRecord = r.side === 'bank' && r.status === 'only' && !!onRecord
-    const bookLine = r.side === 'books' ? ledger.find((l) => l.id === r.ref) : undefined
-    const showOpen = !!onOpen && !!bookLine?.sourceTable
-    const statementRow = r.side === 'bank' ? (r.ref as number) : selectedRow?.side === 'bank' ? (selectedRow.ref as number) : null
-    const ledgerId = r.side === 'books' ? (r.ref as string) : selectedRow?.side === 'books' ? (selectedRow.ref as string) : null
+    const selectable = r.status === 'only' || r.status === 'quiet'
+    const checked = r.side === 'bank' ? selectedBank.has(r.ref as number) : selectedBooks.has(r.ref as string)
+    const bankLine = r.side === 'bank' ? lines.find((l) => l.row === r.ref) : undefined
 
     return (
       <div
         key={r.key}
         id={domId(r.side, r.ref)}
-        className={`sv-row sv-${r.status}${isSel ? ' sv-selected' : ''}${isPartner ? ' sv-partner' : ''}`}
+        className={`sv-row sv-${r.status}${isSel ? ' sv-selected' : ''}${isPartner ? ' sv-partner' : ''}${checked ? ' sv-checked' : ''}`}
         {...activateProps(() => setSel(isSel ? null : { side: r.side, ref: r.ref }))}
         aria-label={`${fmtDate(r.date)} ${r.text} ${statusText(r)}`}
       >
         <span className="sv-no">
-          {r.selectableForTick ? (
+          {selectable ? (
             <input
               type="checkbox"
-              aria-label={`Tick ${r.text}`}
-              checked={picked.has(r.ref as string)}
+              aria-label={`Select ${r.text || 'this line'} to match by hand`}
+              checked={checked}
               onClick={(e) => e.stopPropagation()}
-              onChange={(e) => onPick(r.ref as string, e.target.checked)}
+              onChange={() => (r.side === 'bank' ? onToggleBank(r.ref as number) : onToggleBooks(r.ref as string))}
             />
           ) : (
             r.pairNo ?? ''
@@ -217,133 +221,106 @@ export function BankSplitView({
         <span className="sv-text">
           {r.text || '(no description)'}
           {r.detail && <small style={{ display: 'block', color: 'var(--ink)' }}>{r.detail}</small>}
-          <small>
-            {r.selectableForTick && r.pairNo ? `#${r.pairNo} · ` : ''}
-            {statusText(r)}
-          </small>
+          <small>{statusText(r)}</small>
         </span>
         <span className={`sv-amt ${isIn(r) ? 'sv-in' : 'sv-out'}`}>
           {isIn(r) ? '+' : '-'}
-          {fmt2(isIn(r) ? r.deposit : r.withdrawal)}
+          {fmt2(amountOf(r))}
         </span>
-        {(canPair || r.match || showRecord || showOpen) && (
-          <span className="sv-actions">
-            {showRecord && (
-              <button
-                type="button"
-                className="btn"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onRecord?.(lines.find((l) => l.row === r.ref) as StatementLine)
-                }}
-              >
-                Record this
-              </button>
-            )}
-            {showOpen && bookLine && (
-              <button
-                type="button"
-                className="btn secondary"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onOpen?.(bookLine)
-                }}
-              >
-                Open this entry
-              </button>
-            )}
-            {canPair && statementRow !== null && ledgerId !== null && (
-              <button
-                type="button"
-                className="btn secondary"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onForce(statementRow, ledgerId)
-                  setSel(null)
-                }}
-              >
-                Pair with selected
-              </button>
-            )}
-            {r.match && onChangeMatch && !r.match.extra?.length && !r.match.extraStatements?.length && (
-              <button
-                type="button"
-                className="btn secondary"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onChangeMatch(r.match!)
-                }}
-              >
-                Change match
-              </button>
-            )}
-            {r.match && onUnmatch && (
-              <button
-                type="button"
-                className="btn secondary"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onUnmatch(r.match!)
-                }}
-              >
-                Unmatch
-              </button>
-            )}
-            {r.match?.forced && (
-              <button
-                type="button"
-                className="btn secondary"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onUnforce(r.match!.statement.row)
-                }}
-              >
-                Undo my pairing
-              </button>
-            )}
-          </span>
-        )}
+        <span className="sv-actions">
+          {r.status === 'only' && bankLine && (
+            <button
+              type="button"
+              className="btn"
+              onClick={(e) => {
+                e.stopPropagation()
+                onRecord(bankLine)
+              }}
+            >
+              Record this
+            </button>
+          )}
+          {r.line && (
+            <button
+              type="button"
+              className="btn secondary"
+              onClick={(e) => {
+                e.stopPropagation()
+                onEdit(r.line as LedgerCandidate)
+              }}
+            >
+              Edit
+            </button>
+          )}
+          {r.match && (
+            <button
+              type="button"
+              className="btn secondary"
+              onClick={(e) => {
+                e.stopPropagation()
+                onUnmatch(r.match as StatementMatch)
+              }}
+            >
+              Unmatch
+            </button>
+          )}
+        </span>
       </div>
     )
   }
 
+  const paneHead = (title: string, c: { matched: number; groups: number; red: number }) => (
+    <header className="sv-head">
+      <strong>{title}</strong>
+      <span>
+        {c.matched} matched{c.groups > 0 ? ` · ${c.groups} group${c.groups === 1 ? '' : 's'}` : ''} · <b className={c.red ? 'sv-bad' : ''}>{c.red} not matched</b>
+      </span>
+    </header>
+  )
+
   return (
     <div className="sv">
       <div className="sv-legend" aria-label="Colour key">
-        <span className="sv-chip sv-match">Matched</span>
-        <span className="sv-chip sv-check">Matched, check it</span>
-        <span className="sv-chip sv-only">Needs attention: only on one side</span>
-        <span className="sv-chip sv-ticked">Already ticked</span>
+        <span className="sv-chip sv-match">Green: matched</span>
+        <span className="sv-chip sv-group">Yellow: several lines matched with one</span>
+        <span className="sv-chip sv-only">Red: no match</span>
         <label className="sv-toggle">
-          <input type="checkbox" checked={onlyProblems} onChange={(e) => setOnlyProblems(e.target.checked)} /> Show only the lines in question
+          <input type="checkbox" checked={onlyProblems} onChange={(e) => setOnlyProblems(e.target.checked)} /> Show only the red lines
         </label>
       </div>
       <div className="note" style={{ margin: '6px 0 10px' }}>
-        Click a line to see its partner on the other side. If two lines have the same amount and the app paired the wrong ones, click the line that is right, then
-        press <strong>Pair with selected</strong> on its partner. Pairings you make here only last until you leave this page. What is saved is the tick.
+        Click a line to see what it is matched with. To match by hand, tick the boxes on red lines (several on one side are fine, for example three bank payments against one entry
+        in your books), then press <strong>Match these together</strong>. A wrong match can be broken with <strong>Unmatch</strong>.
       </div>
       <div className="sv-grid">
         <section className="sv-pane" aria-label="Bank statement">
-          <header className="sv-head">
-            <strong>Bank statement</strong>
-            <span>
-              {bankCount.ok} matched · <b className={bankCount.bad ? 'sv-bad' : ''}>{bankCount.bad} in question</b>
-            </span>
-          </header>
+          {paneHead('Bank statement', counts.bank)}
           <div className="sv-list">{shown(bankRows).map(renderRow)}</div>
           {shown(bankRows).length === 0 && <div className="empty-row">Nothing to show.</div>}
         </section>
         <section className="sv-pane" aria-label="Your books">
-          <header className="sv-head">
-            <strong>Your books</strong>
-            <span>
-              {bookCount.ok} matched · <b className={bookCount.bad ? 'sv-bad' : ''}>{bookCount.bad} in question</b>
-            </span>
-          </header>
+          {paneHead('Your books', counts.books)}
           <div className="sv-list">{shown(bookRows).map(renderRow)}</div>
           {shown(bookRows).length === 0 && <div className="empty-row">Nothing to show.</div>}
         </section>
       </div>
+
+      {chosenCount > 0 && (
+        <div className="sv-matchbar" role="region" aria-label="Match by hand">
+          <span>
+            Bank: <b>{chosenBank.length}</b> line{chosenBank.length === 1 ? '' : 's'}, {fmt2(bankTotal / 100)} · Books: <b>{chosenBooks.length}</b> entr{chosenBooks.length === 1 ? 'y' : 'ies'}, {fmt2(booksTotal / 100)}
+          </span>
+          {matchProblem && <span className="sv-bad">{matchProblem}</span>}
+          <span style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+            <Button type="button" onClick={onMatchSelected} disabled={!canMatch}>
+              Match these together
+            </Button>
+            <Button type="button" variant="secondary" onClick={onClearSelection}>
+              Clear
+            </Button>
+          </span>
+        </div>
+      )}
     </div>
   )
 }

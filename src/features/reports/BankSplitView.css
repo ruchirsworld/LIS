@@ -113,7 +113,7 @@
   color: var(--ink);
 }
 
-/* Colours: green = matched, amber = matched but worth a look, red = only on one side. */
+/* Colours: green = matched, yellow = a group (several lines against one), red = no match, grey = outside this statement. */
 .sv-match,
 .sv-chip.sv-match {
   background: var(--green-soft);
@@ -121,11 +121,11 @@
 .sv-row.sv-match {
   border-left-color: var(--green);
 }
-.sv-check,
-.sv-chip.sv-check {
+.sv-group,
+.sv-chip.sv-group {
   background: var(--amber-soft);
 }
-.sv-row.sv-check {
+.sv-row.sv-group {
   border-left-color: var(--amber);
 }
 .sv-only,
@@ -135,22 +135,35 @@
 .sv-row.sv-only {
   border-left-color: var(--red);
 }
-.sv-row.sv-only .sv-text small {
+.sv-row.sv-only .sv-text small:last-child {
   color: var(--red);
   font-weight: 600;
-}
-.sv-ticked,
-.sv-chip.sv-ticked {
-  background: transparent;
-  color: var(--ink-soft);
-}
-.sv-row.sv-ticked {
-  border-left-color: var(--line);
-  color: var(--ink-soft);
 }
 .sv-row.sv-quiet {
   color: var(--ink-soft);
   opacity: 0.7;
+}
+.sv-row.sv-checked {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* The bar that appears once lines are ticked for a hand match. */
+.sv-matchbar {
+  position: sticky;
+  bottom: 8px;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin-top: 10px;
+  padding: 10px 14px;
+  background: var(--paper);
+  border: 2px solid var(--accent);
+  border-radius: 10px;
+  font-size: 13px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
 }
 
 /* The chosen row and its partner on the other side. */

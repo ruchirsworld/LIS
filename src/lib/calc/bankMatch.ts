@@ -30,6 +30,23 @@ export interface StatementMatch {
   extraStatements?: StatementLine[]
 }
 
+/** A stable name for a books entry. A ledger line gets a new id whenever its entry is edited and re-posted, but the
+ * record it came from stays the same, so hand-made matches and unmatches are kept against the record. */
+export function ledgerKey(l: { id: string; sourceTable?: string | null; sourceId?: string | null }): string {
+  return l.sourceTable && l.sourceId ? `${l.sourceTable}|${l.sourceId}` : l.id
+}
+
+/** The keys of every ledger line a match covers. */
+export function ledgerKeysOf(m: StatementMatch): string[] {
+  return [m.ledger, ...(m.extra ?? [])].map(ledgerKey)
+}
+
+/** Statement lines and books entries the user joined by hand: any number on each side, adding up to the same amount. */
+export interface ManualGroup {
+  statementRows: number[]
+  ledgerKeys: string[]
+}
+
 /** Every statement line a match covers: one normally, several when the books record them as one entry. */
 export function statementRowsOf(m: StatementMatch): number[] {
   return [m.statement.row, ...(m.extraStatements ?? []).map((s) => s.row)]
@@ -88,12 +105,13 @@ const cents = (n: number) => Math.round(n * 100)
 export function matchStatement(
   lines: StatementLine[],
   ledger: LedgerCandidate[],
-  opts: { days?: number; forced?: ForcedPair[]; forbidden?: ForcedPair[] } = {}
+  opts: { days?: number; forced?: ForcedPair[]; forbidden?: ForcedPair[]; groups?: ManualGroup[] } = {}
 ): MatchResult {
   const days = opts.days ?? 7
   // Pairs the user said are NOT the same event (an unmatch): the matcher never joins these again.
   const bad = new Set((opts.forbidden ?? []).map((f) => `${f.statementRow}|${f.ledgerId}`))
   const isBad = (row: number, ledgerId: string) => bad.has(`${row}|${ledgerId}`)
+  const isBadLine = (row: number, l: LedgerCandidate) => isBad(row, l.id) || isBad(row, ledgerKey(l))
   const usedStatement = new Set<number>()
   const usedLedger = new Set<string>()
   const result: MatchResult = { toTick: [], alreadyTicked: [], statementOnly: [], booksOnly: [] }
@@ -104,7 +122,7 @@ export function matchStatement(
   // Pairings chosen by hand come first, so the matcher works around them.
   for (const f of opts.forced ?? []) {
     const st = lines.find((x) => x.row === f.statementRow)
-    const lg = ledger.find((x) => x.id === f.ledgerId)
+    const lg = ledger.find((x) => x.id === f.ledgerId || ledgerKey(x) === f.ledgerId)
     if (!st || !lg || usedStatement.has(st.row) || usedLedger.has(lg.id)) continue
     if (sideOf(st) !== sideOf(lg) || amountOf(st) !== amountOf(lg)) continue
     usedStatement.add(st.row)
@@ -114,6 +132,34 @@ export function matchStatement(
     ;(lg.cleared ? result.alreadyTicked : result.toTick).push(match)
   }
 
+  // Groups made by hand: several statement lines against one entry, one line against several entries, or any mix
+  // that adds up. They are kept exactly as the user made them.
+  for (const g of opts.groups ?? []) {
+    const sts = g.statementRows.map((r) => lines.find((x) => x.row === r))
+    const lgs = g.ledgerKeys.map((k) => ledger.find((x) => ledgerKey(x) === k || x.id === k))
+    if (sts.length === 0 || lgs.length === 0) continue
+    if (sts.some((x) => !x || usedStatement.has(x.row)) || lgs.some((x) => !x || usedLedger.has(x.id))) continue
+    const S = (sts as StatementLine[]).slice().sort((a, b) => a.date.localeCompare(b.date) || a.row - b.row)
+    const L = (lgs as LedgerCandidate[]).slice().sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id))
+    const side = sideOf(S[0])
+    if (!S.every((s) => sideOf(s) === side) || !L.every((l) => sideOf(l) === side)) continue
+    if (S.reduce((t, s) => t + amountOf(s), 0) !== L.reduce((t, l) => t + amountOf(l), 0)) continue
+    S.forEach((s) => usedStatement.add(s.row))
+    L.forEach((l) => usedLedger.add(l.id))
+    const gap = Math.min(...S.flatMap((s) => L.map((l) => Math.abs(dayNumber(s.date) - dayNumber(l.date)))))
+    const match: StatementMatch = {
+      statement: S[0],
+      ...(S.length > 1 ? { extraStatements: S.slice(1) } : {}),
+      ledger: L[0],
+      ...(L.length > 1 ? { extra: L.slice(1) } : {}),
+      dayGap: gap,
+      confidence: gap === 0 ? 'exact' : gap <= 3 ? 'close' : 'loose',
+      ambiguous: false,
+      forced: true,
+    }
+    ;(L.every((l) => l.cleared) ? result.alreadyTicked : result.toTick).push(match)
+  }
+
   for (const pass of ['new', 'ticked'] as const) {
     const pool = ledger.filter((l) => (pass === 'new' ? !l.cleared : l.cleared) && !usedLedger.has(l.id))
     interface Candidate { s: StatementLine; l: LedgerCandidate; gap: number }
@@ -121,7 +167,7 @@ export function matchStatement(
     for (const s of lines) {
       if (usedStatement.has(s.row)) continue
       for (const l of pool) {
-        if (sideOf(s) !== sideOf(l) || amountOf(s) !== amountOf(l) || isBad(s.row, l.id)) continue
+        if (sideOf(s) !== sideOf(l) || amountOf(s) !== amountOf(l) || isBadLine(s.row, l)) continue
         const gap = Math.abs(dayNumber(s.date) - dayNumber(l.date))
         if (gap <= days) candidates.push({ s, l, gap })
       }
@@ -172,7 +218,7 @@ export function matchStatement(
         byDay.set(key, [...(byDay.get(key) ?? []), l])
       }
       for (const group of byDay.values()) {
-        if (group.length >= 2 && group.reduce((t, l) => t + amountOf(l), 0) === target && !group.some((l) => isBad(s.row, l.id))) {
+        if (group.length >= 2 && group.reduce((t, l) => t + amountOf(l), 0) === target && !group.some((l) => isBadLine(s.row, l))) {
           picked = group
           break
         }
@@ -180,7 +226,7 @@ export function matchStatement(
       if (!picked && pool.length <= 25) {
         const ids = findSubset(pool.map((l) => ({ id: l.id, c: amountOf(l) })), target)
         const found = ids ? pool.filter((l) => ids.includes(l.id)) : null
-        if (found && !found.some((l) => isBad(s.row, l.id))) {
+        if (found && !found.some((l) => isBadLine(s.row, l))) {
           picked = found
           ambiguous = true
         }
@@ -218,7 +264,7 @@ export function matchStatement(
       const byDay = new Map<string, StatementLine[]>()
       for (const s of pool) byDay.set(s.date, [...(byDay.get(s.date) ?? []), s])
       for (const group of byDay.values()) {
-        if (group.length >= 2 && group.reduce((t, s) => t + amountOf(s), 0) === target && !group.some((s) => isBad(s.row, l.id))) {
+        if (group.length >= 2 && group.reduce((t, s) => t + amountOf(s), 0) === target && !group.some((s) => isBadLine(s.row, l))) {
           picked = group
           break
         }
@@ -226,7 +272,7 @@ export function matchStatement(
       if (!picked && pool.length <= 25) {
         const rows = findSubset(pool.map((s) => ({ id: String(s.row), c: amountOf(s) })), target)
         const found = rows ? pool.filter((s) => rows.includes(String(s.row))) : null
-        if (found && !found.some((s) => isBad(s.row, l.id))) {
+        if (found && !found.some((s) => isBadLine(s.row, l))) {
           picked = found
           ambiguous = true
         }
