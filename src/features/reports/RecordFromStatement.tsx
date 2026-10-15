@@ -21,7 +21,9 @@ import { loanOutstanding } from '../../lib/calc/loans'
 import { useCreateExpense, useCreateExpenseReimbursement } from '../../lib/queries/expenses'
 import { allocateSettlement } from '../../lib/calc/expenses'
 import { useReimbursementDue } from '../dashboard/useReimbursementDue'
-import { fetchBillPaid, useCreateVendorAdvance, useCreateVendorBill, useCreateVendorBillPayment, useVendorBillPayments, useVendorBills } from '../../lib/queries/purchases'
+import { BillItemsEditor } from '../purchases/BillItemsEditor'
+import { emptyItem, itemsProblem, itemsToSave, itemsTotal, usableItems, type BillItemDraft } from '../../lib/calc/billItems'
+import { fetchBillPaid, replaceBillItems, useCreateVendorAdvance, useCreateVendorBill, useCreateVendorBillPayment, useVendorBillPayments, useVendorBills } from '../../lib/queries/purchases'
 import { AddVendorModal } from '../purchases/AddVendorModal'
 import { TDS_SECTIONS } from '../purchases/tdsSections'
 import { useCreateInvoicePayment, useInvoicePayments, useInvoices } from '../../lib/queries/invoices'
@@ -117,6 +119,7 @@ export function RecordFromStatement({
   const [billValue, setBillValue] = useState('')
   const [vendorInvNo, setVendorInvNo] = useState('')
   const [vendorInvDate, setVendorInvDate] = useState('')
+  const [billItems, setBillItems] = useState<BillItemDraft[]>([])
   const [tripCategory, setTripCategory] = useState('')
   const [loanType, setLoanType] = useState<'private' | 'bank'>('bank')
   const [lender, setLender] = useState('')
@@ -146,7 +149,9 @@ export function RecordFromStatement({
   // A contractor's bill is Sub-Contract; anything else defaults to Project Materials, as on the bill form.
   const billSubHeadEffective = billSubHeadId || procSubHeads.find((s) => s.code === (billVendor?.category === 'Contractor' ? '20.6' : '20.1'))?.id || ''
   const fromPayment = billBaseFromPaid(amount, billGstN, billTdsN)
-  const billBase = partOfBigger ? parseINR(billValue) : fromPayment.base
+  // With items, the bill value is their total; otherwise it is worked back from the payment, or typed.
+  const billItemsOn = usableItems(billItems).length > 0
+  const billBase = billItemsOn ? itemsTotal(billItems) : partOfBigger ? parseINR(billValue) : fromPayment.base
   const billPayableN = round2(billPayable({ amount: billBase, gst_pct: billGstN, tds_pct: billTdsN }))
   const billStillDue = round2(billPayableN - amount)
   const openLoans = useMemo(
@@ -311,6 +316,8 @@ export function RecordFromStatement({
         if (!billSubHeadEffective) throw new Error('Pick the type of purchase.')
         if (!billDate) throw new Error('Pick the bill date.')
         if (!notes.trim()) throw new Error('Write what was bought, as a short description.')
+        const itemsError = itemsProblem(billItems)
+        if (itemsError) throw new Error(itemsError)
         if (billBase <= 0) throw new Error('Enter the bill value.')
         if (amount - billPayableN > 0.05) {
           throw new Error(`The bill comes to ${fmt2(billPayableN)} after GST and TDS, which is less than the ${fmt2(amount)} paid. Check the bill value, GST and TDS.`)
@@ -335,6 +342,13 @@ export function RecordFromStatement({
           vendor_invoice_date: vendorInvDate || null,
           receipt_path: null,
         })
+        if (billItemsOn) {
+          try {
+            await replaceBillItems(bill.id, itemsToSave(billItems))
+          } catch (err) {
+            toast('error', `The bill was saved, but its items could not be saved: ${getErrorMessage(err, 'unknown error')}`)
+          }
+        }
         // An advance already held for this vendor is set against the bill as it is saved, so only what is still due is paid
         // from the bank; anything beyond that stays with the vendor as a new advance.
         const due = round2(billPayableN - (await fetchBillPaid(bill.id)))
@@ -689,26 +703,41 @@ export function RecordFromStatement({
           {billGstN > 0 && billVendor && !billVendor.gstin && (
             <div className="note">This vendor has no GST number on file, so the GST on this bill cannot be claimed as input credit. Add it in Settings when you have it.</div>
           )}
-          <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, margin: '4px 0 10px' }}>
-            <input type="checkbox" checked={partOfBigger} onChange={(e) => setPartOfBigger(e.target.checked)} />
-            This payment is only part of a bigger bill
-          </label>
-          {partOfBigger && (
+          {billItems.length === 0 ? (
+            <button type="button" className="btn link" style={{ padding: 0, marginBottom: 8 }} onClick={() => setBillItems([emptyItem()])}>
+              + Add the items bought
+            </button>
+          ) : (
+            <>
+              <label>Items bought (the bill value is their total)</label>
+              <BillItemsEditor items={billItems} onChange={setBillItems} idPrefix="rfs-bi" />
+              <button type="button" className="btn link" style={{ padding: 0, marginBottom: 8 }} onClick={() => setBillItems([])}>
+                Remove all items
+              </button>
+            </>
+          )}
+          {!billItemsOn && (
+            <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, margin: '4px 0 10px' }}>
+              <input type="checkbox" checked={partOfBigger} onChange={(e) => setPartOfBigger(e.target.checked)} />
+              This payment is only part of a bigger bill
+            </label>
+          )}
+          {partOfBigger && !billItemsOn && (
             <div className="field">
               <label htmlFor="rfs-bill-value">Whole bill value before GST (₹)</label>
               <input id="rfs-bill-value" inputMode="decimal" value={billValue} onChange={(e) => setBillValue(e.target.value)} />
             </div>
           )}
           <div className="note">
-            {partOfBigger ? 'The bill' : 'The bill, worked back from this payment,'} is {fmt2(billBase)}
+            {partOfBigger || billItemsOn ? 'The bill' : 'The bill, worked back from this payment,'} is {fmt2(billBase)}
             {billGstN > 0 ? ` plus ${billGstN} percent GST` : ''}
             {billTdsN > 0 ? ` less ${billTdsN} percent TDS` : ''}, so you owe {fmt2(billPayableN)}. Paid now: {fmt2(amount)}.{' '}
             {billStillDue > 0.004
               ? `${fmt2(billStillDue)} is still due on the bill.`
-              : partOfBigger || Math.abs(billStillDue) < 0.005
+              : partOfBigger || billItemsOn || Math.abs(billStillDue) < 0.005
                 ? 'The bill is fully paid.'
                 : `The bill is ${fmt2(-billStillDue)} short of the payment.`}
-            {!partOfBigger && !fromPayment.exact ? ' Taxes are rounded to the paisa, so it is a few paise off the statement.' : ''}
+            {!partOfBigger && !billItemsOn && !fromPayment.exact ? ' Taxes are rounded to the paisa, so it is a few paise off the statement.' : ''}
           </div>
           <div className="note">Any advance already paid to this vendor is set against the new bill first, so the bank is only charged what is left.</div>
         </>

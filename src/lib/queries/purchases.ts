@@ -79,6 +79,42 @@ export async function fetchBillPaid(billId: string): Promise<number> {
   return (data ?? []).reduce((s, p) => s + Number(p.amount || 0), 0)
 }
 
+export function useVendorBillItems() {
+  return useQuery({
+    queryKey: ['vendor_bill_items'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('vendor_bill_items').select('*').order('position')
+      if (error) throw error
+      return data
+    },
+  })
+}
+
+type ItemInput = { name: string; qty: number | null; unit: string | null; rate: number | null; amount: number; position: number }
+
+/** Replaces the items on a bill. The new lines are written first, so a failure leaves the old ones as they were. */
+export async function replaceBillItems(billId: string, items: ItemInput[]): Promise<void> {
+  const { data: old, error: readError } = await supabase.from('vendor_bill_items').select('id').eq('bill_id', billId)
+  if (readError) throw readError
+  if (items.length > 0) {
+    const { error } = await supabase.from('vendor_bill_items').insert(items.map((i) => ({ ...i, bill_id: billId })))
+    if (error) throw error
+  }
+  const oldIds = (old ?? []).map((o) => o.id)
+  if (oldIds.length > 0) {
+    const { error } = await supabase.from('vendor_bill_items').delete().in('id', oldIds)
+    if (error) throw error
+  }
+}
+
+export function useSaveVendorBillItems() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ billId, items }: { billId: string; items: ItemInput[] }) => replaceBillItems(billId, items),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['vendor_bill_items'] }),
+  })
+}
+
 export function useVendorBillPayments() {
   return useQuery({
     queryKey: ['vendor_bill_payments'],

@@ -12,7 +12,9 @@ import {
 import { useAuth } from '../../lib/auth'
 import { useClients, useProjects, useVendors, useExpenseSubHeads } from '../../lib/queries/masters'
 import { useProfiles } from '../../lib/queries/admin'
-import { useCreateVendorBill, useUpdateVendorBill, useCreateVendorBillPayment } from '../../lib/queries/purchases'
+import { useCreateVendorBill, useUpdateVendorBill, useCreateVendorBillPayment, useSaveVendorBillItems, useVendorBillItems } from '../../lib/queries/purchases'
+import { emptyItem, itemToDraft, itemsProblem, itemsToSave, itemsTotal, usableItems, type BillItemDraft } from '../../lib/calc/billItems'
+import { BillItemsEditor } from './BillItemsEditor'
 import { fmt, fmtDate, parseINR } from '../../lib/calc/format'
 import { billTotal, billTdsAmt } from '../../lib/calc/vendorBills'
 import { compressImage } from '../../lib/compressImage'
@@ -72,6 +74,8 @@ export function VendorBillForm({
   const createVendorBill = useCreateVendorBill()
   const updateVendorBill = useUpdateVendorBill()
   const createVendorBillPayment = useCreateVendorBillPayment()
+  const saveBillItems = useSaveVendorBillItems()
+  const { data: allItems } = useVendorBillItems()
 
   const [vendorId, setVendorId] = useState('')
   const [showAddVendor, setShowAddVendor] = useState(false)
@@ -91,6 +95,11 @@ export function VendorBillForm({
   const [vendorInvoiceNo, setVendorInvoiceNo] = useState('')
   const [vendorInvoiceDate, setVendorInvoiceDate] = useState('')
   const [receiptBlob, setReceiptBlob] = useState<Blob | null>(null)
+  // What was bought on this bill. With items, the bill value is their total.
+  const [items, setItems] = useState<BillItemDraft[]>([])
+  const itemsLoadedFor = useRef<string | null>(null)
+  const itemsOn = usableItems(items).length > 0
+  const itemsSum = itemsTotal(items)
   const [receiptStatus, setReceiptStatus] = useState('Take photo')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
@@ -146,6 +155,22 @@ export function VendorBillForm({
     if (suggested) setSubHeadId(suggested.id)
   }
 
+  // The bill value follows the items.
+  useEffect(() => {
+    if (itemsOn) setAmount(String(itemsSum))
+  }, [itemsOn, itemsSum])
+
+  // Bring in the items of the bill being edited, once they have loaded.
+  useEffect(() => {
+    if (!editingBill) {
+      itemsLoadedFor.current = null
+      return
+    }
+    if (!allItems || itemsLoadedFor.current === editingBill.id) return
+    itemsLoadedFor.current = editingBill.id
+    setItems(allItems.filter((i) => i.bill_id === editingBill.id).map(itemToDraft))
+  }, [editingBill, allItems])
+
   useEffect(() => {
     if (!editingBill) return
     setVendorId(editingBill.vendor_id)
@@ -190,6 +215,7 @@ export function VendorBillForm({
     setVendorInvoiceDate('')
     setReceiptBlob(null)
     setReceiptStatus('Take photo')
+    setItems([])
   }
 
   function handleCancel() {
@@ -282,6 +308,11 @@ export function VendorBillForm({
       setFormError('Remarks are required when Other Cost has a value.')
       return
     }
+    const itemsError = itemsProblem(items)
+    if (itemsError) {
+      setFormError(itemsError)
+      return
+    }
     setSubmitting(true)
     try {
       const basePatch = {
@@ -292,7 +323,7 @@ export function VendorBillForm({
         client_id: clientId || null,
         project_id: projectId,
         date,
-        amount: parseINR(amount),
+        amount: itemsOn ? itemsSum : parseINR(amount),
         gst_pct: isSupervisor ? 0 : Number(gstPct) || 0,
         qty: null,
         rate: null,
@@ -303,6 +334,9 @@ export function VendorBillForm({
         vendor_invoice_date: vendorInvoiceDate || null,
       }
 
+      // The bill is saved first; its items follow. A bill that had items and now has none is cleared too.
+      let savedBillId = editingBill?.id ?? ''
+      const hadItems = editingBill ? (allItems ?? []).some((i) => i.bill_id === editingBill.id) : false
       if (editingBill) {
         // Ref ID is already known, so a new photo can be uploaded before the single update.
         let receiptPath: string | null = editingBill.receipt_path ?? null
@@ -314,12 +348,20 @@ export function VendorBillForm({
       } else {
         // Ref ID is only assigned on insert, so create the row first, then upload, then attach the path.
         const created = await createVendorBill.mutateAsync({ ...basePatch, receipt_path: null })
+        savedBillId = created.id
         if (receiptBlob) {
           const receiptPath = await uploadReceiptToDrive(receiptBlob, receiptFileName(created.display_id, date))
           await updateVendorBill.mutateAsync({ id: created.id, patch: { receipt_path: receiptPath } })
         }
         setLastCreatedBill(created)
         resetQuickPay()
+      }
+      if (itemsOn || hadItems) {
+        try {
+          await saveBillItems.mutateAsync({ billId: savedBillId, items: itemsToSave(items) })
+        } catch (err) {
+          setFormError(`The bill was saved, but its items could not be saved: ${getErrorMessage(err, 'unknown error')}`)
+        }
       }
       resetForm()
     } catch (err) {
@@ -406,18 +448,35 @@ export function VendorBillForm({
           </div>
         </div>
 
+        {/* What was bought: optional lines; with any, the bill value is their total */}
+        <div className="field full">
+          {items.length === 0 ? (
+            <button type="button" className="btn link" style={{ padding: 0 }} onClick={() => setItems([emptyItem()])}>
+              + Add the items bought on this bill
+            </button>
+          ) : (
+            <>
+              <label>Items on this bill</label>
+              <BillItemsEditor items={items} onChange={setItems} idPrefix="vb" />
+              <button type="button" className="btn link" style={{ padding: 0 }} onClick={() => setItems([])}>
+                Remove all items and type the bill value instead
+              </button>
+            </>
+          )}
+        </div>
+
         {/* Row 5: Amount only for Supervisor, or Bill value + GST% otherwise, plus receipt upload */}
         <div className="field-row">
           {isSupervisor ? (
             <div className="field">
-              <label>Amount (₹)</label>
-              <CurrencyInput value={amount} onValueChange={setAmount} required />
+              <label>Amount (₹){itemsOn ? ' — total of the items' : ''}</label>
+              <CurrencyInput value={amount} onValueChange={setAmount} required readOnly={itemsOn} />
             </div>
           ) : (
             <>
               <div className="field">
-                <label>Bill value (₹)</label>
-                <CurrencyInput value={amount} onValueChange={setAmount} required />
+                <label>Bill value (₹){itemsOn ? ' — total of the items' : ''}</label>
+                <CurrencyInput value={amount} onValueChange={setAmount} required readOnly={itemsOn} />
               </div>
               <div className="field">
                 <label>GST %</label>

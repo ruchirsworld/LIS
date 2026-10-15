@@ -10,7 +10,8 @@ import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
-import { useVendorBills, useVendorBillPayments, useDeleteVendorBill } from '../../lib/queries/purchases'
+import { useVendorBills, useVendorBillPayments, useDeleteVendorBill, useVendorBillItems } from '../../lib/queries/purchases'
+import { itemsSummary } from '../../lib/calc/billItems'
 import { useVendors, useProjects, useClients, useExpenseSubHeads } from '../../lib/queries/masters'
 import { fmt, fmtDate } from '../../lib/calc/format'
 import { billGstAmt, billTdsAmt, billTotal, billPaid, billDue, billDueRaw } from '../../lib/calc/vendorBills'
@@ -31,8 +32,10 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
   const { data: projects } = useProjects()
   const { data: clients } = useClients()
   const { data: subHeads } = useExpenseSubHeads()
+  const { data: billItems } = useVendorBillItems()
   const deleteBill = useDeleteVendorBill()
   const [payFormId, setPayFormId] = useState<string | null>(null)
+  const [itemsOpenId, setItemsOpenId] = useState<string | null>(null)
   const [editingPayment, setEditingPayment] = useState<VendorBillPayment | null>(null)
   const [editListId, setEditListId] = useState<string | null>(null)
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
@@ -78,6 +81,7 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
     const project = b.project_id ? projects?.find((p) => p.id === b.project_id) : null
     return project?.name ?? ''
   }
+  const itemsOf = (b: NonNullable<typeof bills>[number]) => (billItems ?? []).filter((i) => i.bill_id === b.id)
   const paidOf = (b: NonNullable<typeof bills>[number]) => billPaid(payments?.filter((p) => p.bill_id === b.id) ?? [])
   // Raw (unclamped) — a negative value here means this bill is overpaid, a
   // credit that should offset another underpaid bill for the same vendor
@@ -111,7 +115,7 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
   const exportSections: ExportSection[] = [
     {
       title: 'Bill records',
-      columns: ['Ref ID', 'Vendor', 'Description', 'Sub-head', 'Remarks', 'Client', 'Project', 'Date', 'Qty', 'Rate', 'Other cost', 'Amount', 'GST', 'TDS', 'Total', 'Paid', 'Due'],
+      columns: ['Ref ID', 'Vendor', 'Description', 'Sub-head', 'Remarks', 'Client', 'Project', 'Date', 'Qty', 'Rate', 'Other cost', 'Amount', 'GST', 'TDS', 'Total', 'Paid', 'Due', 'Items'],
       rows: (sortedBills ?? []).map((b) => [
         b.display_id ?? '',
         vendorNameOf(b),
@@ -130,6 +134,7 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
         billTotal(b),
         paidOf(b),
         dueOf(b),
+        itemsSummary(itemsOf(b)),
       ]),
     },
   ]
@@ -242,7 +247,22 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
                   <tr>
                     <td>{b.display_id ?? '—'}</td>
                     <td>{vendor ? vendor.name : '—'}</td>
-                    <td>{b.description ?? '—'}</td>
+                    <td>
+                      {b.description ?? '—'}
+                      {itemsOf(b).length > 0 && (
+                        <div>
+                          <button
+                            type="button"
+                            className="btn link"
+                            style={{ padding: 0, fontSize: 12 }}
+                            aria-expanded={itemsOpenId === b.id}
+                            onClick={() => setItemsOpenId(itemsOpenId === b.id ? null : b.id)}
+                          >
+                            {itemsOpenId === b.id ? '▾' : '▸'} {itemsOf(b).length} item{itemsOf(b).length === 1 ? '' : 's'}
+                          </button>
+                        </div>
+                      )}
+                    </td>
                     <td>{subHeadNameOf(b) || '—'}</td>
                     <td>{b.remarks ?? '—'}</td>
                     <td>{clientLabel(client)}</td>
@@ -297,6 +317,47 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
                       )}
                     </td>
                   </tr>
+                  {itemsOpenId === b.id && itemsOf(b).length > 0 && (
+                    <tr className="pay-form-row">
+                      <td colSpan={20}>
+                        <div className="note" style={{ margin: '0 0 6px', fontWeight: 600 }}>
+                          Items on {b.display_id ?? 'this bill'}
+                        </div>
+                        <table className="data">
+                          <thead>
+                            <tr>
+                              <th>Item</th>
+                              <th style={{ textAlign: 'right' }}>Qty</th>
+                              <th>Unit</th>
+                              <th style={{ textAlign: 'right' }}>Rate</th>
+                              <th style={{ textAlign: 'right' }}>Amount</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {itemsOf(b).map((i) => (
+                              <tr key={i.id}>
+                                <td>{i.name}</td>
+                                <td className="amt">{i.qty ?? '—'}</td>
+                                <td>{i.unit ?? '—'}</td>
+                                <td className="amt">{i.rate != null ? fmt(i.rate) : '—'}</td>
+                                <td className="amt">{fmt(i.amount)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot>
+                            <tr>
+                              <td colSpan={4} style={{ fontWeight: 600 }}>
+                                Total before GST
+                              </td>
+                              <td className="amt" style={{ fontWeight: 600 }}>
+                                {fmt(itemsOf(b).reduce((s, i) => s + Number(i.amount || 0), 0))}
+                              </td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </td>
+                    </tr>
+                  )}
                   {payFormId === b.id && (
                     <VendorBillPaymentForm
                       billId={b.id}

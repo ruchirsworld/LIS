@@ -2411,6 +2411,50 @@ export type Database = {
           },
         ]
       }
+      vendor_bill_items: {
+        Row: {
+          amount: number
+          bill_id: string
+          created_at: string
+          id: string
+          name: string
+          position: number
+          qty: number | null
+          rate: number | null
+          unit: string | null
+        }
+        Insert: {
+          amount: number
+          bill_id: string
+          created_at?: string
+          id?: string
+          name: string
+          position?: number
+          qty?: number | null
+          rate?: number | null
+          unit?: string | null
+        }
+        Update: {
+          amount?: number
+          bill_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          position?: number
+          qty?: number | null
+          rate?: number | null
+          unit?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_bill_items_bill_id_fkey"
+            columns: ["bill_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_bills"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vendor_bill_payments: {
         Row: {
           advance_id: string | null
