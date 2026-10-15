@@ -39,6 +39,7 @@ export function ChangeMatchModal({
       </div>
       <div className="note">
         Now matched to: <strong>{match.ledger.description}</strong> ({fmtDate(match.ledger.date)}).
+        {match.ledger.detail && <div className="retention-note">{match.ledger.detail}</div>}
         {match.ledger.cleared ? ' It was already ticked, and changing the match removes that tick.' : ''}
       </div>
 
@@ -63,6 +64,7 @@ export function ChangeMatchModal({
                     <td>{fmtDate(l.date)}</td>
                     <td>
                       {l.description}
+                      {l.detail && <div className="retention-note">{l.detail}</div>}
                       {l.cleared && <div className="retention-note">Already ticked</div>}
                       {other && <div className="retention-note">Now matched to another statement line: {other}</div>}
                     </td>

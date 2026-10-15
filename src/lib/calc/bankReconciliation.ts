@@ -12,6 +12,8 @@ export interface BankLine {
   /** The kind of record this line came from (an expense, a transfer ...) and its id, so it can be opened. */
   sourceTable?: string | null
   sourceId?: string | null
+  /** What the person typed when they made the entry (description, vendor, note, reference), read from the original record. */
+  detail?: string
 }
 
 export interface ReconciliationSummary {

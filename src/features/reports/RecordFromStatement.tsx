@@ -19,7 +19,8 @@ import { useCreateCapitalTx } from '../../lib/queries/capital'
 import { useCreateLoan, useCreateLoanPayment, useLoanPayments, useLoans } from '../../lib/queries/loans'
 import { loanOutstanding } from '../../lib/calc/loans'
 import { useCreateExpense, useCreateExpenseReimbursement } from '../../lib/queries/expenses'
-import { allocateSettlement } from '../../lib/calc/expenses'
+import { allocateSettlement, chosenSettlementProblem, chosenToAllocations, oldestFirstChoices, type ChosenAmounts } from '../../lib/calc/expenses'
+import { SettlementEntryPicker } from '../dashboard/SettlementEntryPicker'
 import { useReimbursementDue } from '../dashboard/useReimbursementDue'
 import { BillItemsEditor } from '../purchases/BillItemsEditor'
 import { emptyItem, itemsProblem, itemsToSave, itemsTotal, usableItems, type BillItemDraft } from '../../lib/calc/billItems'
@@ -109,6 +110,8 @@ export function RecordFromStatement({
   const [partnerId, setPartnerId] = useState('')
   const [tripId, setTripId] = useState('')
   const [reimbUserId, setReimbUserId] = useState('')
+  const [reimbChoose, setReimbChoose] = useState(false)
+  const [reimbPicks, setReimbPicks] = useState<ChosenAmounts>({})
   // A bill made from this payment.
   const [showAddVendor, setShowAddVendor] = useState(false)
   const [billDate, setBillDate] = useState(line.date)
@@ -138,7 +141,7 @@ export function RecordFromStatement({
   // People the firm owes money to, and (for the one chosen) the entries that money is for, oldest first.
   const owedPeople = dueRows.filter((r) => r.userId)
   const owed = owedPeople.find((r) => r.userId === reimbUserId) ?? null
-  const reimbAllocations = owed ? allocateSettlement(amount, owed.outstanding) : []
+  const reimbAllocations = owed ? (reimbChoose ? chosenToAllocations(reimbPicks, owed.outstanding) : allocateSettlement(amount, owed.outstanding)) : []
   // The bill this payment belongs to: its value before GST is worked back from the payment, unless it is only part of a bigger bill.
   const billVendor = (vendors ?? []).find((v) => v.id === vendorId)
   const billIsSupervisor = billVendor?.category === 'Supervisor'
@@ -238,8 +241,12 @@ export function RecordFromStatement({
       } else if (kind === 'reimbursement') {
         if (!owed) throw new Error('Pick the person who is being repaid.')
         if (amount > owed.due + 0.005) throw new Error(`The statement amount (${fmt2(amount)}) is more than the ${fmt2(owed.due)} owed to ${owed.name}. If part of it is something else, record that separately.`)
-        // One reimbursement per expense it settles, oldest first, like the Settle button on the dashboard.
-        for (const alloc of allocateSettlement(amount, owed.outstanding)) {
+        if (reimbChoose) {
+          const problem = chosenSettlementProblem(amount, reimbPicks, owed.outstanding)
+          if (problem) throw new Error(problem)
+        }
+        // One reimbursement per expense it settles: oldest first, or the entries the person chose.
+        for (const alloc of reimbChoose ? chosenToAllocations(reimbPicks, owed.outstanding) : allocateSettlement(amount, owed.outstanding)) {
           await createReimbursement.mutateAsync({
             ...(alloc.source === 'vendor_payment' ? { vendor_bill_payment_id: alloc.expenseId } : { expense_id: alloc.expenseId }),
             date,
@@ -556,7 +563,15 @@ export function RecordFromStatement({
             <>
               <div className="field">
                 <label htmlFor="rfs-reimb-user">Who is being repaid?</label>
-                <select id="rfs-reimb-user" value={reimbUserId} onChange={(e) => setReimbUserId(e.target.value)}>
+                <select
+                  id="rfs-reimb-user"
+                  value={reimbUserId}
+                  onChange={(e) => {
+                    setReimbUserId(e.target.value)
+                    setReimbChoose(false)
+                    setReimbPicks({})
+                  }}
+                >
                   <option value="">Pick a person</option>
                   {owedPeople.map((r) => (
                     <option key={r.userId} value={r.userId ?? ''}>
@@ -566,8 +581,32 @@ export function RecordFromStatement({
                 </select>
               </div>
               {owed && (
+                <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, margin: '4px 0 8px' }}>
+                  <input
+                    type="checkbox"
+                    checked={reimbChoose}
+                    onChange={(e) => {
+                      setReimbChoose(e.target.checked)
+                      if (e.target.checked) setReimbPicks(oldestFirstChoices(amount, owed.outstanding))
+                    }}
+                  />
+                  Choose which entries this payment settles (otherwise the oldest are settled first)
+                </label>
+              )}
+              {owed && reimbChoose && (
+                <SettlementEntryPicker
+                  entries={owed.details}
+                  outstanding={owed.outstanding}
+                  amount={amount}
+                  value={reimbPicks}
+                  onChange={setReimbPicks}
+                  idPrefix="rfs-sep"
+                />
+              )}
+              {owed && (
                 <div className="note">
-                  {fmt2(amount)} is split over {reimbAllocations.length} entr{reimbAllocations.length === 1 ? 'y' : 'ies'}, oldest first
+                  {fmt2(amount)} is split over {reimbAllocations.length} entr{reimbAllocations.length === 1 ? 'y' : 'ies'}
+                  {reimbChoose ? ', as you chose' : ', oldest first'}
                   {amount < owed.due - 0.005 ? `, and ${fmt2(owed.due - amount)} is still owed after this` : ', which clears everything owed to them'}.
                   <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
                     {reimbAllocations.map((a) => {

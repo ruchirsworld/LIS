@@ -115,6 +115,7 @@ export function ReimbursementDue() {
                     <SettleReimbursementForm
                       due={r.due}
                       outstandingExpenses={r.outstanding}
+                      entries={r.details}
                       colSpan={3}
                       onClose={() => setSettlingUserId('')}
                     />

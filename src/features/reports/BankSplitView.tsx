@@ -15,6 +15,8 @@ interface Row {
   ref: number | string
   date: string
   text: string
+  /** What the person typed on a books entry. */
+  detail?: string
   deposit: number
   withdrawal: number
   status: Status
@@ -132,6 +134,7 @@ export function BankSplitView({
           ref: l.id,
           date: l.date,
           text: l.description,
+          detail: l.detail,
           deposit: l.deposit,
           withdrawal: l.withdrawal,
           status: hit ? statusOfMatch(hit.m) : booksOnly.has(l.id) ? 'only' : 'quiet',
@@ -213,6 +216,7 @@ export function BankSplitView({
         <span className="sv-date">{fmtDate(r.date)}</span>
         <span className="sv-text">
           {r.text || '(no description)'}
+          {r.detail && <small style={{ display: 'block', color: 'var(--ink)' }}>{r.detail}</small>}
           <small>
             {r.selectableForTick && r.pairNo ? `#${r.pairNo} · ` : ''}
             {statusText(r)}

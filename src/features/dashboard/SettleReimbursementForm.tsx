@@ -3,7 +3,8 @@ import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
 import { PaymentAccountPicker, bankAccountIdOf, paymentModeOf } from '../../components/PaymentAccountPicker'
 import { useCreateExpenseReimbursement } from '../../lib/queries/expenses'
-import { allocateSettlement, type OutstandingExpense } from '../../lib/calc/expenses'
+import { allocateSettlement, chosenSettlementProblem, chosenToAllocations, oldestFirstChoices, type ChosenAmounts, type OutstandingExpense } from '../../lib/calc/expenses'
+import { SettlementEntryPicker, type PickerEntry } from './SettlementEntryPicker'
 import { fmtPlain, parseINR } from '../../lib/calc/format'
 import { getErrorMessage } from '../../lib/errors'
 
@@ -18,11 +19,14 @@ function todayStr() {
 export function SettleReimbursementForm({
   due,
   outstandingExpenses,
+  entries,
   colSpan,
   onClose,
 }: {
   due: number
   outstandingExpenses: OutstandingExpense[]
+  /** The entries behind outstandingExpenses, so the person can choose which ones this payment settles. */
+  entries?: PickerEntry[]
   colSpan: number
   onClose: () => void
 }) {
@@ -31,6 +35,8 @@ export function SettleReimbursementForm({
   const [amount, setAmount] = useState(fmtPlain(due).replace(/,/g, ''))
   const [reference, setReference] = useState('')
   const [accountId, setAccountId] = useState('')
+  const [choose, setChoose] = useState(false)
+  const [picks, setPicks] = useState<ChosenAmounts>({})
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -41,10 +47,17 @@ export function SettleReimbursementForm({
       setError(`Amount can't exceed the total due (${fmtPlain(due)}).`)
       return
     }
+    if (choose) {
+      const problem = chosenSettlementProblem(amt, picks, outstandingExpenses)
+      if (problem) {
+        setError(problem)
+        return
+      }
+    }
     setSubmitting(true)
     setError(null)
     try {
-      const allocations = allocateSettlement(amt, outstandingExpenses)
+      const allocations = choose ? chosenToAllocations(picks, outstandingExpenses) : allocateSettlement(amt, outstandingExpenses)
       for (const alloc of allocations) {
         await createReimbursement.mutateAsync({
           ...(alloc.source === 'vendor_payment'
@@ -78,6 +91,22 @@ export function SettleReimbursementForm({
             <CurrencyInput value={amount} onValueChange={setAmount} />
           </div>
           <PaymentAccountPicker style={{ flexBasis: '100%' }} value={accountId} onChange={setAccountId} />
+          {entries && entries.length > 0 && (
+            <label style={{ flexBasis: '100%', display: 'flex', gap: 8, alignItems: 'center', fontSize: 13 }}>
+              <input
+                type="checkbox"
+                checked={choose}
+                onChange={(e) => {
+                  setChoose(e.target.checked)
+                  if (e.target.checked) setPicks(oldestFirstChoices(parseINR(amount), outstandingExpenses))
+                }}
+              />
+              Choose which entries this payment settles (otherwise the oldest are settled first)
+            </label>
+          )}
+          {choose && entries && (
+            <SettlementEntryPicker entries={entries} outstanding={outstandingExpenses} amount={parseINR(amount)} value={picks} onChange={setPicks} />
+          )}
 
           <div className="field">
             <label>Reference</label>

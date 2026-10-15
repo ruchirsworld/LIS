@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../supabase'
 import { selectByIds } from './byIds'
+import { fetchSourceDetails } from './bankLineDetail'
 import type { Database, Json } from '../../types/database'
 
 type CompanyProfile = Database['public']['Tables']['company_profile']['Row']
@@ -282,6 +283,8 @@ export interface BankLineRow {
   withdrawal: number
   sourceTable: string | null
   sourceId: string | null
+  /** What the person typed when they made the entry, read from the original record. */
+  detail?: string
 }
 
 /** Every ledger line posted to one bank account, oldest first. */
@@ -298,7 +301,7 @@ export function useBankLines(bankAccountId: string | null) {
         .eq('gl_account_id', account.id)
         .eq('bank_account_id', bankAccountId as string)
       if (error) throw error
-      return (data ?? [])
+      const lines = (data ?? [])
         .map((row) => {
           type Entry = { date: string; description: string; source_table: string | null; source_id: string | null }
           const entry = row.journal_entries as unknown as Entry | Entry[]
@@ -314,6 +317,9 @@ export function useBankLines(bankAccountId: string | null) {
           }
         })
         .sort((a, b) => a.date.localeCompare(b.date))
+      // What the person typed on each entry, so the list shows more than the system's label.
+      const details = await fetchSourceDetails(lines)
+      return lines.map((l) => ({ ...l, detail: details.get(`${l.sourceTable}|${l.sourceId}`) }))
     },
   })
 }

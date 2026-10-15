@@ -59,6 +59,8 @@ function plainCells(table: unknown[][]): unknown[][] {
   return table.map((row) => row.map((c) => (c instanceof Date ? parseStatementDate(c) ?? '' : c)))
 }
 
+/** The system's label, then what the person typed on the entry. */
+const labelOf = (l: { description: string; detail?: string }) => (l.detail ? `${l.description} — ${l.detail}` : l.description)
 const amountOf = (l: { deposit: number; withdrawal: number }) => (l.deposit > 0 ? l.deposit : l.withdrawal)
 const sideOf = (l: { deposit: number }) => (l.deposit > 0 ? 'In' : 'Out')
 
@@ -290,7 +292,7 @@ export function BankStatementMatcher({
             [m.statement, ...(m.extraStatements ?? [])].reduce((t, s) => t + s.deposit, 0),
             [m.statement, ...(m.extraStatements ?? [])].reduce((t, s) => t + s.withdrawal, 0),
             fmtDate(m.ledger.date),
-            [m.ledger, ...(m.extra ?? [])].map((l) => l.description).join(' + '),
+            [m.ledger, ...(m.extra ?? [])].map(labelOf).join(' + '),
           ]),
           numericColumns: [2, 3],
           decimals: 2,
@@ -305,7 +307,7 @@ export function BankStatementMatcher({
         {
           title: 'In the books, not on the statement',
           columns: ['Date', 'Entry', 'In', 'Out'],
-          rows: result.booksOnly.map((l) => [fmtDate(l.date), l.description, l.deposit, l.withdrawal]),
+          rows: result.booksOnly.map((l) => [fmtDate(l.date), labelOf(l), l.deposit, l.withdrawal]),
           numericColumns: [2, 3],
           decimals: 2,
         },
@@ -469,6 +471,7 @@ export function BankStatementMatcher({
                                   <div className="retention-note">
                                     {m.extra?.length ? `${fmt2(amountOf(l))} ` : ''}
                                     {l.description}
+                                    {l.detail && <div style={{ color: 'var(--ink)' }}>{l.detail}</div>}
                                   </div>
                                   {l.sourceTable && (
                                     <button type="button" className="btn link" style={{ padding: 0, fontSize: 12 }} onClick={() => void openEntry(l)}>
@@ -521,7 +524,14 @@ export function BankStatementMatcher({
                             </td>
                             <td>
                               {fmtDate(m.ledger.date)}
-                              <div className="retention-note">{[m.ledger, ...(m.extra ?? [])].map((l) => l.description).join(' + ')}</div>
+                              <div className="retention-note">
+                                {[m.ledger, ...(m.extra ?? [])].map((l) => (
+                                  <div key={l.id}>
+                                    {l.description}
+                                    {l.detail && <div style={{ color: 'var(--ink)' }}>{l.detail}</div>}
+                                  </div>
+                                ))}
+                              </div>
                             </td>
                             <td className="amt">
                               {sideOf(m.statement) === 'In' ? '+' : '-'}
@@ -567,7 +577,14 @@ export function BankStatementMatcher({
               <PileTable
                 empty="Everything in your books for this period is on the statement."
                 head={['Date', 'Entry', 'Amount']}
-                rows={result.booksOnly.map((l) => [fmtDate(l.date), l.description, `${l.deposit > 0 ? '+' : '-'}${fmt2(amountOf(l))}`])}
+                rows={result.booksOnly.map((l) => [
+                  fmtDate(l.date),
+                  <>
+                    {l.description}
+                    {l.detail && <div className="retention-note" style={{ color: 'var(--ink)' }}>{l.detail}</div>}
+                  </>,
+                  `${l.deposit > 0 ? '+' : '-'}${fmt2(amountOf(l))}`,
+                ])}
                 actions={(i) =>
                   result.booksOnly[i].sourceTable ? (
                     <button type="button" className="btn secondary" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => void openEntry(result.booksOnly[i])}>
@@ -621,7 +638,7 @@ function MatchActions({ m, onChange, onUnmatch }: { m: StatementMatch; onChange:
   )
 }
 
-function PileTable({ head, rows, empty, actions }: { head: string[]; rows: string[][]; empty: string; actions?: (index: number) => React.ReactNode }) {
+function PileTable({ head, rows, empty, actions }: { head: string[]; rows: React.ReactNode[][]; empty: string; actions?: (index: number) => React.ReactNode }) {
   return (
     <div className="table-scroll">
       <table className="data">
