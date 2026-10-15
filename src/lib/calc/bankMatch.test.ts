@@ -159,4 +159,28 @@ describe('matching a bank statement to the books', () => {
     expect(statementRowsOf(r.toTick[0]).sort()).toEqual([1, 2])
     expect(r.toTick[0].ambiguous).toBe(true)
   })
+
+  it('never joins a pair the user unmatched, and uses another entry instead', () => {
+    const stmt = [s(1, '2026-10-12', 0, 500)]
+    const books = [l('a', '2026-10-12', 0, 500), l('b', '2026-10-13', 0, 500)]
+    const r = matchStatement(stmt, books, { forbidden: [{ statementRow: 1, ledgerId: 'a' }] })
+    expect(r.toTick).toHaveLength(1)
+    expect(r.toTick[0].ledger.id).toBe('b')
+    expect(r.booksOnly.map((x) => x.id)).toEqual(['a'])
+  })
+
+  it('leaves both sides unmatched when the only partner was unmatched', () => {
+    const r = matchStatement([s(1, '2026-10-12', 0, 500)], [l('a', '2026-10-12', 0, 500)], { forbidden: [{ statementRow: 1, ledgerId: 'a' }] })
+    expect(r.toTick).toHaveLength(0)
+    expect(r.statementOnly.map((x) => x.row)).toEqual([1])
+    expect(r.booksOnly.map((x) => x.id)).toEqual(['a'])
+  })
+
+  it('does not rebuild a lump-sum match that was unmatched', () => {
+    const stmt = [s(1, '2026-10-12', 0, 1500)]
+    const books = [l('a', '2026-10-12', 0, 1000), l('b', '2026-10-12', 0, 500)]
+    expect(matchStatement(stmt, books).toTick).toHaveLength(1)
+    const r = matchStatement(stmt, books, { forbidden: [{ statementRow: 1, ledgerId: 'a' }] })
+    expect(r.toTick).toHaveLength(0)
+  })
 })

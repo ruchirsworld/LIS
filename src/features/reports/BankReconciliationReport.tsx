@@ -117,6 +117,7 @@ export function BankReconciliationReport() {
             if (closing !== null) setBalanceText(String(closing))
           }}
           onTick={(ids) => setCleared.mutateAsync({ lineIds: ids, cleared: true, clearedOn: statementDate })}
+          onUntick={(ids) => setCleared.mutateAsync({ lineIds: ids, cleared: false, clearedOn: statementDate })}
           onPendingChange={setPendingMatches}
         />
       )}

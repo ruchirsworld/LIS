@@ -4,7 +4,7 @@ import { fmt2, fmtDate } from '../../lib/calc/format'
 import { useGoTo } from '../../lib/navContext'
 import { resolveEntryTarget } from '../../lib/entryTarget'
 import { RecordFromStatement } from './RecordFromStatement'
-import { ledgerIdsOf, ledgerTotalOf, matchStatement, type ForcedPair, type LedgerCandidate, type StatementMatch } from '../../lib/calc/bankMatch'
+import { ledgerIdsOf, ledgerTotalOf, matchStatement, statementRowsOf, type ForcedPair, type LedgerCandidate, type StatementMatch } from '../../lib/calc/bankMatch'
 import {
   closingBalance,
   detectMapping,
@@ -16,7 +16,8 @@ import {
   type StatementLine,
 } from '../../lib/import/bankStatement'
 import { getErrorMessage } from '../../lib/errors'
-import { toast } from '../../lib/feedback'
+import { confirmAction, toast } from '../../lib/feedback'
+import { ChangeMatchModal } from './ChangeMatchModal'
 import type { BankLineRow } from '../../lib/queries/books'
 import { ReportExportButtons } from './ReportExportButtons'
 import { BankSplitView } from './BankSplitView'
@@ -41,6 +42,8 @@ interface StoredStatement {
   mapping: ColumnMapping
   days: number
   forced: ForcedPair[]
+  /** Pairs the user unmatched: the matcher never joins these again. */
+  forbidden?: ForcedPair[]
 }
 const storeKeyOf = (bankId: string) => `lis.bankStatement.${bankId}`
 function loadStored(bankId: string): StoredStatement | null {
@@ -76,6 +79,7 @@ export function BankStatementMatcher({
   clearedIds,
   onStatementRead,
   onTick,
+  onUntick,
   ticking,
   onPendingChange,
 }: {
@@ -86,6 +90,8 @@ export function BankStatementMatcher({
   /** Called with the statement's last date and closing balance when a file is read. */
   onStatementRead: (info: { lastDate: string; closing: number | null }) => void
   onTick: (ledgerLineIds: string[]) => Promise<void>
+  /** Takes the tick off entries again (when a match that was already ticked is changed). */
+  onUntick: (ledgerLineIds: string[]) => Promise<void>
   ticking: boolean
   /** Reports how many matched lines are still waiting to be ticked. */
   onPendingChange?: (count: number) => void
@@ -103,11 +109,13 @@ export function BankStatementMatcher({
   const [view, setView] = useState<'lists' | 'split'>('lists')
   // Pairings the user chose by hand (a statement line and the book entry it really is).
   const [forced, setForced] = useState<ForcedPair[]>(restored?.forced ?? [])
+  const [forbidden, setForbidden] = useState<ForcedPair[]>(restored?.forbidden ?? [])
+  const [changing, setChanging] = useState<StatementMatch | null>(null)
 
   const headers = useMemo(() => (rows && headerRow >= 0 ? rows[headerRow].map((c) => String(c ?? '').trim()) : []), [rows, headerRow])
   const lines = useMemo(() => (rows && mapping ? extractLines(rows, headerRow, mapping) : []), [rows, headerRow, mapping])
   const candidates = useMemo<LedgerCandidate[]>(() => ledger.map((l) => ({ ...l, cleared: clearedIds.has(l.id) })), [ledger, clearedIds])
-  const result = useMemo(() => matchStatement(lines, candidates, { days, forced }), [lines, candidates, days, forced])
+  const result = useMemo(() => matchStatement(lines, candidates, { days, forced, forbidden }), [lines, candidates, days, forced, forbidden])
   const statementOnlyNet = Math.round(result.statementOnly.reduce((s, l) => s + l.deposit - l.withdrawal, 0) * 100) / 100
 
   // Keep the statement for this session.
@@ -117,12 +125,12 @@ export function BankStatementMatcher({
         sessionStorage.removeItem(storeKeyOf(bankId))
         return
       }
-      const json = JSON.stringify({ fileName, rows, headerRow, mapping, days, forced } satisfies StoredStatement)
+      const json = JSON.stringify({ fileName, rows, headerRow, mapping, days, forced, forbidden } satisfies StoredStatement)
       if (json.length < 4_000_000) sessionStorage.setItem(storeKeyOf(bankId), json)
     } catch {
       // Storage full or blocked: the statement just will not survive leaving the page.
     }
-  }, [bankId, fileName, rows, headerRow, mapping, days, forced])
+  }, [bankId, fileName, rows, headerRow, mapping, days, forced, forbidden])
 
   // When the page is opened again with a kept statement, tell the page its date and closing balance.
   useEffect(() => {
@@ -139,7 +147,55 @@ export function BankStatementMatcher({
     setHeaderRow(-1)
     setFileName('')
     setForced([])
+    setForbidden([])
     setReadError(null)
+  }
+
+  /** A wrong match: break it. The statement line and the entry both go back to "not matched", and they are not paired again. */
+  async function unmatch(m: StatementMatch, andClose = false) {
+    const ledgerIds = ledgerIdsOf(m)
+    const rows = statementRowsOf(m)
+    if (m.ledger.cleared) {
+      const ok = await confirmAction({
+        title: 'Unmatch this line?',
+        message: 'It was already ticked off. Unmatching also takes the tick off, so the entry counts as not on the statement again.',
+        confirmLabel: 'Unmatch',
+        danger: true,
+      })
+      if (!ok) return
+      try {
+        await onUntick(ledgerIds)
+      } catch (err) {
+        toast('error', getErrorMessage(err, 'Could not take the tick off.'))
+        return
+      }
+    }
+    setForced((cur) => cur.filter((f) => !rows.includes(f.statementRow) && !ledgerIds.includes(f.ledgerId)))
+    setForbidden((cur) => [...cur, ...rows.flatMap((r) => ledgerIds.map((id) => ({ statementRow: r, ledgerId: id })))])
+    if (andClose) setChanging(null)
+  }
+
+  /** The statement line really is another entry: pair them, and keep the old partner from coming back. */
+  async function changeMatch(m: StatementMatch, ledgerId: string) {
+    if (m.ledger.cleared) {
+      const ok = await confirmAction({
+        title: 'Change this match?',
+        message: 'The old entry was already ticked off. Changing the match takes that tick off.',
+        confirmLabel: 'Change it',
+      })
+      if (!ok) return
+      try {
+        await onUntick(ledgerIdsOf(m))
+      } catch (err) {
+        toast('error', getErrorMessage(err, 'Could not take the tick off.'))
+        return
+      }
+    }
+    const row = m.statement.row
+    const oldIds = ledgerIdsOf(m)
+    setForbidden((cur) => [...cur.filter((f) => !(f.statementRow === row && f.ledgerId === ledgerId)), ...oldIds.map((id) => ({ statementRow: row, ledgerId: id }))])
+    setForced((cur) => [...cur.filter((f) => f.statementRow !== row && f.ledgerId !== ledgerId), { statementRow: row, ledgerId }])
+    setChanging(null)
   }
 
   async function openEntry(l: { sourceTable?: string | null; sourceId?: string | null; date: string }) {
@@ -199,6 +255,7 @@ export function BankStatementMatcher({
       setMapping(map)
       setFileName(file.name)
       setForced([])
+      setForbidden([])
       if (read.length === 0) {
         setReadError('The table was found but no transaction lines could be read. Check the columns below.')
         return
@@ -343,6 +400,8 @@ export function BankStatementMatcher({
                     onUnforce={(statementRow) => setForced((cur) => cur.filter((f) => f.statementRow !== statementRow))}
                     onRecord={setRecording}
                     onOpen={(l) => void openEntry(l)}
+                    onChangeMatch={setChanging}
+                    onUnmatch={(m) => void unmatch(m)}
                   />
                   <div style={{ marginTop: 10 }}>
                     <Button type="button" onClick={() => void tickPicked()} disabled={picked.size === 0 || ticking}>
@@ -373,6 +432,7 @@ export function BankStatementMatcher({
                           <th>In your books</th>
                           <th style={{ textAlign: 'right' }}>Amount</th>
                           <th>How close</th>
+                          <th></th>
                         </tr>
                       </thead>
                       <tbody>
@@ -423,6 +483,9 @@ export function BankStatementMatcher({
                               {fmt2(ledgerTotalOf(m))}
                             </td>
                             <td style={{ color: m.ambiguous || m.confidence === 'loose' ? 'var(--amber)' : undefined }}>{matchNote(m)}</td>
+                            <td>
+                              <MatchActions m={m} onChange={setChanging} onUnmatch={(x) => void unmatch(x)} />
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -434,6 +497,45 @@ export function BankStatementMatcher({
                     </Button>
                   </div>
                 </>
+              )}
+
+              {result.alreadyTicked.length > 0 && (
+                <details style={{ marginTop: 14 }}>
+                  <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>Already ticked ({result.alreadyTicked.length}). Open to change one that is wrong.</summary>
+                  <div className="table-scroll">
+                    <table className="data">
+                      <thead>
+                        <tr>
+                          <th>Statement</th>
+                          <th>In your books</th>
+                          <th style={{ textAlign: 'right' }}>Amount</th>
+                          <th></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {result.alreadyTicked.map((m) => (
+                          <tr key={m.ledger.id + '|' + m.statement.row}>
+                            <td>
+                              {fmtDate(m.statement.date)}
+                              <div className="retention-note">{m.statement.description}</div>
+                            </td>
+                            <td>
+                              {fmtDate(m.ledger.date)}
+                              <div className="retention-note">{[m.ledger, ...(m.extra ?? [])].map((l) => l.description).join(' + ')}</div>
+                            </td>
+                            <td className="amt">
+                              {sideOf(m.statement) === 'In' ? '+' : '-'}
+                              {fmt2(ledgerTotalOf(m))}
+                            </td>
+                            <td>
+                              <MatchActions m={m} onChange={setChanging} onUnmatch={(x) => void unmatch(x)} />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </details>
               )}
 
               <h4 style={{ margin: '16px 0 6px', fontSize: 13 }}>On the statement, not in your books ({result.statementOnly.length})</h4>
@@ -480,7 +582,41 @@ export function BankStatementMatcher({
           )}
         </>
       )}
+      {changing && (
+        <ChangeMatchModal
+          match={changing}
+          options={candidates.filter(
+            (l) =>
+              sideOf(l) === sideOf(changing.statement) &&
+              Math.round(amountOf(l) * 100) === Math.round(amountOf(changing.statement) * 100) &&
+              !ledgerIdsOf(changing).includes(l.id)
+          )}
+          matchedElsewhere={(id) => {
+            const other = [...result.toTick, ...result.alreadyTicked].find((x) => x.statement.row !== changing.statement.row && ledgerIdsOf(x).includes(id))
+            return other ? `${fmtDate(other.statement.date)} ${other.statement.description}` : null
+          }}
+          onPick={(id) => void changeMatch(changing, id)}
+          onUnmatch={() => void unmatch(changing, true)}
+          onClose={() => setChanging(null)}
+        />
+      )}
       {recording && <RecordFromStatement line={recording} bankAccountId={bankId} bankName={bankName} onClose={() => setRecording(null)} />}
+    </div>
+  )
+}
+
+function MatchActions({ m, onChange, onUnmatch }: { m: StatementMatch; onChange: (m: StatementMatch) => void; onUnmatch: (m: StatementMatch) => void }) {
+  const single = !m.extra?.length && !m.extraStatements?.length
+  return (
+    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+      {single && (
+        <button type="button" className="btn secondary" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => onChange(m)}>
+          Change
+        </button>
+      )}
+      <button type="button" className="btn secondary" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => onUnmatch(m)}>
+        Unmatch
+      </button>
     </div>
   )
 }

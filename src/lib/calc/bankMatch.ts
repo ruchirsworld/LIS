@@ -88,9 +88,12 @@ const cents = (n: number) => Math.round(n * 100)
 export function matchStatement(
   lines: StatementLine[],
   ledger: LedgerCandidate[],
-  opts: { days?: number; forced?: ForcedPair[] } = {}
+  opts: { days?: number; forced?: ForcedPair[]; forbidden?: ForcedPair[] } = {}
 ): MatchResult {
   const days = opts.days ?? 7
+  // Pairs the user said are NOT the same event (an unmatch): the matcher never joins these again.
+  const bad = new Set((opts.forbidden ?? []).map((f) => `${f.statementRow}|${f.ledgerId}`))
+  const isBad = (row: number, ledgerId: string) => bad.has(`${row}|${ledgerId}`)
   const usedStatement = new Set<number>()
   const usedLedger = new Set<string>()
   const result: MatchResult = { toTick: [], alreadyTicked: [], statementOnly: [], booksOnly: [] }
@@ -118,7 +121,7 @@ export function matchStatement(
     for (const s of lines) {
       if (usedStatement.has(s.row)) continue
       for (const l of pool) {
-        if (sideOf(s) !== sideOf(l) || amountOf(s) !== amountOf(l)) continue
+        if (sideOf(s) !== sideOf(l) || amountOf(s) !== amountOf(l) || isBad(s.row, l.id)) continue
         const gap = Math.abs(dayNumber(s.date) - dayNumber(l.date))
         if (gap <= days) candidates.push({ s, l, gap })
       }
@@ -169,15 +172,16 @@ export function matchStatement(
         byDay.set(key, [...(byDay.get(key) ?? []), l])
       }
       for (const group of byDay.values()) {
-        if (group.length >= 2 && group.reduce((t, l) => t + amountOf(l), 0) === target) {
+        if (group.length >= 2 && group.reduce((t, l) => t + amountOf(l), 0) === target && !group.some((l) => isBad(s.row, l.id))) {
           picked = group
           break
         }
       }
       if (!picked && pool.length <= 25) {
         const ids = findSubset(pool.map((l) => ({ id: l.id, c: amountOf(l) })), target)
-        if (ids) {
-          picked = pool.filter((l) => ids.includes(l.id))
+        const found = ids ? pool.filter((l) => ids.includes(l.id)) : null
+        if (found && !found.some((l) => isBad(s.row, l.id))) {
+          picked = found
           ambiguous = true
         }
       }
@@ -214,15 +218,16 @@ export function matchStatement(
       const byDay = new Map<string, StatementLine[]>()
       for (const s of pool) byDay.set(s.date, [...(byDay.get(s.date) ?? []), s])
       for (const group of byDay.values()) {
-        if (group.length >= 2 && group.reduce((t, s) => t + amountOf(s), 0) === target) {
+        if (group.length >= 2 && group.reduce((t, s) => t + amountOf(s), 0) === target && !group.some((s) => isBad(s.row, l.id))) {
           picked = group
           break
         }
       }
       if (!picked && pool.length <= 25) {
         const rows = findSubset(pool.map((s) => ({ id: String(s.row), c: amountOf(s) })), target)
-        if (rows) {
-          picked = pool.filter((s) => rows.includes(String(s.row)))
+        const found = rows ? pool.filter((s) => rows.includes(String(s.row))) : null
+        if (found && !found.some((s) => isBad(s.row, l.id))) {
+          picked = found
           ambiguous = true
         }
       }

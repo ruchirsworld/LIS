@@ -64,6 +64,8 @@ export function BankSplitView({
   onUnforce,
   onRecord,
   onOpen,
+  onChangeMatch,
+  onUnmatch,
 }: {
   lines: StatementLine[]
   ledger: LedgerCandidate[]
@@ -77,6 +79,10 @@ export function BankSplitView({
   onRecord?: (line: StatementLine) => void
   /** Go to the screen that holds a line in the books. */
   onOpen?: (line: LedgerCandidate) => void
+  /** Choose a different entry for a matched line. */
+  onChangeMatch?: (m: StatementMatch) => void
+  /** Break a match that is wrong. */
+  onUnmatch?: (m: StatementMatch) => void
 }) {
   const [onlyProblems, setOnlyProblems] = useState(false)
   const [sel, setSel] = useState<{ side: Side; ref: number | string } | null>(null)
@@ -216,7 +222,7 @@ export function BankSplitView({
           {isIn(r) ? '+' : '-'}
           {fmt2(isIn(r) ? r.deposit : r.withdrawal)}
         </span>
-        {(canPair || r.match?.forced || showRecord || showOpen) && (
+        {(canPair || r.match || showRecord || showOpen) && (
           <span className="sv-actions">
             {showRecord && (
               <button
@@ -253,6 +259,30 @@ export function BankSplitView({
                 }}
               >
                 Pair with selected
+              </button>
+            )}
+            {r.match && onChangeMatch && !r.match.extra?.length && !r.match.extraStatements?.length && (
+              <button
+                type="button"
+                className="btn secondary"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onChangeMatch(r.match!)
+                }}
+              >
+                Change match
+              </button>
+            )}
+            {r.match && onUnmatch && (
+              <button
+                type="button"
+                className="btn secondary"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onUnmatch(r.match!)
+                }}
+              >
+                Unmatch
               </button>
             )}
             {r.match?.forced && (
