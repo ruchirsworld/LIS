@@ -24,6 +24,8 @@ import { ReimbursementDue } from './ReimbursementDue'
 import { SupervisorDashboardPage } from './SupervisorDashboardPage'
 import { DashSection, useDashSections, type DashSectionId } from './DashSection'
 import { DashboardInsights } from './DashboardInsights'
+import { PeriodActivity, RevenueDetail, type PeriodKpiId } from './PeriodActivity'
+import { ProjectSummary } from './ProjectSummary'
 import { ClaimActions, SendInvoiceAction } from './DashActions'
 import { Delta, ProgressBar, Sparkline } from './dashViz'
 import { useAuth } from '../../lib/auth'
@@ -52,7 +54,7 @@ const JUMP_LINKS: { id: DashSectionId; label: string }[] = [
   { id: 'reports', label: 'Reports' },
 ]
 
-type ExpandedKpi = 'approvals' | 'draftInvoices' | 'overdueInvoices' | 'outstanding' | 'retention' | 'gstHeld' | 'imprest' | 'gst' | null
+type ExpandedKpi = 'approvals' | 'draftInvoices' | 'overdueInvoices' | 'outstanding' | 'retention' | 'gstHeld' | 'imprest' | 'gst' | PeriodKpiId | null
 
 function clockTime(ms: number): string {
   return new Date(ms).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })
@@ -633,8 +635,9 @@ export function DashboardPage() {
             value={fmt(summary?.total_received)}
             loading={summaryLoading}
             extra={trend(summary?.total_received, prevSummary?.total_received, 'up')}
-            hint="Open the receipts for this period"
-            {...drill('invoices', { range: periodRange, focus: 'inv-payments' })}
+            hint="Click to see who paid, and against which invoice"
+            onClick={() => toggleKpi('revenue')}
+            active={expandedKpi === 'revenue'}
           />
           <KpiCard
             label="Expenses"
@@ -666,6 +669,8 @@ export function DashboardPage() {
             active={expandedKpi === 'gst'}
           />
         </div>
+
+        {expandedKpi === 'revenue' && <RevenueDetail range={range} goTo={goTo} />}
 
         {expandedKpi === 'gst' &&
           (() => {
@@ -708,6 +713,8 @@ export function DashboardPage() {
               </div>
             )
           })()}
+
+        <PeriodActivity range={range} expanded={expandedKpi} onToggle={(id) => toggleKpi(id)} goTo={goTo} />
       </DashSection>
 
       <DashSection id="projects" title="Projects" open={sections.isOpen('projects')} onToggle={() => sections.toggle('projects')}>
@@ -738,6 +745,7 @@ export function DashboardPage() {
             {...drill('projects')}
           />
         </div>
+        <ProjectSummary range={range} periodLabel={PERIOD_LABEL[periodType]} goTo={goTo} />
       </DashSection>
 
       {error && (
