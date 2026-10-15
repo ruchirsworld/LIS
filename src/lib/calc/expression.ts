@@ -104,3 +104,19 @@ export function evaluateExpression(expr: string): number {
   if (!isFinite(result)) throw new Error('Invalid result')
   return result
 }
+
+/** What the keyboard types, as the calculator shows it: * and x become ×, / becomes ÷, - becomes −, and anything
+ * that is not part of a sum (letters, commas, spaces, =) is dropped. */
+export function cleanCalcInput(raw: string): string {
+  return raw
+    .replace(/[*xX]/g, '×')
+    .replace(/\//g, '÷')
+    .replace(/-/g, '−')
+    .replace(/[^0-9.+−×÷()]/g, '')
+}
+
+/** The value of what the calculator shows, to the paisa. Throws on an incomplete or invalid sum. */
+export function evaluateDisplay(display: string): number {
+  const result = evaluateExpression(display.replace(/×/g, '*').replace(/÷/g, '/').replace(/−/g, '-'))
+  return Math.round(result * 100) / 100
+}

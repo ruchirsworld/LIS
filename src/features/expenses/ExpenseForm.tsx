@@ -833,6 +833,7 @@ export function ExpenseForm({
         )}
         {showCalc && !showQtyRateFields && (
           <InlineCalculator
+            onClose={() => setShowCalc(false)}
             onResult={(value) => {
               setAmount(String(value))
               setShowCalc(false)
