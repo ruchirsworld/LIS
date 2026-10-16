@@ -1,10 +1,11 @@
 // Matches the lines of a bank statement to the lines of the books for the same
 // bank account. A statement line and a ledger line are the same event when they
 // are on the same side (money in or money out), for the same amount, and close
-// in date. Each line is used once, nearest dates first.
+// in date. Each line is used once, nearest dates first. Amounts that differ by less than a rupee (99 paise) still
+// count as the same; an exact amount is always preferred over one that is slightly off.
 
 import type { StatementLine } from '../import/bankStatement'
-import type { BankLine } from './bankReconciliation'
+import { AMOUNT_TOLERANCE, type BankLine } from './bankReconciliation'
 
 export interface LedgerCandidate extends BankLine {
   /** Already ticked off against an earlier statement. */
@@ -28,6 +29,8 @@ export interface StatementMatch {
   /** The reverse: the books hold one entry for what the bank shows as several payments; the other
    * statement lines, with `statement` being the first. */
   extraStatements?: StatementLine[]
+  /** Statement amount less books amount, in rupees, when they differ by some paise (ignored in reconciliation). Absent when equal. */
+  amountGap?: number
 }
 
 /** A stable name for a books entry. A ledger line gets a new id whenever its entry is edited and re-posted, but the
@@ -63,16 +66,16 @@ export function ledgerTotalOf(m: StatementMatch): number {
   return Math.round(all.reduce((s, l) => s + (l.deposit > 0 ? l.deposit : l.withdrawal), 0) * 100) / 100
 }
 
-/** The entries that add up to the target, by DFS with pruning. Null when none do (or the search is too big). */
-function findSubset(items: { id: string; c: number }[], target: number): string[] | null {
+/** The entries that add up to the target (within `tol`), by DFS with pruning. Null when none do (or the search is too big). */
+function findSubset(items: { id: string; c: number }[], target: number, tol = 0): string[] | null {
   const sorted = [...items].sort((a, b) => b.c - a.c)
   const suffix: number[] = new Array(sorted.length + 1).fill(0)
   for (let i = sorted.length - 1; i >= 0; i--) suffix[i] = suffix[i + 1] + sorted[i].c
   let budget = 150000
   const chosen: string[] = []
   const dfs = (i: number, remaining: number): boolean => {
-    if (remaining === 0) return chosen.length >= 2
-    if (i >= sorted.length || remaining < 0 || suffix[i] < remaining || budget-- <= 0) return false
+    if (Math.abs(remaining) <= tol && chosen.length >= 2) return true
+    if (i >= sorted.length || remaining < -tol || suffix[i] < remaining - tol || budget-- <= 0) return false
     chosen.push(sorted[i].id)
     if (dfs(i + 1, remaining - sorted[i].c)) return true
     chosen.pop()
@@ -101,6 +104,11 @@ export interface MatchResult {
 const DAY = 86400000
 const dayNumber = (isoDate: string) => Math.round(Date.UTC(+isoDate.slice(0, 4), +isoDate.slice(5, 7) - 1, +isoDate.slice(8, 10)) / DAY)
 const cents = (n: number) => Math.round(n * 100)
+const TOL = Math.round(AMOUNT_TOLERANCE * 100)
+/** The amounts are the same, or differ by less than a rupee. */
+const near = (a: number, b: number) => Math.abs(a - b) <= TOL
+/** Finds the entries that add up to the target: an exact total first, then one within the tolerance. */
+const subsetFor = (items: { id: string; c: number }[], target: number) => findSubset(items, target) ?? findSubset(items, target, TOL)
 
 export function matchStatement(
   lines: StatementLine[],
@@ -124,7 +132,7 @@ export function matchStatement(
     const st = lines.find((x) => x.row === f.statementRow)
     const lg = ledger.find((x) => x.id === f.ledgerId || ledgerKey(x) === f.ledgerId)
     if (!st || !lg || usedStatement.has(st.row) || usedLedger.has(lg.id)) continue
-    if (sideOf(st) !== sideOf(lg) || amountOf(st) !== amountOf(lg)) continue
+    if (sideOf(st) !== sideOf(lg) || !near(amountOf(st), amountOf(lg))) continue
     usedStatement.add(st.row)
     usedLedger.add(lg.id)
     const gap = Math.abs(dayNumber(st.date) - dayNumber(lg.date))
@@ -143,7 +151,7 @@ export function matchStatement(
     const L = (lgs as LedgerCandidate[]).slice().sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id))
     const side = sideOf(S[0])
     if (!S.every((s) => sideOf(s) === side) || !L.every((l) => sideOf(l) === side)) continue
-    if (S.reduce((t, s) => t + amountOf(s), 0) !== L.reduce((t, l) => t + amountOf(l), 0)) continue
+    if (!near(S.reduce((t, s) => t + amountOf(s), 0), L.reduce((t, l) => t + amountOf(l), 0))) continue
     S.forEach((s) => usedStatement.add(s.row))
     L.forEach((l) => usedLedger.add(l.id))
     const gap = Math.min(...S.flatMap((s) => L.map((l) => Math.abs(dayNumber(s.date) - dayNumber(l.date)))))
@@ -162,14 +170,15 @@ export function matchStatement(
 
   for (const pass of ['new', 'ticked'] as const) {
     const pool = ledger.filter((l) => (pass === 'new' ? !l.cleared : l.cleared) && !usedLedger.has(l.id))
-    interface Candidate { s: StatementLine; l: LedgerCandidate; gap: number }
+    interface Candidate { s: StatementLine; l: LedgerCandidate; gap: number; diff: number }
     const candidates: Candidate[] = []
     for (const s of lines) {
       if (usedStatement.has(s.row)) continue
       for (const l of pool) {
-        if (sideOf(s) !== sideOf(l) || amountOf(s) !== amountOf(l) || isBadLine(s.row, l)) continue
+        const diff = Math.abs(amountOf(s) - amountOf(l))
+        if (sideOf(s) !== sideOf(l) || diff > TOL || isBadLine(s.row, l)) continue
         const gap = Math.abs(dayNumber(s.date) - dayNumber(l.date))
-        if (gap <= days) candidates.push({ s, l, gap })
+        if (gap <= days) candidates.push({ s, l, gap, diff })
       }
     }
     // How many partners each line could have had at its best gap, to flag a coin-toss.
@@ -180,9 +189,10 @@ export function matchStatement(
       bestGapOfLedger.set(c.l.id, Math.min(bestGapOfLedger.get(c.l.id) ?? Infinity, c.gap))
     }
     const rivals = (c: Candidate) =>
-      candidates.filter((o) => (o.s.row === c.s.row || o.l.id === c.l.id) && o.gap === c.gap).length > 1
+      candidates.filter((o) => (o.s.row === c.s.row || o.l.id === c.l.id) && o.gap === c.gap && o.diff === c.diff).length > 1
 
-    candidates.sort((a, b) => a.gap - b.gap || a.s.row - b.s.row || a.l.date.localeCompare(b.l.date))
+    // An exact amount beats one that is a few paise off; then the nearest date.
+    candidates.sort((a, b) => a.diff - b.diff || a.gap - b.gap || a.s.row - b.s.row || a.l.date.localeCompare(b.l.date))
     for (const c of candidates) {
       if (usedStatement.has(c.s.row) || usedLedger.has(c.l.id)) continue
       usedStatement.add(c.s.row)
@@ -218,13 +228,13 @@ export function matchStatement(
         byDay.set(key, [...(byDay.get(key) ?? []), l])
       }
       for (const group of byDay.values()) {
-        if (group.length >= 2 && group.reduce((t, l) => t + amountOf(l), 0) === target && !group.some((l) => isBadLine(s.row, l))) {
+        if (group.length >= 2 && near(group.reduce((t, l) => t + amountOf(l), 0), target) && !group.some((l) => isBadLine(s.row, l))) {
           picked = group
           break
         }
       }
       if (!picked && pool.length <= 25) {
-        const ids = findSubset(pool.map((l) => ({ id: l.id, c: amountOf(l) })), target)
+        const ids = subsetFor(pool.map((l) => ({ id: l.id, c: amountOf(l) })), target)
         const found = ids ? pool.filter((l) => ids.includes(l.id)) : null
         if (found && !found.some((l) => isBadLine(s.row, l))) {
           picked = found
@@ -264,13 +274,13 @@ export function matchStatement(
       const byDay = new Map<string, StatementLine[]>()
       for (const s of pool) byDay.set(s.date, [...(byDay.get(s.date) ?? []), s])
       for (const group of byDay.values()) {
-        if (group.length >= 2 && group.reduce((t, s) => t + amountOf(s), 0) === target && !group.some((s) => isBadLine(s.row, l))) {
+        if (group.length >= 2 && near(group.reduce((t, s) => t + amountOf(s), 0), target) && !group.some((s) => isBadLine(s.row, l))) {
           picked = group
           break
         }
       }
       if (!picked && pool.length <= 25) {
-        const rows = findSubset(pool.map((s) => ({ id: String(s.row), c: amountOf(s) })), target)
+        const rows = subsetFor(pool.map((s) => ({ id: String(s.row), c: amountOf(s) })), target)
         const found = rows ? pool.filter((s) => rows.includes(String(s.row))) : null
         if (found && !found.some((s) => isBadLine(s.row, l))) {
           picked = found
@@ -293,6 +303,13 @@ export function matchStatement(
       }
       ;(pass === 'new' ? result.toTick : result.alreadyTicked).push(match)
     }
+  }
+
+  // Note any matched pair or group whose amounts differ by some paise.
+  for (const m of [...result.toTick, ...result.alreadyTicked]) {
+    const statementTotal = [m.statement, ...(m.extraStatements ?? [])].reduce((t, s) => t + amountOf(s), 0)
+    const ledgerTotal = [m.ledger, ...(m.extra ?? [])].reduce((t, l) => t + amountOf(l), 0)
+    if (statementTotal !== ledgerTotal) m.amountGap = (statementTotal - ledgerTotal) / 100
   }
 
   result.statementOnly = lines.filter((s) => !usedStatement.has(s.row))

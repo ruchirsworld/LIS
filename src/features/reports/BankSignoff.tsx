@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Button } from '../../components/ui'
 import { fmt2, fmtDate } from '../../lib/calc/format'
-import { signoffStatus, type BankLine, type ReconciliationSummary } from '../../lib/calc/bankReconciliation'
+import { signoffStatus, withinTolerance, type BankLine, type ReconciliationSummary } from '../../lib/calc/bankReconciliation'
 import { getErrorMessage } from '../../lib/errors'
 import { confirmAction, toast } from '../../lib/feedback'
 import { useProfiles } from '../../lib/queries/admin'
@@ -38,7 +38,7 @@ export function BankSignoff({
 
   const nameOf = (id: string | null) => profiles?.find((p) => p.id === id)?.name ?? 'Someone'
   const entered = balanceText.trim() !== ''
-  const agrees = entered && Math.abs(summary.difference) < 0.01
+  const agrees = entered && withinTolerance(summary.difference)
   const existing = signoffs?.find((s) => s.statement_date === statementDate)
 
   async function done() {
@@ -103,7 +103,7 @@ export function BankSignoff({
       {existing && (
         <div className="note" style={{ color: 'var(--green)', fontWeight: 600 }}>
           Saved: {nameOf(existing.completed_by)} confirmed this on {fmtDate(existing.completed_at.slice(0, 10))}
-          {Math.abs(Number(existing.difference)) < 0.01 ? ', with no difference.' : `, with a difference of ${fmt2(Number(existing.difference))}.`}
+          {withinTolerance(Number(existing.difference)) ? ', with no difference.' : `, with a difference of ${fmt2(Number(existing.difference))}.`}
         </div>
       )}
 
@@ -148,7 +148,7 @@ export function BankSignoff({
                     <tr key={s.id}>
                       <td>{fmtDate(s.statement_date)}</td>
                       <td className="amt">{fmt2(Number(s.statement_balance))}</td>
-                      <td className="amt" style={{ color: Math.abs(Number(s.difference)) < 0.01 ? undefined : 'var(--red)' }}>
+                      <td className="amt" style={{ color: withinTolerance(Number(s.difference)) ? undefined : 'var(--red)' }}>
                         {fmt2(Number(s.difference))}
                         {s.note && <div className="retention-note">{s.note}</div>}
                       </td>

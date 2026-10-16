@@ -6,8 +6,8 @@ import { ledgerKey, ledgerKeysOf, statementRowsOf, type LedgerCandidate, type Ma
 import type { StatementLine } from '../../lib/import/bankStatement'
 import './BankSplitView.css'
 
-// green = matched one to one, yellow = several lines matched with one on the other side (a group),
-// red = no match, grey = in your books but outside this statement's dates.
+// green = matched one to one, or a group that has been saved (ticked); yellow = several lines matched with one on the
+// other side (a group) that is not saved yet; red = no match; grey = in your books but outside this statement's dates.
 type Status = 'match' | 'group' | 'only' | 'quiet'
 type Side = 'bank' | 'books'
 
@@ -36,6 +36,9 @@ const isIn = (r: { deposit: number }) => r.deposit > 0
 
 const isGroup = (m: StatementMatch) => !!m.extra?.length || !!m.extraStatements?.length
 
+/** Every entry in the books that the match covers has been ticked (saved). */
+const isSaved = (m: StatementMatch) => [m.ledger, ...(m.extra ?? [])].every((l) => l.cleared)
+
 function statusText(row: Row): string {
   const m = row.match
   if (!m) return row.status === 'only' ? (row.side === 'bank' ? 'Not in your books' : 'Not on the statement') : 'Outside this statement'
@@ -49,6 +52,7 @@ function statusText(row: Row): string {
   }
   if (m.forced) parts.push('matched by you')
   else if (m.dayGap > 0) parts.push(`dates ${m.dayGap} day${m.dayGap === 1 ? '' : 's'} apart`)
+  if (m.amountGap) parts.push(`amount differs by ₹${Math.abs(m.amountGap).toFixed(2)}, ignored`)
   if (m.ambiguous) parts.push(isGroup(m) ? 'check these belong together' : 'another entry has the same amount, check it')
   if (m.ledger.cleared) parts.push('ticked')
   return parts.join(' · ')
@@ -103,7 +107,8 @@ export function BankSplitView({
       statementRowsOf(m).forEach((row) => byStatement.set(row, { m, no: i + 1 }))
       ledgerKeysOf(m).forEach((k) => byLedger.set(k, { m, no: i + 1 }))
     })
-    const statusOfMatch = (m: StatementMatch): Status => (isGroup(m) ? 'group' : 'match')
+    // A group stays yellow until it is saved; once ticked it turns green like any other match.
+    const statusOfMatch = (m: StatementMatch): Status => (isGroup(m) && !isSaved(m) ? 'group' : 'match')
 
     const bank: Row[] = [...lines]
       .sort((a, b) => a.date.localeCompare(b.date) || a.row - b.row)
@@ -282,7 +287,7 @@ export function BankSplitView({
     <div className="sv">
       <div className="sv-legend" aria-label="Colour key">
         <span className="sv-chip sv-match">Green: matched</span>
-        <span className="sv-chip sv-group">Yellow: several lines matched with one</span>
+        <span className="sv-chip sv-group">Yellow: several lines matched with one, not saved yet</span>
         <span className="sv-chip sv-only">Red: no match</span>
         <label className="sv-toggle">
           <input type="checkbox" checked={onlyProblems} onChange={(e) => setOnlyProblems(e.target.checked)} /> Show only the red lines

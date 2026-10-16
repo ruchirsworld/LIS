@@ -220,3 +220,30 @@ describe('matching a bank statement to the books', () => {
     expect(matchStatement(stmt, [l('a', '2026-10-01', 500, 0)], { days: 0, groups: [{ statementRows: [1], ledgerKeys: ['a'] }] }).toTick).toHaveLength(0)
   })
 })
+
+describe('amounts a few paise apart', () => {
+  it('matches an amount that differs by less than a rupee, and says by how much', () => {
+    const r = matchStatement([s(1, '2026-10-05', 0, 1000.5)], [l('a', '2026-10-05', 0, 1000)])
+    expect(r.toTick).toHaveLength(1)
+    expect(r.toTick[0].amountGap).toBe(0.5)
+    expect(r.statementOnly).toHaveLength(0)
+  })
+
+  it('matches 99 paise apart but not a whole rupee apart', () => {
+    expect(matchStatement([s(1, '2026-10-05', 0, 100.99)], [l('a', '2026-10-05', 0, 100)]).toTick).toHaveLength(1)
+    expect(matchStatement([s(1, '2026-10-05', 0, 101)], [l('a', '2026-10-05', 0, 100)]).toTick).toHaveLength(0)
+  })
+
+  it('prefers the exact amount over one that is slightly off', () => {
+    const r = matchStatement([s(1, '2026-10-05', 0, 250)], [l('near', '2026-10-05', 0, 250.4), l('exact', '2026-10-06', 0, 250)])
+    expect(r.toTick[0].ledger.id).toBe('exact')
+    expect(r.toTick[0].amountGap).toBeUndefined()
+  })
+
+  it('matches a lump sum that is a few paise off the entries it settles', () => {
+    const r = matchStatement([s(1, '2026-10-05', 0, 1000)], [l('a', '2026-10-05', 0, 600.4), l('b', '2026-10-05', 0, 400)])
+    expect(r.toTick).toHaveLength(1)
+    expect(ledgerIdsOf(r.toTick[0]).sort()).toEqual(['a', 'b'])
+    expect(r.toTick[0].amountGap).toBe(-0.4)
+  })
+})

@@ -31,6 +31,13 @@ export interface ReconciliationSummary {
 
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100
 
+/** Reconciliation ignores a difference of up to 99 paise: an amount that is off by less than a rupee still matches,
+ * and a statement within 99 paise of the books counts as agreeing. */
+export const AMOUNT_TOLERANCE = 0.99
+
+/** True when a difference is small enough to be ignored in reconciliation. */
+export const withinTolerance = (difference: number) => Math.abs(difference) <= AMOUNT_TOLERANCE + 1e-9
+
 /** What the books say the account holds on a date: money in less money out, up to and including it. */
 export function bookBalanceAsOf(lines: BankLine[], date: string): number {
   return round2(lines.filter((l) => l.date <= date).reduce((s, l) => s + l.deposit - l.withdrawal, 0))

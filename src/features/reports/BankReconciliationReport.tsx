@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { fmt2, fmtDate } from '../../lib/calc/format'
-import { summariseReconciliation } from '../../lib/calc/bankReconciliation'
+import { summariseReconciliation, withinTolerance } from '../../lib/calc/bankReconciliation'
 import { useBankAccounts } from '../../lib/queries/masters'
 import { useBankLines, useClearedBankLines, useCompanyProfile, useSetBankLineCleared } from '../../lib/queries/books'
 import { useAccountOpenings } from '../../lib/queries/openings'
@@ -49,7 +49,7 @@ export function BankReconciliationReport() {
 
   const accountName = accounts?.find((a) => a.id === selected)?.name ?? ''
   const visible = (lines ?? []).filter((l) => l.date <= statementDate && (showAll || !cleared.has(l.id)))
-  const agrees = balanceText.trim() !== '' && Math.abs(summary.difference) < 0.01
+  const agrees = balanceText.trim() !== '' && withinTolerance(summary.difference)
 
   async function toggle(ids: string[], tick: boolean) {
     try {
@@ -173,7 +173,7 @@ export function BankReconciliationReport() {
             {balanceText.trim() === ''
               ? 'Enter the statement balance to see the difference.'
               : agrees
-                ? 'The books and the bank statement agree.'
+                ? `The books and the bank statement agree${Math.abs(summary.difference) >= 0.005 ? ` (a difference of ${fmt2(summary.difference)} is ignored)` : ''}.`
                 : `Difference to explain: ${fmt2(summary.difference)}`}
           </div>
 
