@@ -14,7 +14,8 @@ import { ExpenseForm } from '../expenses/ExpenseForm'
 import { ReimbursementRecordsTable } from '../expenses/ReimbursementRecordsTable'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import { TripRecordsTable } from './TripRecordsTable'
-import { SpendBySource, spendExportSection } from './SpendBySource'
+import { SpendBySource } from './SpendBySource'
+import { spendExportSection } from '../../lib/calc/spendByAccount'
 import type { ExportSection } from '../../lib/export/report'
 
 function todayStr() {

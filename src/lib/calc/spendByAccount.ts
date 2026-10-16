@@ -44,3 +44,13 @@ export function spendByAccount(rows: SpendRow[], banks: BankName[]): { lines: Sp
     .map((label) => ({ key: label.toLowerCase().replace(/\s+/g, '-'), label, amount: round2(totals.get(label) ?? 0) }))
   return { lines, total: round2(rows.reduce((s, r) => s + Number(r.amount || 0), 0)) }
 }
+
+/** The split as a table for the PDF and Excel downloads: one row per account, and a total. */
+export function spendExportSection(title: string, expenses: SpendRow[], banks: BankName[]) {
+  const { lines, total } = spendByAccount(expenses, banks)
+  return {
+    title,
+    columns: ['Paid from', 'Amount'],
+    rows: [...lines.map((l): (string | number)[] => [l.label, l.amount]), ['Total', total]],
+  }
+}

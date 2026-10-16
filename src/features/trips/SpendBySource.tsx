@@ -44,13 +44,3 @@ export function SpendBySource({ expenses, label = 'Spent via', style }: { expens
     </div>
   )
 }
-
-/** Export rows for the same split: one row per account, and a total. */
-export function spendExportSection(title: string, expenses: SpendRow[], banks: { id: string; name: string }[]) {
-  const { lines, total } = spendByAccount(expenses, banks)
-  return {
-    title,
-    columns: ['Paid from', 'Amount'],
-    rows: [...lines.map((l) => [l.label, l.amount]), ['Total', total]],
-  }
-}

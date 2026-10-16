@@ -95,8 +95,9 @@ const GST_INPUT = ['1050', '1051', '1052', '1053']
 const IMPREST = ['1060']
 const STAFF_ADVANCE = ['1070']
 const SUPPLIER_ADVANCE = ['1075']
+const DEPOSITS = ['1080']
 
-const MAPPED_ASSETS = [...CASH, ...BANK, ...RECEIVABLES, ...RETENTION, ...TDS_RECEIVABLE, ...GST_INPUT, ...IMPREST, ...STAFF_ADVANCE, ...SUPPLIER_ADVANCE]
+const MAPPED_ASSETS = [...CASH, ...BANK, ...RECEIVABLES, ...RETENTION, ...TDS_RECEIVABLE, ...GST_INPUT, ...IMPREST, ...STAFF_ADVANCE, ...SUPPLIER_ADVANCE, ...DEPOSITS]
 const MAPPED_LIABILITIES = [...BORROWINGS, ...PAYABLES, ...ADVANCES, ...REIMBURSE, ...SALARIES, ...GST_PAYABLE, ...TDS_PAYABLE]
 
 /**
@@ -186,6 +187,7 @@ export function buildBalanceSheet(
   addAsset('Site imprest held by supervisors', IMPREST)
   addAsset('Advances to staff', STAFF_ADVANCE)
   addAsset('Advances to suppliers', SUPPLIER_ADVANCE)
+  addAsset('Security deposits', DEPOSITS)
   const otherAssets = both((r) =>
     byType(r, 'asset')
       .filter((x) => !MAPPED_ASSETS.includes(x.code))

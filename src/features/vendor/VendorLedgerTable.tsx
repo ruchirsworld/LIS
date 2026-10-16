@@ -161,7 +161,12 @@ export function VendorLedgerTable({ vendorId }: { vendorId: string }) {
                   <td className="amt">{fmt(r.balance)}</td>
                   <td>{r.receiptPath ? <ReceiptLink path={r.receiptPath} /> : '—'}</td>
                   <td>
-                    {r.payment && (
+                    {r.payment && r.payment.payment_mode === 'Advance' && (
+                      <span className="retention-note" title="Made automatically from an advance. To change it, change the advance or the bill.">
+                        Automatic
+                      </span>
+                    )}
+                    {r.payment && r.payment.payment_mode !== 'Advance' && (
                       <RowMenu
                         items={[
                           { label: 'Edit', onClick: () => setEditingPayment(r.payment) },

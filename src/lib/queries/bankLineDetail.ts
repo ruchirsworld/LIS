@@ -1,4 +1,5 @@
 import { selectByIds } from './byIds'
+import { otherReceiptLabel } from '../calc/otherReceipts'
 
 // The label on a ledger line is written by the system ("Vendor payment — Pay/12"). What the person typed when
 // they made the entry (the description, the vendor, the note, the reference) lives on the original record. This
@@ -25,36 +26,61 @@ export async function fetchSourceDetails(rows: Source[]): Promise<Map<string, st
     if (text) out.set(`${table}|${id}`, text)
   }
   try {
-    // Expenses, and the expenses behind reimbursements.
-    const reimb = byId(await selectByIds<{ id: string; reference: string | null; expense_id: string | null }>('expense_reimbursements', 'id, reference, expense_id', 'id', idsOf(rows, 'expense_reimbursements')))
-    const expenseIds = [...idsOf(rows, 'expenses'), ...[...reimb.values()].map((r) => r.expense_id).filter((x): x is string => !!x)]
-    const expenses = byId(await selectByIds<{ id: string; description: string | null; remarks: string | null; display_id: string | null; created_by: string | null }>('expenses', 'id, description, remarks, display_id, created_by', 'id', expenseIds))
+    type Named = { id: string; name: string }
+    const ids = (table: string) => idsOf(rows, table)
 
-    // Vendor payments, with their bill and vendor; advances with their vendor.
-    const payments = byId(await selectByIds<{ id: string; reference: string | null; bill_id: string }>('vendor_bill_payments', 'id, reference, bill_id', 'id', idsOf(rows, 'vendor_bill_payments')))
-    const bills = byId(await selectByIds<{ id: string; description: string | null; display_id: string | null; vendor_id: string }>('vendor_bills', 'id, description, display_id, vendor_id', 'id', [...payments.values()].map((p) => p.bill_id)))
-    const advances = byId(await selectByIds<{ id: string; notes: string | null; reference: string | null; vendor_id: string }>('vendor_advances', 'id, notes, reference, vendor_id', 'id', idsOf(rows, 'vendor_advances')))
+    // Round 1: the records the lines point at, all at once.
+    const [reimbRows, expenseRows, paymentRows, advanceRows, receiptRows, transferRows, capitalRows, loanRows, loanPayRows, otherRows, imprestRows, wageRows, salaryAdvRows] = await Promise.all([
+      selectByIds<{ id: string; reference: string | null; expense_id: string | null }>('expense_reimbursements', 'id, reference, expense_id', 'id', ids('expense_reimbursements')),
+      selectByIds<{ id: string; description: string | null; remarks: string | null; display_id: string | null; created_by: string | null }>('expenses', 'id, description, remarks, display_id, created_by', 'id', ids('expenses')),
+      selectByIds<{ id: string; reference: string | null; bill_id: string }>('vendor_bill_payments', 'id, reference, bill_id', 'id', ids('vendor_bill_payments')),
+      selectByIds<{ id: string; notes: string | null; reference: string | null; vendor_id: string }>('vendor_advances', 'id, notes, reference, vendor_id', 'id', ids('vendor_advances')),
+      selectByIds<{ id: string; reference: string | null; invoice_id: string }>('invoice_payments', 'id, reference, invoice_id', 'id', ids('invoice_payments')),
+      selectByIds<{ id: string; notes: string | null }>('transfers', 'id, notes', 'id', ids('transfers')),
+      selectByIds<{ id: string; notes: string | null; partner_id: string }>('capital_transactions', 'id, notes, partner_id', 'id', ids('capital_transactions')),
+      selectByIds<{ id: string; lender: string | null; notes: string | null }>('loans', 'id, lender, notes', 'id', ids('loans')),
+      selectByIds<{ id: string; reference: string | null; loan_id: string }>('loan_payments', 'id, reference, loan_id', 'id', ids('loan_payments')),
+      selectByIds<{ id: string; kind: string; payer: string | null; notes: string | null; reference: string | null }>('other_receipts', 'id, kind, payer, notes, reference', 'id', ids('other_receipts')),
+      selectByIds<{ id: string; remarks: string | null }>('staff_imprest_transactions', 'id, remarks', 'id', ids('staff_imprest_transactions')),
+      selectByIds<{ id: string; notes: string | null }>('wage_payments', 'id, notes', 'id', ids('wage_payments')),
+      selectByIds<{ id: string; remarks: string | null }>('staff_salary_advances', 'id, remarks', 'id', ids('staff_salary_advances')),
+    ])
+    const reimb = byId(reimbRows)
+    const payments = byId(paymentRows)
+    const advances = byId(advanceRows)
+    const receipts = byId(receiptRows)
+    const transfers = byId(transferRows)
+    const capital = byId(capitalRows)
+    const loans = byId(loanRows)
+    const loanPays = byId(loanPayRows)
+    const otherReceipts = byId(otherRows)
+    const imprest = byId(imprestRows)
+    const wages = byId(wageRows)
+    const salaryAdv = byId(salaryAdvRows)
 
-    // Client receipts, with the invoice and client.
-    const receipts = byId(await selectByIds<{ id: string; reference: string | null; invoice_id: string }>('invoice_payments', 'id, reference, invoice_id', 'id', idsOf(rows, 'invoice_payments')))
-    const invoices = byId(await selectByIds<{ id: string; invoice_number: string | null; display_id: string | null; client_id: string }>('invoices', 'id, invoice_number, display_id, client_id', 'id', [...receipts.values()].map((r) => r.invoice_id)))
+    // Round 2: what those records point at (the expense behind a reimbursement, the bill behind a payment ...).
+    const reimbExpenseIds = reimbRows.map((r) => r.expense_id).filter((x): x is string => !!x && !expenseRows.some((e) => e.id === x))
+    const [moreExpenses, billRows, invoiceRows, loanOfPayRows] = await Promise.all([
+      selectByIds<(typeof expenseRows)[number]>('expenses', 'id, description, remarks, display_id, created_by', 'id', reimbExpenseIds),
+      selectByIds<{ id: string; description: string | null; display_id: string | null; vendor_id: string }>('vendor_bills', 'id, description, display_id, vendor_id', 'id', paymentRows.map((p) => p.bill_id)),
+      selectByIds<{ id: string; invoice_number: string | null; display_id: string | null; client_id: string }>('invoices', 'id, invoice_number, display_id, client_id', 'id', receiptRows.map((r) => r.invoice_id)),
+      selectByIds<{ id: string; lender: string | null }>('loans', 'id, lender', 'id', loanPayRows.map((p) => p.loan_id)),
+    ])
+    const expenses = byId([...expenseRows, ...moreExpenses])
+    const bills = byId(billRows)
+    const invoices = byId(invoiceRows)
+    const loanOfPay = byId(loanOfPayRows)
 
-    // The rest.
-    const transfers = byId(await selectByIds<{ id: string; notes: string | null }>('transfers', 'id, notes', 'id', idsOf(rows, 'transfers')))
-    const capital = byId(await selectByIds<{ id: string; notes: string | null; partner_id: string }>('capital_transactions', 'id, notes, partner_id', 'id', idsOf(rows, 'capital_transactions')))
-    const loans = byId(await selectByIds<{ id: string; lender: string | null; notes: string | null }>('loans', 'id, lender, notes', 'id', idsOf(rows, 'loans')))
-    const loanPays = byId(await selectByIds<{ id: string; reference: string | null; loan_id: string }>('loan_payments', 'id, reference, loan_id', 'id', idsOf(rows, 'loan_payments')))
-    const loanOfPay = byId(await selectByIds<{ id: string; lender: string | null }>('loans', 'id, lender', 'id', [...loanPays.values()].map((p) => p.loan_id)))
-    const imprest = byId(await selectByIds<{ id: string; remarks: string | null }>('staff_imprest_transactions', 'id, remarks', 'id', idsOf(rows, 'staff_imprest_transactions')))
-    const wages = byId(await selectByIds<{ id: string; notes: string | null }>('wage_payments', 'id, notes', 'id', idsOf(rows, 'wage_payments')))
-    const salaryAdv = byId(await selectByIds<{ id: string; remarks: string | null }>('staff_salary_advances', 'id, remarks', 'id', idsOf(rows, 'staff_salary_advances')))
-
-    // Names: vendors, clients and people.
-    const vendorIds = [...bills.values(), ...advances.values()].map((x) => x.vendor_id)
-    const vendors = byId(await selectByIds<{ id: string; name: string }>('vendors', 'id, name', 'id', vendorIds))
-    const clients = byId(await selectByIds<{ id: string; name: string }>('clients', 'id, name', 'id', [...invoices.values()].map((i) => i.client_id)))
-    const peopleIds = [...expenses.values()].map((e) => e.created_by).filter((x): x is string => !!x).concat([...capital.values()].map((c) => c.partner_id))
-    const people = byId(await selectByIds<{ id: string; name: string }>('profiles', 'id, name', 'id', peopleIds))
+    // Round 3: names.
+    const peopleIds = [...expenses.values()].map((e) => e.created_by).filter((x): x is string => !!x).concat(capitalRows.map((c) => c.partner_id))
+    const [vendorRows, clientRows, peopleRows] = await Promise.all([
+      selectByIds<Named>('vendors', 'id, name', 'id', [...billRows, ...advanceRows].map((x) => x.vendor_id)),
+      selectByIds<Named>('clients', 'id, name', 'id', invoiceRows.map((i) => i.client_id)),
+      selectByIds<Named>('profiles', 'id, name', 'id', peopleIds),
+    ])
+    const vendors = byId(vendorRows)
+    const clients = byId(clientRows)
+    const people = byId(peopleRows)
 
     for (const r of rows) {
       if (!r.sourceTable || !r.sourceId) continue
@@ -104,6 +130,11 @@ export async function fetchSourceDetails(rows: Source[]): Promise<Map<string, st
         case 'loan_payments': {
           const p = loanPays.get(id)
           if (p) set('loan_payments', id, join([loanOfPay.get(p.loan_id)?.lender, p.reference]))
+          break
+        }
+        case 'other_receipts': {
+          const o = otherReceipts.get(id)
+          if (o) set('other_receipts', id, join([otherReceiptLabel(o.kind), o.payer, o.notes, o.reference]))
           break
         }
         case 'staff_imprest_transactions':

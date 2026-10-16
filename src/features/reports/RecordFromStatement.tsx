@@ -21,6 +21,8 @@ import { loanOutstanding } from '../../lib/calc/loans'
 import { useCreateExpense, useCreateExpenseReimbursement } from '../../lib/queries/expenses'
 import { allocateSettlement, chosenSettlementProblem, chosenToAllocations, oldestFirstChoices, type ChosenAmounts } from '../../lib/calc/expenses'
 import { SettlementEntryPicker } from '../dashboard/SettlementEntryPicker'
+import { useCreateOtherReceipt } from '../../lib/queries/otherReceipts'
+import { OTHER_RECEIPT_KINDS, type OtherReceiptKind } from '../../lib/calc/otherReceipts'
 import { useReimbursementDue } from '../dashboard/useReimbursementDue'
 import { BillItemsEditor } from '../purchases/BillItemsEditor'
 import { emptyItem, itemsProblem, itemsToSave, itemsTotal, usableItems, type BillItemDraft } from '../../lib/calc/billItems'
@@ -29,7 +31,7 @@ import { AddVendorModal } from '../purchases/AddVendorModal'
 import { TDS_SECTIONS } from '../purchases/tdsSections'
 import { useCreateInvoicePayment, useInvoicePayments, useInvoices } from '../../lib/queries/invoices'
 
-type Kind = 'transfer' | 'expense' | 'trip' | 'reimbursement' | 'vendor' | 'vendorbill' | 'vendoradvance' | 'receipt' | 'capital' | 'loan' | 'loanpay'
+type Kind = 'transfer' | 'expense' | 'trip' | 'reimbursement' | 'vendor' | 'vendorbill' | 'vendoradvance' | 'receipt' | 'otherreceipt' | 'capital' | 'loan' | 'loanpay'
 
 const CASH = 'cash'
 const KIND_LABEL: Record<Kind, string> = {
@@ -41,6 +43,7 @@ const KIND_LABEL: Record<Kind, string> = {
   vendorbill: 'Vendor bill and payment (the bill is not entered yet)',
   vendoradvance: 'Advance to a vendor (no bill yet)',
   receipt: 'Receipt from a client',
+  otherreceipt: 'Other money received (deposit given back, interest, refund, scrap sold ...)',
   capital: 'Capital (money a partner puts in or takes out)',
   loan: 'A new loan received',
   loanpay: 'Repayment of a loan',
@@ -63,7 +66,7 @@ export function RecordFromStatement({
   const goTo = useGoTo()
   const incoming = line.deposit > 0
   const amount = incoming ? line.deposit : line.withdrawal
-  const kinds: Kind[] = incoming ? ['transfer', 'receipt', 'capital', 'loan'] : ['transfer', 'expense', 'trip', 'reimbursement', 'vendor', 'vendorbill', 'vendoradvance', 'capital', 'loanpay']
+  const kinds: Kind[] = incoming ? ['transfer', 'receipt', 'otherreceipt', 'capital', 'loan'] : ['transfer', 'expense', 'trip', 'reimbursement', 'vendor', 'vendorbill', 'vendoradvance', 'capital', 'loanpay']
 
   const { data: banks } = useBankAccounts()
   const { data: clients } = useClients()
@@ -79,6 +82,7 @@ export function RecordFromStatement({
   const createExpense = useCreateExpense()
   const createVendorPayment = useCreateVendorBillPayment()
   const createVendorAdvance = useCreateVendorAdvance()
+  const createOtherReceipt = useCreateOtherReceipt()
   const createVendorBill = useCreateVendorBill()
   const createReceipt = useCreateInvoicePayment()
   const createCapital = useCreateCapitalTx()
@@ -110,6 +114,8 @@ export function RecordFromStatement({
   const [partnerId, setPartnerId] = useState('')
   const [tripId, setTripId] = useState('')
   const [reimbUserId, setReimbUserId] = useState('')
+  const [otherKind, setOtherKind] = useState<OtherReceiptKind>('security_deposit')
+  const [otherPayer, setOtherPayer] = useState('')
   const [reimbChoose, setReimbChoose] = useState(false)
   const [reimbPicks, setReimbPicks] = useState<ChosenAmounts>({})
   // A bill made from this payment.
@@ -384,6 +390,17 @@ export function RecordFromStatement({
           })
           toast('info', `${fmt2(left)} of this payment is held as an advance for the vendor, because an earlier advance already covered part of the bill.`)
         }
+      } else if (kind === 'otherreceipt') {
+        await createOtherReceipt.mutateAsync({
+          kind: otherKind,
+          date,
+          amount,
+          payer: otherPayer.trim() || null,
+          notes: notes.trim() || null,
+          reference: reference.trim() || null,
+          payment_mode: 'Bank',
+          bank_account_id: bankAccountId,
+        })
       } else if (kind === 'vendoradvance') {
         if (!vendorId) throw new Error('Pick the vendor.')
         await createVendorAdvance.mutateAsync({
@@ -782,6 +799,28 @@ export function RecordFromStatement({
         </>
       )}
 
+      {kind === 'otherreceipt' && (
+        <>
+          <div className="field">
+            <label htmlFor="rfs-other-kind">What was it?</label>
+            <select id="rfs-other-kind" value={otherKind} onChange={(e) => setOtherKind(e.target.value as OtherReceiptKind)}>
+              {OTHER_RECEIPT_KINDS.map((k) => (
+                <option key={k.value} value={k.value}>
+                  {k.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="rfs-other-payer">Received from (optional)</label>
+            <input id="rfs-other-payer" value={otherPayer} onChange={(e) => setOtherPayer(e.target.value)} />
+          </div>
+          <div className="note">
+            {otherKind === 'security_deposit' ? 'A returned deposit reduces Security Deposits. It does not count as income.' : 'This is recorded as Other Income, so it adds to your profit.'}
+          </div>
+        </>
+      )}
+
       {kind === 'vendoradvance' && (
         <>
           <div className="field">
@@ -950,7 +989,7 @@ export function RecordFromStatement({
           <input id="rfs-ref" value={reference} onChange={(e) => setReference(e.target.value)} />
         </div>
       )}
-      {(kind === 'transfer' || kind === 'expense' || kind === 'trip' || kind === 'vendorbill' || kind === 'vendoradvance' || kind === 'capital' || kind === 'loan') && (
+      {(kind === 'transfer' || kind === 'expense' || kind === 'trip' || kind === 'vendorbill' || kind === 'vendoradvance' || kind === 'otherreceipt' || kind === 'capital' || kind === 'loan') && (
         <div className="field">
           <label htmlFor="rfs-notes">{kind === 'expense' ? 'Description' : kind === 'vendorbill' ? 'What was bought' : 'Note (optional)'}</label>
           <input id="rfs-notes" value={notes} onChange={(e) => setNotes(e.target.value)} />

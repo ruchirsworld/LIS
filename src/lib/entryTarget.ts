@@ -20,6 +20,7 @@ export function baseTarget(sourceTable: string | null | undefined, date: string)
     case 'expense_reimbursements':
       return { tab: 'expenses' }
     case 'transfers':
+    case 'other_receipts':
       return { tab: 'transfers' }
     case 'vendor_bills':
     case 'vendor_bill_payments':

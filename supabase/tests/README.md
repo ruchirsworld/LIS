@@ -15,6 +15,8 @@ you want to check. A passing file ends with an error whose message starts
 | `summaries.sql` | The Financial summary, GST summary and Dashboard cards ignore Draft invoices and pending or rejected expenses, and count an invoice once it is Sent. |
 | `vendor_advances.sql` | A vendor advance posts to Advances to Suppliers, the oldest advance is set against bills as they are entered, edits and deletes redo the set-off, and the ledger balances. |
 | `account_openings.sql` | An opening balance posts to the bank and Opening Balance Equity, can be changed or removed, an overdraft runs the other way, and monthly statement balances are never posted. |
+| `other_receipts.sql` | Money received for other reasons posts to the bank or cash; a returned deposit credits Security Deposits and everything else credits Other Income; bad input is refused. |
+| `transfers_posting.sql` | A transfer posts both sides, an edit posts it again once, a delete takes its entry out, and a supervisor cannot read loans. |
 | `access_rules.sql` | A supervisor cannot read the books, approve reimbursements or call the posting helpers; unique numbers and non-negative amounts are enforced. |
 
 Run them against a staging project first, and against production after every

@@ -299,10 +299,10 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
                             <div key={p.id} className="pay-history-line">
                               <span>
                                 {p.display_id} — {fmtDate(p.date)} — {fmt(p.amount)}
-                                {p.payment_mode ? ` · ${p.payment_mode}` : ''}
+                                {p.payment_mode ? ` · ${p.payment_mode === 'Advance' ? 'from advance' : p.payment_mode}` : ''}
                                 {p.reference ? ` · ${p.reference}` : ''}
                               </span>
-                              {showEditList && (
+                              {showEditList && p.payment_mode !== 'Advance' && (
                                 <button
                                   type="button"
                                   className="pay-history-edit"

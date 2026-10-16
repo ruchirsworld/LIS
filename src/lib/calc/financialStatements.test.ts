@@ -83,4 +83,12 @@ describe('balance sheet', () => {
     expect(totals.assets.cur).toBe(50000)
     expect(totals.funds.cur).toBe(50000)
   })
+
+  it('shows deposits we will get back as their own asset line', () => {
+    const ledger = [acc('1020', 'asset', 'Bank', 50000, 0), acc('1080', 'asset', 'Security Deposits', 10000, 0), acc('3010', 'equity', "Partners' capital", 0, 60000)]
+    const { lines, totals } = buildBalanceSheet(ledger, [], { cur: 0, prev: 0 })
+    expect(lines.find((l) => l.label === 'Security deposits')?.cur).toBe(10000)
+    expect(lines.find((l) => l.label === 'Other assets')).toBeUndefined()
+    expect(totals.assets.cur).toBe(60000)
+  })
 })

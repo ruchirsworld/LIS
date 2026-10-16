@@ -5,6 +5,7 @@ import './index.css'
 import App from './App.tsx'
 import { toast } from './lib/feedback'
 import { getErrorMessage } from './lib/errors'
+import { keepAppUpToDate } from './pwa'
 
 // Every save, delete or approval ends in a short message — so a change that
 // worked says so, and one that failed is never silent. A mutation can opt out
@@ -29,6 +30,8 @@ const queryClient = new QueryClient({
     },
   },
 })
+
+keepAppUpToDate()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

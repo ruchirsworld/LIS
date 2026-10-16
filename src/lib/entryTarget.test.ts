@@ -29,4 +29,8 @@ describe('where a line in the books is opened', () => {
     expect(baseTarget(null, '2026-10-08')).toBeNull()
     expect(baseTarget('something_else', '2026-10-08')).toBeNull()
   })
+
+  it('sends other money received to the Transfers screen', () => {
+    expect(baseTarget('other_receipts', '2026-10-01')).toEqual({ tab: 'transfers' })
+  })
 })

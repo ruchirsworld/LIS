@@ -114,7 +114,8 @@ export function PeriodActivity({
   onToggle: (id: PeriodKpiId) => void
   goTo: GoTo | null
 }) {
-  const { data: expenses, isLoading: expLoading } = useExpenses(range)
+  // The same full lists the rest of the dashboard already loads, cut to the period here, so no second request is made.
+  const { data: allExpenses, isLoading: expLoading } = useExpenses(null)
   const { data: trips } = useTrips()
   const { data: profiles } = useProfiles()
   const { data: projects } = useProjects()
@@ -125,17 +126,19 @@ export function PeriodActivity({
   const { data: advances } = useVendorAdvances()
   const { data: bills } = useVendorBills(null)
   const { data: vendors } = useVendors()
-  const { data: loansInPeriod } = useLoans(range)
   const { data: allLoans } = useLoans(null)
   const { data: loanPayments } = useLoanPayments()
-  const { data: capital } = useCapitalTx(range)
+  const { data: allCapital } = useCapitalTx(null)
 
   const periodRange = range?.from && range?.to ? { from: range.from, to: range.to } : undefined
+  const expenses = (allExpenses ?? []).filter((e) => inRange(e.date, range))
+  const loansInPeriod = (allLoans ?? []).filter((l) => inRange(l.date_taken ?? '', range))
+  const capital = (allCapital ?? []).filter((c) => inRange(c.date ?? '', range))
 
   // Spending, by where it was booked.
-  const tripExp = (expenses ?? []).filter((e) => e.cost_center === 'Trips')
-  const adminExp = (expenses ?? []).filter((e) => e.cost_center === 'Admin')
-  const projectExp = (expenses ?? []).filter((e) => e.cost_center === 'Project')
+  const tripExp = expenses.filter((e) => e.cost_center === 'Trips')
+  const adminExp = expenses.filter((e) => e.cost_center === 'Admin')
+  const projectExp = expenses.filter((e) => e.cost_center === 'Project')
   const total = (rows: { amount: number }[]) => sumOf(rows, (r) => r.amount)
 
   const tripName = (id: string | null) => (id ? trips?.find((t) => t.id === id)?.name ?? 'Trip' : 'Not on a trip')
@@ -170,18 +173,18 @@ export function PeriodActivity({
   })()
 
   // Loans taken and repaid.
-  const loansReceived = sumOf(loansInPeriod ?? [], (l) => l.principal)
+  const loansReceived = sumOf(loansInPeriod, (l) => l.principal)
   const repaymentsIn = (loanPayments ?? []).filter((p) => inRange(p.date, range))
   const principalPaid = sumOf(repaymentsIn, (p) => p.principal_paid)
   const interestPaid = sumOf(repaymentsIn, (p) => p.interest_paid)
   const lenderOf = (loanId: string) => allLoans?.find((l) => l.id === loanId)?.lender ?? 'Loan'
 
   // Capital in and out.
-  const injected = sumOf((capital ?? []).filter((c) => c.type === 'injection'), (c) => c.amount)
-  const withdrawn = sumOf((capital ?? []).filter((c) => c.type === 'withdrawal'), (c) => c.amount)
+  const injected = sumOf(capital.filter((c) => c.type === 'injection'), (c) => c.amount)
+  const withdrawn = sumOf(capital.filter((c) => c.type === 'withdrawal'), (c) => c.amount)
   const partnerRows = (() => {
     const map = new Map<string, { in: number; out: number }>()
-    for (const c of capital ?? []) {
+    for (const c of capital) {
       const k = profiles?.find((p) => p.id === c.partner_id)?.name ?? 'Partner'
       const cur = map.get(k) ?? { in: 0, out: 0 }
       if (c.type === 'injection') cur.in += Number(c.amount)
@@ -291,7 +294,7 @@ export function PeriodActivity({
           <Peek
             head={['Date', 'Lender', 'Amount']}
             right={[2]}
-            rows={(loansInPeriod ?? []).map((l) => [fmtDate(l.date_taken), l.lender, fmt(l.principal)])}
+            rows={loansInPeriod.map((l) => [fmtDate(l.date_taken), l.lender, fmt(l.principal)])}
             foot={['Total', '', fmt(loansReceived)]}
           />
           <div className="note" style={{ margin: '12px 0 0', fontWeight: 600 }}>

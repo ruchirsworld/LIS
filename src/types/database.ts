@@ -14,6 +14,66 @@ export type Database = {
   }
   public: {
     Tables: {
+      other_receipts: {
+        Row: {
+          amount: number
+          bank_account_id: string | null
+          created_at: string
+          created_by: string | null
+          date: string
+          display_id: string | null
+          id: string
+          kind: string
+          notes: string | null
+          payer: string | null
+          payment_mode: string
+          reference: string | null
+        }
+        Insert: {
+          amount: number
+          bank_account_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          date: string
+          display_id?: string | null
+          id?: string
+          kind: string
+          notes?: string | null
+          payer?: string | null
+          payment_mode?: string
+          reference?: string | null
+        }
+        Update: {
+          amount?: number
+          bank_account_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          display_id?: string | null
+          id?: string
+          kind?: string
+          notes?: string | null
+          payer?: string | null
+          payment_mode?: string
+          reference?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "other_receipts_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "other_receipts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       account_month_balances: {
         Row: {
           bank_account_id: string | null
