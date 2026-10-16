@@ -23,6 +23,8 @@ export interface ColumnMapping {
   amount: number | null
   drcr: number | null
   balance: number | null
+  /** Some banks print a second Dr/Cr column after the balance (Kotak does): it says whether the balance is in credit or overdrawn. */
+  balanceDrcr?: number | null
 }
 
 const text = (v: unknown) => String(v ?? '').trim()
@@ -130,14 +132,18 @@ export function detectMapping(headers: string[]): ColumnMapping {
   }
   const date = pick(DATE_HEAD, VALUE_DATE_HEAD)
   // A combined Dr/Cr column must be claimed before the Debit and Credit patterns can mistake it for one of them.
-  const drcr = pick(/dr\s*\/\s*cr|cr\s*\/\s*dr|^type$|debit\s*\/\s*credit/i)
+  const COMBINED = /dr\s*\/\s*cr|cr\s*\/\s*dr|^type$|debit\s*\/\s*credit/i
+  const drcr = pick(COMBINED)
+  // A second combined Dr/Cr column sits beside the balance. It must not be taken for the Debit column.
+  const balanceDrcr = headers.findIndex((h, idx) => !used.has(idx) && COMBINED.test(h) && !/^type$/i.test(h))
+  if (balanceDrcr !== -1) used.add(balanceDrcr)
   const withdrawal = pick(/withdraw|paid\s*out|money\s*out/i, /\bdebit\b|\bdr\b/i)
   const deposit = pick(/deposit|paid\s*in|money\s*in/i, /\bcredit\b|\bcr\b/i)
   const balance = pick(/balance|\bbal\b/i)
   const amount = withdrawal === null && deposit === null ? pick(/^(txn|transaction)?\s*amount/i, /amount/i) : null
   const reference = pick(/chq|cheque|ref|utr|instrument/i)
   const description = pick(/narration|description|particulars|remarks|details/i)
-  return { date, description, reference, withdrawal, deposit, amount, drcr, balance }
+  return { date, description, reference, withdrawal, deposit, amount, drcr, balance, balanceDrcr: balanceDrcr === -1 ? null : balanceDrcr }
 }
 
 /** The lines of the statement, using the mapping. Rows without a valid date are skipped. */
@@ -167,6 +173,7 @@ export function extractLines(rows: unknown[][], headerRow: number, map: ColumnMa
     if (deposit === 0 && withdrawal === 0) continue
 
     const bal = map.balance === null ? null : parseMoney(row[map.balance])
+    const overdrawn = map.balanceDrcr != null && /^d/i.test(text(row[map.balanceDrcr]))
     out.push({
       row: r + 1,
       date,
@@ -174,10 +181,21 @@ export function extractLines(rows: unknown[][], headerRow: number, map: ColumnMa
       reference: map.reference === null ? '' : text(row[map.reference]),
       deposit: Math.round(deposit * 100) / 100,
       withdrawal: Math.round(withdrawal * 100) / 100,
-      balance: bal ? (bal.side === 'dr' ? -Math.abs(bal.value) : bal.value) : null,
+      balance: bal ? (bal.side === 'dr' || overdrawn ? -Math.abs(bal.value) : bal.value) : null,
     })
   }
   return out
+}
+
+/** Dates typed into Excel are stored as serial numbers (with the time as a fraction). In every column headed "date",
+ * turn them into YYYY-MM-DD text. The day is the whole-number part, so a late-evening transaction never slips to the
+ * next day the way a time-zone-shifted date object can. */
+export function serialDatesToText(rows: unknown[][], headerRow: number): unknown[][] {
+  const dateColumns = new Set<number>()
+  rows[headerRow]?.forEach((c, i) => {
+    if (/\bdate\b|\bdt\b/i.test(text(c))) dateColumns.add(i)
+  })
+  return rows.map((row, r) => (r <= headerRow ? row : row.map((c, i) => (dateColumns.has(i) && typeof c === 'number' ? parseStatementDate(c) ?? c : c))))
 }
 
 /** The balance after the last transaction, whichever way round the file is sorted. */

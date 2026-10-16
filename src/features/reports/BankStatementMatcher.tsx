@@ -22,6 +22,7 @@ import {
   findHeaderRow,
   parseCsv,
   parseStatementDate,
+  serialDatesToText,
   type ColumnMapping,
   type StatementLine,
 } from '../../lib/import/bankStatement'
@@ -238,7 +239,8 @@ export function BankStatementMatcher({
         at = findHeaderRow(table)
       } else {
         const XLSX = await import('xlsx')
-        const wb = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true })
+        // Dates stay as Excel serial numbers: a date object is shifted by the computer's time zone, which moves evening transactions to the next day.
+        const wb = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: false })
         for (const name of wb.SheetNames) {
           const sheetRows = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[name], { header: 1, raw: true, defval: '' })
           const found = findHeaderRow(sheetRows)
@@ -255,7 +257,7 @@ export function BankStatementMatcher({
         return
       }
       const map = detectMapping(table[at].map((c) => String(c ?? '').trim()))
-      table = plainCells(table)
+      table = serialDatesToText(plainCells(table), at)
       const read = extractLines(table, at, map)
       setRows(table)
       setHeaderRow(at)

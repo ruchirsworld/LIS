@@ -1,6 +1,6 @@
 # LIS changes since v2.0.1
 
-Version 2.0.1 was released on 3 September 2026. This list covers everything after it, up to 2.1.9. It is put together from the project history, grouped by area. Version numbers are shown where a release carried one.
+Version 2.0.1 was released on 3 September 2026. This list covers everything after it, up to 2.1.10. It is put together from the project history, grouped by area. Version numbers are shown where a release carried one.
 
 ## 2.0.2 – 2.0.3 (3 – 4 September)
 
@@ -115,3 +115,7 @@ Version 2.0.1 was released on 3 September 2026. This list covers everything afte
 - New "Start the books from <month>" button in Reports > Opening and monthly balances: after a month is right, it moves the opening balance back to the first day of that month, using the balance typed for it.
 - The monthly check now works from the opening balance in both directions (forward for later months, backward for earlier ones), so months can be checked newest first.
 - Client outstanding, retention, vendor dues, the Balance Sheet and the Profit and Loss are not affected: they still use every entry.
+
+## 2.1.10 (16 October): Kotak bank statements can be uploaded
+- Bank reconciliation could not read Kotak's Excel statement ("no transaction lines could be read"). Kotak prints a second Dr / Cr column beside the balance, and the app took it for the money-out column. It is now read as the balance's Cr/Dr marker, and a balance marked Dr is read as an overdraft.
+- Dates in Excel statements that carry a time (Kotak's Transaction Date) could be read a day late for evening transactions. The day is now taken from the date itself, so the time of day cannot move it.

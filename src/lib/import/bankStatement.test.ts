@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { closingBalance, detectMapping, extractLines, findHeaderRow, parseCsv, parseMoney, parseStatementDate } from './bankStatement'
+import { closingBalance, detectMapping, extractLines, findHeaderRow, parseCsv, parseMoney, parseStatementDate, serialDatesToText } from './bankStatement'
 
 describe('dates are read day-first', () => {
   it('handles the formats banks use', () => {
@@ -82,6 +82,36 @@ describe('a statement table is found and read', () => {
     expect(map.drcr).toBe(3)
     const lines = extractLines(rows, 0, map)
     expect(lines.map((l) => [l.deposit, l.withdrawal])).toEqual([[10000, 0], [0, 2500]])
+  })
+
+  it('reads the Kotak layout: one Amount column, a Dr / Cr flag, and a second Dr / Cr flag after the balance', () => {
+    const rows = [
+      ['Sl. No.', 'Transaction Date', 'Value Date', 'Description', 'Chq /Ref No.', 'Amount', 'Dr / Cr', 'Balance', 'Dr / Cr'],
+      [1, 46296.52222, 46296, 'UPI/SHASHANK PATHA/ICIC/315902806051', 'UPI-627403381547', 1500, 'CR', 1557.67, 'CR'],
+      [2, 46296.52291, 46296, 'UPI/ASHWANI KUMAR/IBKL/615111462027', 'UPI-627403458046', 1440, 'DR', 117.67, 'CR'],
+    ]
+    const map = detectMapping(rows[0].map(String))
+    expect(map).toMatchObject({ date: 1, amount: 5, drcr: 6, balance: 7, balanceDrcr: 8, withdrawal: null, deposit: null })
+    const lines = extractLines(serialDatesToText(rows, 0), 0, map)
+    expect(lines.map((l) => [l.date, l.deposit, l.withdrawal, l.balance])).toEqual([
+      ['2026-10-01', 1500, 0, 1557.67],
+      ['2026-10-01', 0, 1440, 117.67],
+    ])
+  })
+
+  it('reads a balance flagged Dr as an overdraft', () => {
+    const rows = [
+      ['Transaction Date', 'Description', 'Amount', 'Dr / Cr', 'Balance', 'Dr / Cr'],
+      ['02/10/2026', 'PAYMENT', 500, 'DR', 120, 'DR'],
+    ]
+    const lines = extractLines(rows, 0, detectMapping(rows[0].map(String)))
+    expect(lines[0]).toMatchObject({ withdrawal: 500, balance: -120 })
+  })
+
+  it('keeps the day of an Excel date-and-time cell, even late in the evening', () => {
+    // 46297.8993 is 2 Oct 2026 at 21:35: it must stay 2 Oct, not slip to 3 Oct.
+    const rows = [['Transaction Date', 'Amount'], [46297.899305555555, 78]]
+    expect(serialDatesToText(rows, 0)[1][0]).toBe('2026-10-02')
   })
 
   it('works with a signed amount column', () => {
