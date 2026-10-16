@@ -4,7 +4,7 @@ import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
 import { SearchableSelect } from '../../components/SearchableSelect'
 import { useAuth } from '../../lib/auth'
-import { useClients } from '../../lib/queries/masters'
+import { useBankAccounts, useClients } from '../../lib/queries/masters'
 import {
   useDeleteJournalVoucher,
   useGlAccounts,
@@ -20,9 +20,11 @@ interface Line {
   debit: string
   credit: string
   clientId: string
+  /** Which bank a Bank (1020) line is for. Without it the entry could not be counted in Kotak or CBI. */
+  bankId: string
 }
 
-const BLANK: Line = { account: '', debit: '0', credit: '0', clientId: '' }
+const BLANK: Line = { account: '', debit: '0', credit: '0', clientId: '', bankId: '' }
 // Accounts that hang off a client in the party ledger.
 const CLIENT_ACCOUNTS = new Set(['1030', '1035', '2060'])
 
@@ -68,6 +70,7 @@ export function JournalVouchersReport() {
   const isAdmin = profile?.role === 'admin'
   const { data: accounts } = useGlAccounts()
   const { data: clients } = useClients()
+  const { data: banks } = useBankAccounts()
   const { data: vouchers } = useJournalVouchers()
   const post = usePostJournalVoucher()
   const remove = useDeleteJournalVoucher()
@@ -97,6 +100,10 @@ export function JournalVouchersReport() {
       setError('Debits and credits must be equal.')
       return
     }
+    if (used.some((l) => l.account === '1020' && !l.bankId)) {
+      setError('Choose which bank account the Bank line is for (Kotak or CBI). Without it the entry is not counted in that bank.')
+      return
+    }
     if (!narration.trim()) {
       setError('Write a narration — say what this voucher is for.')
       return
@@ -111,6 +118,7 @@ export function JournalVouchersReport() {
           debit: parseINR(l.debit),
           credit: parseINR(l.credit),
           client_id: l.clientId || null,
+          bank_account_id: l.account === '1020' ? l.bankId || null : null,
         })),
       })
       setNarration('')
@@ -162,7 +170,7 @@ export function JournalVouchersReport() {
             <thead>
               <tr>
                 <th>Account</th>
-                <th>Client (if any)</th>
+                <th>Client or bank (if any)</th>
                 <th style={{ textAlign: 'right' }}>Debit</th>
                 <th style={{ textAlign: 'right' }}>Credit</th>
                 <th></th>
@@ -175,7 +183,7 @@ export function JournalVouchersReport() {
                     <SearchableSelect
                       items={accounts}
                       value={accounts?.find((a) => a.code === l.account)?.id ?? ''}
-                      onChange={(id) => setLine(i, { account: accounts?.find((a) => a.id === id)?.code ?? '', clientId: '' })}
+                      onChange={(id) => setLine(i, { account: accounts?.find((a) => a.id === id)?.code ?? '', clientId: '', bankId: '' })}
                       getId={(a) => a.id}
                       getLabel={(a) => `${a.code} — ${a.name}`}
                       placeholder="— Select account —"
@@ -191,6 +199,15 @@ export function JournalVouchersReport() {
                         getLabel={(c) => clientLabel(c)}
                         placeholder="— Client —"
                       />
+                    ) : l.account === '1020' ? (
+                      <select aria-label="Bank account" value={l.bankId} onChange={(e) => setLine(i, { bankId: e.target.value })}>
+                        <option value="">— Which bank? —</option>
+                        {(banks ?? []).map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.name}
+                          </option>
+                        ))}
+                      </select>
                     ) : (
                       '—'
                     )}

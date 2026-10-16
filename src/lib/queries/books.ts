@@ -184,6 +184,7 @@ export function usePostJournalVoucher() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['journal_vouchers'] })
+      qc.invalidateQueries({ queryKey: ['bank_lines'] })
       qc.invalidateQueries({ queryKey: ['ledger_lines'] })
       qc.invalidateQueries({ queryKey: ['trial_balance'] })
       qc.invalidateQueries({ queryKey: ['dashboard-kpis'] })
@@ -201,6 +202,7 @@ export function useDeleteJournalVoucher() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['journal_vouchers'] })
+      qc.invalidateQueries({ queryKey: ['bank_lines'] })
       qc.invalidateQueries({ queryKey: ['ledger_lines'] })
       qc.invalidateQueries({ queryKey: ['trial_balance'] })
       qc.invalidateQueries({ queryKey: ['dashboard-kpis'] })

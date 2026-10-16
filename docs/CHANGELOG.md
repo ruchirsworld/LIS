@@ -1,6 +1,6 @@
 # LIS changes since v2.0.1
 
-Version 2.0.1 was released on 3 September 2026. This list covers everything after it, up to 2.1.11. It is put together from the project history, grouped by area. Version numbers are shown where a release carried one.
+Version 2.0.1 was released on 3 September 2026. This list covers everything after it, up to 2.1.12. It is put together from the project history, grouped by area. Version numbers are shown where a release carried one.
 
 ## 2.0.2 – 2.0.3 (3 – 4 September)
 
@@ -123,3 +123,6 @@ Version 2.0.1 was released on 3 September 2026. This list covers everything afte
 ## 2.1.11 (16 October): Bank reconciliation ignores paise, and saved groups turn green
 - Reconciliation ignores a difference of up to 99 paise. An amount that is off by less than a rupee still matches (an exact amount is preferred, and the pair says "amount differs by ..., ignored"). This covers single matches, lump-sum groups and groups made by hand. The reconciliation counts as agreeing when the final difference is 99 paise or less, and so does the saved sign-off.
 - A group (several lines matched with one) stays yellow until it is saved with "Tick matched entries"; once saved it turns green, like any other match.
+
+## 2.1.12 (16 October): journal vouchers name the bank
+- A Bank line in a journal voucher (for example paying GST from Kotak) now asks which bank it is for, and the voucher cannot be posted without it. Before, the line had no bank, so it never reached Kotak's or CBI's balance or reconciliation.
