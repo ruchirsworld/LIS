@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../supabase'
 import { selectByIds } from './byIds'
 import { fetchSourceDetails } from './bankLineDetail'
+import { fetchBooksStarts } from './openings'
+import { startKey } from '../calc/booksStart'
 import type { Database, Json } from '../../types/database'
 
 type CompanyProfile = Database['public']['Tables']['company_profile']['Row']
@@ -295,6 +297,10 @@ export function useBankLines(bankAccountId: string | null) {
     queryFn: async (): Promise<BankLineRow[]> => {
       const { data: account, error: accountError } = await supabase.from('gl_accounts').select('id').eq('code', '1020').single()
       if (accountError) throw accountError
+      // The books for this account start on its opening balance's date; with no opening balance there is nothing to reconcile yet.
+      const starts = await fetchBooksStarts()
+      const startsOn = starts.get(startKey(bankAccountId))
+      if (!startsOn) return []
       const { data, error } = await supabase
         .from('journal_lines')
         .select('id, debit, credit, journal_entries!inner(date, description, source_table, source_id)')
@@ -316,6 +322,7 @@ export function useBankLines(bankAccountId: string | null) {
             sourceId: e?.source_id ?? null,
           }
         })
+        .filter((l) => l.date >= startsOn)
         .sort((a, b) => a.date.localeCompare(b.date))
       // What the person typed on each entry, so the list shows more than the system's label.
       const details = await fetchSourceDetails(lines)

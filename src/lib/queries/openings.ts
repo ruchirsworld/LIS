@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../supabase'
 import { selectByIds } from './byIds'
+import { startsFromOpenings, type BooksStarts } from '../calc/booksStart'
 
 // Opening balances of cash and bank accounts (posted to the books) and the statement's balance at the start of each
 // month (a check only). A null account is Cash in hand.
@@ -16,6 +17,13 @@ export function useAccountOpenings() {
   })
 }
 
+/** The day each account's books start (its opening balance's date). Cash & bank counts nothing before it. */
+export async function fetchBooksStarts(): Promise<BooksStarts> {
+  const { data, error } = await supabase.from('account_openings').select('bank_account_id, as_on')
+  if (error) throw error
+  return startsFromOpenings(data ?? [])
+}
+
 export function useMonthBalances() {
   return useQuery({
     queryKey: ['account_month_balances'],
@@ -29,7 +37,7 @@ export function useMonthBalances() {
 
 /** Everything that depends on the account balances, so a new opening shows up everywhere at once. */
 function refreshBooks(qc: ReturnType<typeof useQueryClient>) {
-  for (const key of ['account_openings', 'account_month_balances', 'ledger_lines', 'bank_lines', 'dashboard-kpis', 'gl_balances', 'books_health', 'cash_bank_movements']) {
+  for (const key of ['account_openings', 'account_month_balances', 'ledger_lines', 'bank_lines', 'dashboard-kpis', 'gl_balances', 'books_health', 'cash_bank_movements', 'bank_reconciliations']) {
     qc.invalidateQueries({ queryKey: [key] })
   }
 }

@@ -5,13 +5,15 @@ import { Button, ModuleHeader, KpiCard, type KpiTone } from '../../components/ui
 import { fmt, fmtDate } from '../../lib/calc/format'
 import { useDashboardKpis } from '../../lib/queries/dashboard'
 import { useReportSummary } from '../../lib/queries/reports'
-import { useProjects, useClients } from '../../lib/queries/masters'
+import { useProjects, useClients, useBankAccounts } from '../../lib/queries/masters'
 import { useInvoices, useInvoicePayments, useOverdueInvoices } from '../../lib/queries/invoices'
 import { useVendorBills } from '../../lib/queries/purchases'
 import { useExpenses } from '../../lib/queries/expenses'
 import { usePendingApprovalsCount } from '../../lib/queries/approvals'
 import { useCashMovements, useSiteImprestBalances } from '../../lib/queries/ledger'
 import { useBooksHealth } from '../../lib/queries/books'
+import { useAccountOpenings } from '../../lib/queries/openings'
+import { describeBooksStart, startsFromOpenings } from '../../lib/calc/booksStart'
 import { useProfiles } from '../../lib/queries/admin'
 import { dueAmount, gstHeld, netPayable, retentionHeld } from '../../lib/calc/invoices'
 import { projectExpenseTotal, projectVendorBillTotal } from '../../lib/calc/projects'
@@ -75,6 +77,8 @@ export function DashboardPage() {
   const prevRange = previousRange(range, periodType)
   const { data: prevSummary } = useReportSummary(prevRange, prevRange !== null)
   const { data: cashMovements } = useCashMovements(30)
+  const { data: bankAccounts } = useBankAccounts()
+  const { data: openings } = useAccountOpenings()
   const { data: booksHealth, isLoading: booksHealthLoading } = useBooksHealth()
   const { data: projects, isLoading: projectsLoading } = useProjects()
   const { data: clients } = useClients()
@@ -216,6 +220,10 @@ export function DashboardPage() {
     }
     return series
   })()
+
+  // Cash & bank counts each account only from its opening balance's date; say so under the figure.
+  const booksStart = describeBooksStart([{ id: null, name: 'Cash' }, ...(bankAccounts ?? []).map((b) => ({ id: b.id, name: b.name }))], startsFromOpenings(openings ?? []))
+  const cashSub = openings && bankAccounts ? [booksStart.counted, booksStart.missing.length ? `Opening balance not set: ${booksStart.missing.join(', ')}` : ''].filter(Boolean).join(' · ') : undefined
 
   const comparedTo = previousPeriodLabel(periodType)
   const trend = (current: number | undefined, previous: number | undefined, goodWhen: 'up' | 'down' | 'neutral') =>
@@ -485,7 +493,7 @@ export function DashboardPage() {
             value={fmt(data?.cash_and_bank_balance)}
             loading={isLoading}
             extra={cashSeries ? <Sparkline values={cashSeries} label="Cash and bank balance, last 30 days" /> : undefined}
-            sub={cashSeries ? 'Last 30 days' : undefined}
+            sub={cashSub || (cashSeries ? 'Last 30 days' : undefined)}
             hint="Open the Cash & bank report"
             {...drill('reports', { report: 'cash-bank' })}
           />

@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../supabase'
 import { selectByIds } from './byIds'
+import { fetchBooksStarts } from './openings'
+import { isCounted } from '../calc/booksStart'
 
 export interface LedgerLine {
   id: string
@@ -115,10 +117,9 @@ export interface CashBankLine {
   credit: number
 }
 
-/** Every journal line ever posted to Cash-in-Hand or Bank — the real
- * accounting position, not just what's been logged via the Transfers tab
- * (expenses paid, invoice payments received, site imprest advances/returns
- * all post here directly too). Backs the Cash & Bank report; the Dashboard's
+/** Every journal line posted to Cash-in-Hand or Bank from each account's books start (its opening balance's date) —
+ * the real accounting position, not just what's been logged via the Transfers tab (expenses paid, invoice payments
+ * received, site imprest advances/returns all post here directly too). Backs the Cash & Bank report; the Dashboard's
  * "Cash & bank" KPI is this same total via v_dashboard_kpis instead. */
 export function useCashAndBankLines() {
   return useQuery({
@@ -142,13 +143,16 @@ export function useCashAndBankLines() {
       const entryIds = [...new Set(lines.map((l) => l.entry_id))]
       const entries = await selectByIds<{ id: string; date: string }>('journal_entries', 'id, date', 'id', entryIds)
       const dateById = new Map(entries.map((e) => [e.id, e.date]))
+      const starts = await fetchBooksStarts()
 
-      return lines.map((l) => ({
-        date: dateById.get(l.entry_id) ?? '',
-        bank_account_id: l.bank_account_id,
-        debit: Number(l.debit || 0),
-        credit: Number(l.credit || 0),
-      }))
+      return lines
+        .map((l) => ({
+          date: dateById.get(l.entry_id) ?? '',
+          bank_account_id: l.bank_account_id,
+          debit: Number(l.debit || 0),
+          credit: Number(l.credit || 0),
+        }))
+        .filter((l) => isCounted(starts, l.bank_account_id, l.date))
     },
   })
 }
@@ -160,7 +164,8 @@ export interface CashMovement {
 
 /** Net movement in Cash-in-Hand + Bank per day over the last `days` days —
  * the Dashboard works the Cash & bank sparkline backwards from today's
- * balance with it, so only that window is fetched, not every line ever. */
+ * balance with it, so only that window is fetched, not every line ever.
+ * Only entries inside an account's books (from its opening balance's date) count, the same as the balance. */
 export function useCashMovements(days = 30) {
   return useQuery({
     queryKey: ['ledger_lines', 'cash_movements', days],
@@ -179,16 +184,17 @@ export function useCashMovements(days = 30) {
 
       const { data, error } = await supabase
         .from('journal_lines')
-        .select('debit, credit, journal_entries!inner(date)')
+        .select('bank_account_id, debit, credit, journal_entries!inner(date)')
         .in('gl_account_id', accountIds)
         .gte('journal_entries.date', sinceISO)
       if (error) throw error
+      const starts = await fetchBooksStarts()
 
       const byDate = new Map<string, number>()
       for (const row of data ?? []) {
         const entry = row.journal_entries as unknown as { date: string } | { date: string }[] | null
         const date = Array.isArray(entry) ? entry[0]?.date : entry?.date
-        if (!date) continue
+        if (!date || !isCounted(starts, row.bank_account_id, date)) continue
         byDate.set(date, (byDate.get(date) ?? 0) + Number(row.debit || 0) - Number(row.credit || 0))
       }
       return [...byDate.entries()].map(([date, net]) => ({ date, net }))

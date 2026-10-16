@@ -3,6 +3,7 @@ import { fmt2, fmtDate } from '../../lib/calc/format'
 import { summariseReconciliation } from '../../lib/calc/bankReconciliation'
 import { useBankAccounts } from '../../lib/queries/masters'
 import { useBankLines, useClearedBankLines, useCompanyProfile, useSetBankLineCleared } from '../../lib/queries/books'
+import { useAccountOpenings } from '../../lib/queries/openings'
 import { getErrorMessage } from '../../lib/errors'
 import { toast } from '../../lib/feedback'
 import { companyHeaderLine } from '../invoices/ledgerExport'
@@ -27,6 +28,10 @@ export function BankReconciliationReport() {
 
   const selected = bankId ?? accounts?.[0]?.id ?? null
   const { data: lines } = useBankLines(selected)
+  const { data: openings } = useAccountOpenings()
+  // The books for an account start on its opening balance's date: nothing older is listed or counted, and with no opening balance there is nothing to reconcile yet.
+  const booksStart = openings?.find((o) => o.bank_account_id === selected)?.as_on ?? null
+  const startMissing = !!selected && !!openings && booksStart === null
   const { data: clearedMap } = useClearedBankLines(selected)
   const setCleared = useSetBankLineCleared(selected)
 
@@ -109,7 +114,20 @@ export function BankReconciliationReport() {
 
       {!accounts?.length && <div className="empty-row">No bank accounts yet. Add one in Settings.</div>}
 
-      {selected && lines && (
+      {startMissing && (
+        <div className="note" style={{ borderLeft: '3px solid var(--amber, #b7791f)' }}>
+          <strong>{accountName} has no opening balance yet.</strong> The books for an account start on the date of its opening balance, so nothing is listed here until you set it. Go to Reports &gt; Opening and monthly balances and enter the
+          balance from the statement.
+        </div>
+      )}
+      {booksStart && (
+        <div className="note" style={{ marginTop: 0 }}>
+          {accountName} is counted from <strong>{fmtDate(booksStart)}</strong>, the date of its opening balance. Older entries are saved but not listed here. To reconcile an earlier month, type its opening balance and press
+          <strong> Start the books from</strong> in Reports &gt; Opening and monthly balances.
+        </div>
+      )}
+
+      {selected && !startMissing && lines && (
         <BankStatementMatcher
           key={selected}
           bankId={selected}
@@ -127,7 +145,7 @@ export function BankReconciliationReport() {
         />
       )}
 
-      {selected && (
+      {selected && !startMissing && (
         <>
           <div className="table-scroll">
             <table className="data">

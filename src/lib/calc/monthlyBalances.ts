@@ -2,7 +2,8 @@
 //
 // Two opening balances are compared for every month:
 //   1. the one typed from the statement (what the bank says the account held on the 1st), and
-//   2. the one the app calculates from the entries (the account's opening balance plus everything entered before that day).
+//   2. the one the app calculates from the entries, worked from the account's opening balance (the books start): forward from
+//      it (opening + entries since) for later months, and backward (opening - entries since that month began) for earlier ones.
 // A difference between them means entries made before that month are missing or wrong. When the difference
 // changes from one month to the next, the entries of that month are the ones to look at. Each month can be checked
 // on its own, so months can be entered in any order (newest first is fine).
@@ -57,21 +58,28 @@ export interface AccountLine {
   date: string
   debit: number
   credit: number
-  /** The account's opening balance entry: it is the starting point, counted from its own day, and is not "money in". */
-  isOpening?: boolean
 }
 
-/** One row per month for ONE account. `balances` holds the statement balances typed, by month start. */
-export function buildMonthlyCheck(months: string[], lines: AccountLine[], balances: Map<string, number>): MonthRow[] {
-  const real = lines.filter((l) => !l.isOpening)
-  const openings = lines.filter((l) => l.isOpening)
+/** The account's opening balance: what it held at the start of `date`. The starting point for every month's calculation. */
+export interface BooksStart {
+  date: string
+  amount: number
+}
+
+/** One row per month for ONE account. `lines` are the real movements (not the opening balance entry); `balances` holds
+ * the statement balances typed, by month start; `start` is the account's opening balance, or null when none is set. */
+export function buildMonthlyCheck(months: string[], lines: AccountLine[], balances: Map<string, number>, start: BooksStart | null): MonthRow[] {
+  const real = lines
+  const net = (from: string | null, to: string) =>
+    real.filter((l) => (from === null || l.date >= from) && l.date < to).reduce((s, l) => s + Number(l.debit || 0) - Number(l.credit || 0), 0)
 
   // What the entries say the balance was at the very start of a month (before that day's entries).
-  const calculatedAt = (month: string) =>
-    round2(
-      openings.filter((l) => l.date <= month).reduce((s, l) => s + Number(l.debit || 0) - Number(l.credit || 0), 0) +
-        real.filter((l) => l.date < month).reduce((s, l) => s + Number(l.debit || 0) - Number(l.credit || 0), 0)
-    )
+  // From the opening balance: forward for months after it, backward for months before it, so months can be checked
+  // newest first. With no opening balance set, it is only what has been entered so far.
+  const calculatedAt = (month: string) => {
+    if (!start) return round2(net(null, month))
+    return round2(month >= start.date ? start.amount + net(start.date, month) : start.amount - net(month, start.date))
+  }
 
   const moved = new Map<string, { in: number; out: number }>()
   for (const l of real) {

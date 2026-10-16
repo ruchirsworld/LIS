@@ -1,6 +1,6 @@
 # LIS changes since v2.0.1
 
-Version 2.0.1 was released on 3 September 2026. This list covers everything after it, up to 2.1.7 (released) and 2.1.8 (ready, waiting to be released). It is put together from the project history, grouped by area. Version numbers are shown where a release carried one.
+Version 2.0.1 was released on 3 September 2026. This list covers everything after it, up to 2.1.9. It is put together from the project history, grouped by area. Version numbers are shown where a release carried one.
 
 ## 2.0.2 – 2.0.3 (3 – 4 September)
 
@@ -95,7 +95,7 @@ Version 2.0.1 was released on 3 September 2026. This list covers everything afte
 - **2.1.6:** Dashboard period cards with a + for details (revenue, trip, admin and project expenses, salary, vendor payments, loans, capital) and a Project summary of every project with the period's spending highlighted.
 - **2.1.7:** opening balances for Cash, Kotak and CBI, and a month-by-month check of the entries against the bank statement. A "Paid to vendors" line in the Financial summary.
 
-## 2.1.8 (ready to release)
+## 2.1.8 (16 October)
 - **Other money received:** a deposit given back, interest, a refund, scrap sold or other income, from Money > Transfers or from "Record this" on a bank statement line. New accounts: Security Deposits and Other Income.
 - **Audit fixes** (see the audit summary):
   - Deleting a transfer now removes its entry from the books, and editing one posts it again.
@@ -107,3 +107,11 @@ Version 2.0.1 was released on 3 September 2026. This list covers everything afte
   - The period cards and the entry details in Bank reconciliation load faster.
   - The app now checks for a new version every half hour and when you return to it.
   - Dependency security updates (10 known issues down to 3).
+
+## 2.1.9 (16 October): Cash & bank counted from the opening balance
+- Each account (Cash, Kotak, CBI) is now counted only from the date of its opening balance. Cash & bank is the opening balance plus the entries dated on or after that day. Older entries stay saved and open from their own screens, but are not counted yet.
+- This applies to the Dashboard Cash & bank card and its 30-day trend, the Cash & bank report, Bank reconciliation (the books side, the statement matcher and the sign-off) and the "below zero" health check, which now names the account.
+- The Dashboard shows "Counted from <date>" under Cash & bank. An account with no opening balance shows "Opening balance not set", is left out of the total, and is flagged in the Books health check.
+- New "Start the books from <month>" button in Reports > Opening and monthly balances: after a month is right, it moves the opening balance back to the first day of that month, using the balance typed for it.
+- The monthly check now works from the opening balance in both directions (forward for later months, backward for earlier ones), so months can be checked newest first.
+- Client outstanding, retention, vendor dues, the Balance Sheet and the Profit and Loss are not affected: they still use every entry.
