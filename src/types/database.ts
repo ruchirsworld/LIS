@@ -14,6 +14,99 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_month_balances: {
+        Row: {
+          bank_account_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          updated_at: string
+          balance: number
+          month: string
+        }
+        Insert: {
+          bank_account_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          updated_at?: string
+          balance: number
+          month: string
+        }
+        Update: {
+          bank_account_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          updated_at?: string
+          balance?: number
+          month?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_month_balances_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "account_month_balances_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      account_openings: {
+        Row: {
+          bank_account_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          updated_at: string
+          amount: number
+          as_on: string
+          notes: string | null
+        }
+        Insert: {
+          bank_account_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          updated_at?: string
+          amount: number
+          as_on: string
+          notes?: string | null
+        }
+        Update: {
+          bank_account_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          updated_at?: string
+          amount?: number
+          as_on?: string
+          notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_openings_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "account_openings_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       app_settings: {
         Row: {
           key: string

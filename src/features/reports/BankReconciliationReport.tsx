@@ -30,7 +30,12 @@ export function BankReconciliationReport() {
   const { data: clearedMap } = useClearedBankLines(selected)
   const setCleared = useSetBankLineCleared(selected)
 
-  const cleared = useMemo(() => new Set(clearedMap?.keys() ?? []), [clearedMap])
+  // The opening balance is the account's starting point, not a line on the statement, so it counts as confirmed.
+  const cleared = useMemo(() => {
+    const set = new Set(clearedMap?.keys() ?? [])
+    for (const l of lines ?? []) if (l.sourceTable === 'account_openings') set.add(l.id)
+    return set
+  }, [clearedMap, lines])
   const statementBalance = Number(balanceText.replace(/[₹,\s]/g, '')) || 0
   const summary = useMemo(
     () => summariseReconciliation(lines ?? [], cleared, statementBalance, statementDate),

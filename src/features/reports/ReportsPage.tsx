@@ -10,6 +10,7 @@ import { ProjectProfitabilityReport } from './ProjectProfitabilityReport'
 import { LoanReport } from './LoanReport'
 import { CapitalReport } from './CapitalReport'
 import { CashBankReport } from './CashBankReport'
+import { MonthlyBalancesReport } from './MonthlyBalancesReport'
 import { TripsReport } from './TripsReport'
 import { FinancialSummaryReport } from './FinancialSummaryReport'
 import { GstSummaryReport } from './GstSummaryReport'
@@ -188,6 +189,13 @@ const CATEGORIES: ReportCategory[] = [
         title: 'Bank reconciliation',
         description: 'Tick the lines that appear on the bank statement and see whether the books and the bank agree.',
         Component: BankReconciliationReport,
+        periodless: true,
+      },
+      {
+        id: 'monthly-balances',
+        title: 'Opening and monthly balances',
+        description: "Give each account its opening balance, and check each month's entries against the bank statement.",
+        Component: MonthlyBalancesReport,
         periodless: true,
       },
       {

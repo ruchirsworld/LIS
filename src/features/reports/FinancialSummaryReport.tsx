@@ -4,6 +4,8 @@ import { useInvoices } from '../../lib/queries/invoices'
 import { useLoans, useLoanPayments } from '../../lib/queries/loans'
 import { useCapitalTx } from '../../lib/queries/capital'
 import { useProfiles } from '../../lib/queries/admin'
+import { useVendorAdvances, useVendorBillPayments } from '../../lib/queries/purchases'
+import { vendorPaidTotals } from '../../lib/calc/periodActivity'
 import { fmt } from '../../lib/calc/format'
 import { netPayable } from '../../lib/calc/invoices'
 import { totalInterestDue } from '../../lib/calc/loans'
@@ -22,6 +24,11 @@ export function FinancialSummaryReport({ range }: { range: DateRange | null }) {
   // Partners are Admin and CXO only.
   const profiles = (allProfiles ?? []).filter((p) => p.role === 'admin' || p.role === 'cxo')
   const { data: capitalTx } = useCapitalTx(null)
+  const { data: vendorPayments } = useVendorBillPayments()
+  const { data: vendorAdvances } = useVendorAdvances()
+  // Money actually paid to vendors: payments on bills plus advances. A payment made from an advance only uses
+  // money already paid as the advance, so it is not counted again.
+  const vendorPaid = vendorPaidTotals(vendorPayments ?? [], vendorAdvances ?? [], range).total
 
   // Draft invoices raised in this period still need sending.
   let invoiceDueToSend = 0
@@ -47,6 +54,7 @@ export function FinancialSummaryReport({ range }: { range: DateRange | null }) {
     ['Total received', summary?.total_received ?? 0],
     ['Invoice due (to send)', invoiceDueToSend],
     ['Total purchases', summary?.vendor_purchases ?? 0],
+    ['Paid to vendors', vendorPaid],
     ['Interest due', interestDue],
   ]
 
