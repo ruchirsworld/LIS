@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clusterPairs, type DuplicatePair } from './activityFeed'
+import { clusterPairs, type DuplicatePair } from './duplicateClusters'
 
 const pair = (a: string, b: string, amount = 500): DuplicatePair => ({
   a_table: 'expenses', a_id: a, a_display_id: `E${a}`, a_kind: 'Expense', a_date: '2026-10-10', a_recorded_at: '2026-10-10T10:00:00Z', a_description: null, a_entered_by: 'u1',
