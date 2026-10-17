@@ -24,6 +24,7 @@ import {
   SalaryAdvanceLedgerReport,
 } from './PartyLedgerReport'
 import { AuditLogReport } from './AuditLogReport'
+import { ActivityByUserReport } from './ActivityByUserReport'
 import { BooksHealthReport } from './BooksHealthReport'
 import { JournalVouchersReport } from './JournalVouchersReport'
 import { GstTdsRegisterReport } from './GstTdsRegisterReport'
@@ -269,6 +270,12 @@ const CATEGORIES: ReportCategory[] = [
         description: 'Post a manual voucher — GST payment or set-off, bad-debt write-off, corrections — and see those already posted.',
         Component: JournalVouchersReport,
         periodless: true,
+      },
+      {
+        id: 'activity-by-user',
+        title: 'Activity by user',
+        description: 'Everything one person recorded, in one list: expenses, bills, payments, receipts, transfers and more.',
+        Component: ActivityByUserReport,
       },
       {
         id: 'audit-log',

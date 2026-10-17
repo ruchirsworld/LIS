@@ -36,6 +36,39 @@ export function useReportSummary(range: DateRange | null, enabled = true) {
   })
 }
 
+export interface ActivityRow {
+  activity_date: string
+  recorded_at: string
+  kind: string
+  source_table: string
+  source_id: string
+  display_id: string | null
+  description: string | null
+  amount: number | null
+  /** 'in' or 'out' when money moves; null for a bill, an invoice or a transfer. */
+  direction: string | null
+  status: string | null
+  reimbursable: boolean
+}
+
+/** Everything one person recorded (activity_by_user): the date range filters on each entry's own date, or on the day it was recorded. */
+export function useActivityByUser(userId: string | null, range: DateRange | null, byRecorded: boolean) {
+  return useQuery({
+    queryKey: ['activity_by_user', userId, range, byRecorded],
+    enabled: !!userId,
+    queryFn: async (): Promise<ActivityRow[]> => {
+      const { data, error } = await supabase.rpc('activity_by_user', {
+        p_user: userId as string,
+        p_from: range?.from ?? undefined,
+        p_to: range?.to ?? undefined,
+        p_by_recorded: byRecorded,
+      })
+      if (error) throw error
+      return data as ActivityRow[]
+    },
+  })
+}
+
 export interface TrialBalanceRow {
   code: string | null
   name: string | null

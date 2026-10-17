@@ -3463,6 +3463,22 @@ export type Database = {
       }
     }
     Functions: {
+      activity_by_user: {
+        Args: { p_user: string; p_from?: string; p_to?: string; p_by_recorded?: boolean }
+        Returns: {
+          activity_date: string
+          recorded_at: string
+          kind: string
+          source_table: string
+          source_id: string
+          display_id: string | null
+          description: string | null
+          amount: number | null
+          direction: string | null
+          status: string | null
+          reimbursable: boolean
+        }[]
+      }
       books_health_check: {
         Args: never
         Returns: {

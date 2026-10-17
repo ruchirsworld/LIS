@@ -43,6 +43,10 @@ export function baseTarget(sourceTable: string | null | undefined, date: string)
       return { tab: 'capital' }
     case 'manual_journal':
       return { tab: 'reports', filter: { report: 'journal-vouchers' } }
+    case 'trips':
+      return { tab: 'expenses', costCenter: 'Trips' }
+    case 'account_openings':
+      return { tab: 'reports', filter: { report: 'monthly-balances' } }
     default:
       return null
   }
