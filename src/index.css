@@ -1,30 +1,100 @@
 :root {
-  /* Warm sand neutrals */
-  --ink: #2a2820;
-  --ink-soft: #746c56;
-  --paper: #ffffff;
-  --paper-2: #faf3e6; /* lighter sand, used for secondary surfaces */
-  --bg: #f3f2ee; /* page background — a little grey, warm-tinted to match */
-  --line: #e8e2d3;
+  /* LIS design system (Phase 1). Colour carries meaning, never decoration. Every screen reads these tokens; the older names
+     (--ink, --paper, --accent, --green …) are kept as aliases so existing screens pick the new palette up at once. */
 
-  /* Earthy green — primary/brand accent, tuned to the Laavin logo green */
-  --accent: #2f6b40;
-  --accent-soft: #e2eee2;
+  /* Base */
+  --bg: #f8f7f4; /* page */
+  --surface: #ffffff; /* cards, tables, panels */
+  --border: #e5e3de;
+  --zebra: #f9f8f5; /* alternate table rows */
+  --hover: #f1f0ec; /* hover on rows, menu items */
 
-  /* Status semantics, tuned warm */
-  --green: #2e7d4e;
-  --green-soft: #e3f3e7;
-  --amber: #cc9544; /* saffron/gold, tuned to the logo tagline color */
-  --amber-soft: #f7ecd9;
-  --red: #b8452e; /* terracotta-red */
-  --red-soft: #f9e4dd;
+  /* Text */
+  --text: #1c2533; /* ink navy */
+  --muted: #667085; /* slate: labels, hints */
 
-  /* A bit of blue — used sparingly (draft status, focus rings) */
-  --blue: #3b6e91;
-  --blue-soft: #e4eef3;
+  /* Brand */
+  --primary: #1f4e79; /* trust, focus: main buttons, active nav, links, headings */
+  --primary-tint: #eaf1f8;
+  --secondary: #2a8c82; /* calm, balance: secondary buttons, selected states */
+  --secondary-tint: #e6f3f1;
+  --cta: #c8653f; /* attention: the one main call to action, key totals; at most one per view */
+  --cta-tint: #faece6;
+  /* The brand hues above are fills, bars and chart colours. Where text sits on white or on a tint, or white text sits on a button, the
+     deeper shades below keep it at WCAG AA (4.5:1 or better). */
+  --secondary-strong: #237a71;
+  --cta-strong: #a94d29;
 
-  --font-sans: 'Space Grotesk', system-ui, sans-serif;
-  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  /* Status: used for status only, always with an icon or a label */
+  --success: #3e8e5a;
+  --success-tint: #eaf4ee;
+  --pending: #f2a93b; /* pending, reimbursable */
+  --pending-tint: #fdf4e3;
+  --error: #b42318;
+  --error-tint: #fdecea;
+  --info: #1f4e79;
+  --info-tint: #eaf1f8;
+  /* Text on a status tint needs a deeper shade than the fill colour to stay readable (WCAG AA). */
+  --success-text: #2d6b43;
+  --pending-text: #8a5300;
+  --error-text: #b42318;
+  --info-text: #1f4e79;
+
+  /* Cost-centre tags: never reuse a status colour */
+  --cc-admin: #6e5a8a;
+  --cc-admin-tint: #efebf5;
+  --cc-project: #2a8c82;
+  --cc-project-tint: #e6f3f1;
+  --cc-project-text: #1f6b63;
+  --cc-trip: #5b7083;
+  --cc-trip-tint: #ecf0f3;
+  --cc-trip-text: #4f6173;
+
+  /* Charts only, in this order */
+  --chart-1: #1f4e79;
+  --chart-2: #2a8c82;
+  --chart-3: #c8653f;
+  --chart-4: #6e5a8a;
+  --chart-5: #8a8f3c;
+  --chart-6: #c9b48a;
+
+  /* Shape and spacing */
+  --radius: 8px;
+  --radius-sm: 6px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 16px;
+  --space-4: 24px;
+  --space-5: 32px;
+  --shadow-sm: 0 1px 2px rgba(28, 37, 51, 0.06);
+  --shadow-md: 0 4px 12px rgba(28, 37, 51, 0.1);
+  --shadow-lg: 0 12px 32px rgba(28, 37, 51, 0.18);
+  --tap: 44px; /* minimum tap target on touch screens */
+
+  /* Type */
+  --font-sans: 'Inter Variable', Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  --text-title: 24px;
+  --text-section: 18px;
+  --text-body: 14px;
+  --text-label: 13px;
+
+  /* Aliases for the older token names */
+  --ink: var(--text);
+  --ink-soft: var(--muted);
+  --paper: var(--surface);
+  --paper-2: var(--zebra);
+  --line: var(--border);
+  --accent: var(--primary);
+  --accent-soft: var(--primary-tint);
+  --green: var(--success);
+  --green-soft: var(--success-tint);
+  --amber: var(--pending);
+  --amber-soft: var(--pending-tint);
+  --red: var(--error);
+  --red-soft: var(--error-tint);
+  --blue: var(--primary);
+  --blue-soft: var(--primary-tint);
 
   color-scheme: light;
 }
@@ -38,6 +108,8 @@
 body {
   margin: 0;
   font-family: var(--font-sans);
+  font-size: var(--text-body);
+  font-variant-numeric: tabular-nums;
   background: var(--bg);
   color: var(--ink);
 }

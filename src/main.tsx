@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import '@fontsource-variable/inter'
 import './index.css'
 import App from './App.tsx'
 import { toast } from './lib/feedback'

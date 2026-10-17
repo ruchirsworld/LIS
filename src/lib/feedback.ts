@@ -6,10 +6,21 @@
 
 export type ToastKind = 'success' | 'error' | 'info'
 
+export interface ToastAction {
+  label: string
+  onClick: () => void
+}
+
+export interface ToastOptions {
+  /** A button on the toast, e.g. Undo. The toast stays for 10 seconds when it has one. */
+  action?: ToastAction
+}
+
 export interface ToastItem {
   id: number
   kind: ToastKind
   message: string
+  action?: ToastAction
 }
 
 export interface ConfirmRequest {
@@ -38,8 +49,8 @@ export function onConfirm(fn: ConfirmListener): () => void {
   return () => confirmListeners.delete(fn)
 }
 
-export function toast(kind: ToastKind, message: string): void {
-  const item: ToastItem = { id: nextId++, kind, message }
+export function toast(kind: ToastKind, message: string, options?: ToastOptions): void {
+  const item: ToastItem = { id: nextId++, kind, message, action: options?.action }
   toastListeners.forEach((fn) => fn(item))
 }
 

@@ -2,9 +2,10 @@
    cleaned up into reusable classes instead of one inline stylesheet. */
 
 .card {
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
 }
 
 details.toggle-section {
@@ -55,52 +56,82 @@ details.toggle-section .note:last-child {
   padding-bottom: 16px;
 }
 
+/* Page title: plain text on the page, no coloured band. */
 .module-header {
-  background: var(--accent);
-  color: #fff;
-  font-size: 16px;
+  color: var(--text);
+  font-size: var(--text-title);
+  line-height: 1.25;
   font-weight: 600;
-  padding: 10px 16px;
-  border-radius: 8px;
-  margin-bottom: 18px;
+  letter-spacing: -0.01em;
+  padding: 0;
+  margin-bottom: var(--space-3);
 }
 
 /* Pages whose header carries a cost-center/section switcher (Expenses, HR)
    sit directly above their content — tighter than the app default. */
 .expenses-page .module-header,
 .hr-page .module-header {
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
 }
 
+/* Buttons: primary (deep blue), secondary (teal outline), cta (terracotta, the one main action of a view), danger (red). */
 .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   font-family: inherit;
-  font-size: 14px;
+  font-size: var(--text-body);
   font-weight: 500;
-  border-radius: 6px;
+  line-height: 1.2;
+  border-radius: var(--radius);
   padding: 9px 18px;
   cursor: pointer;
-  border: none;
-  background: var(--accent);
+  border: 1px solid transparent;
+  background: var(--primary);
   color: #fff;
+  box-shadow: var(--shadow-sm);
+  transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
 }
 .btn:hover {
-  opacity: 0.9;
+  background: color-mix(in srgb, var(--primary) 88%, #000);
 }
 .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 .btn.secondary {
-  background: none;
-  border: 1px solid var(--line);
-  color: var(--accent);
+  background: var(--surface);
+  border-color: var(--secondary-strong);
+  color: var(--secondary-strong);
+  box-shadow: none;
+}
+.btn.secondary:hover {
+  background: var(--secondary-tint);
+}
+.btn.cta {
+  background: var(--cta-strong);
+}
+.btn.cta:hover {
+  background: color-mix(in srgb, var(--cta-strong) 88%, #000);
+}
+.btn.danger {
+  background: var(--error);
+}
+.btn.danger:hover {
+  background: color-mix(in srgb, var(--error) 88%, #000);
 }
 .btn.link {
   background: none;
   border: none;
-  color: var(--accent);
+  box-shadow: none;
+  color: var(--primary);
   padding: 0;
-  font-size: 12px;
+  font-size: var(--text-label);
+}
+.btn.link:hover {
+  background: none;
+  text-decoration: underline;
 }
 .btn.danger-link {
   background: none;
@@ -119,18 +150,25 @@ details.toggle-section .note:last-child {
   gap: 4px;
 }
 .field label {
-  font-size: 11px;
-  color: var(--ink-soft);
+  font-size: var(--text-label);
+  font-weight: 500;
+  color: var(--muted);
 }
 .field input,
-.field select {
+.field select,
+.field textarea {
   width: 100%;
-  font-size: 14px;
+  font-size: var(--text-body);
   padding: 8px 10px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--paper-2);
-  color: var(--ink);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+}
+.field input:hover,
+.field select:hover,
+.field textarea:hover {
+  border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
 }
 
 input:focus-visible,
@@ -869,13 +907,14 @@ table.data {
    wider and hiding its last columns behind a sideways scrollbar. Amounts and buttons stay on one line. */
 table.data th {
   text-align: left;
-  font-size: 11px;
+  font-size: 12px;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--ink-soft);
+  color: var(--muted);
   padding: 10px 10px;
-  background: var(--paper-2);
-  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
   white-space: normal;
   overflow-wrap: break-word;
   position: sticky;
@@ -884,8 +923,8 @@ table.data th {
 }
 table.data td {
   padding: 11px 10px;
-  font-size: 13.5px;
-  border-bottom: 1px solid var(--line);
+  font-size: var(--text-body);
+  border-bottom: 1px solid var(--border);
   white-space: normal;
   overflow-wrap: break-word;
 }
@@ -897,6 +936,13 @@ table.data td button {
 }
 table.data tr:last-child td {
   border-bottom: none;
+}
+/* Zebra rows (white / warm grey) and a hover highlight on every table. Lists that group their rows set their own colours below. */
+table.data > tbody > tr:nth-child(even) > td {
+  background: var(--zebra);
+}
+table.data > tbody > tr:hover > td {
+  box-shadow: inset 0 0 0 999px rgba(31, 78, 121, 0.05);
 }
 table.data.table-compact th {
   padding: 6px 10px;
@@ -937,41 +983,35 @@ table.data.table-compact td {
     display: none;
   }
 }
-/* A transaction recorded as a reimbursement (paid out of someone's own pocket): a faint amber wash and edge, so it
- * stands out in a long list without shouting. */
-/* Grouped records (Admin and Project expenses, Activity by user): a month heading, then the dates inside it. Date groups are blue and
-   white/cream in turn, and the rows of a group alternate light and a little deeper, so neighbouring groups cannot be mistaken for
-   each other. Reimbursements stay amber, deeper than the cream. */
+/* Grouped records (Admin and Project expenses, Activity by user): a month heading, then the dates inside it. Neutral: a grey month bar,
+   a light date bar, zebra rows. Reimbursable rows are the only coloured rows: a thin amber bar on the left and a pale amber tint. */
 table.data tr.expense-month-group-row > td {
-  background: color-mix(in srgb, var(--ink) 13%, var(--paper));
-  font-size: 15px;
-  font-weight: 700;
-  padding: 11px 12px;
-  border-top: 2px solid var(--ink-soft);
+  background: var(--hover);
+  color: var(--text);
+  font-size: var(--text-section);
+  font-weight: 600;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
 }
-table.data tr.expense-date-group-row.grp-head-0 > td {
-  background: color-mix(in srgb, var(--blue) 24%, var(--paper));
+table.data tr.expense-date-group-row > td {
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--text-label);
+  font-weight: 600;
+  border-top: 1px solid var(--border);
+  box-shadow: inset 3px 0 0 var(--primary);
 }
-table.data tr.expense-date-group-row.grp-head-1 > td {
-  background: color-mix(in srgb, var(--blue) 9%, var(--paper));
+table.data tr.grp-row.grp-alt-0 > td {
+  background: var(--surface);
 }
-table.data tr.grp-row.grp-seg-0.grp-alt-0 > td {
-  background: color-mix(in srgb, var(--blue) 8%, var(--paper));
-}
-table.data tr.grp-row.grp-seg-0.grp-alt-1 > td {
-  background: color-mix(in srgb, var(--blue) 15%, var(--paper));
-}
-table.data tr.grp-row.grp-seg-1.grp-alt-0 > td {
-  background: var(--paper);
-}
-table.data tr.grp-row.grp-seg-1.grp-alt-1 > td {
-  background: color-mix(in srgb, var(--blue) 3%, var(--paper));
+table.data tr.grp-row.grp-alt-1 > td {
+  background: var(--zebra);
 }
 table.data tr.grp-row.row-reimb.grp-alt-0 > td {
-  background: color-mix(in srgb, var(--amber) 22%, var(--paper));
+  background: color-mix(in srgb, var(--pending) 10%, var(--surface));
 }
 table.data tr.grp-row.row-reimb.grp-alt-1 > td {
-  background: color-mix(in srgb, var(--amber) 34%, var(--paper));
+  background: color-mix(in srgb, var(--pending) 16%, var(--surface));
 }
 /* A trip row and the heading of its entries stay in view while that trip's entries scroll: the row sticks under the table header,
    the heading under the row. Each trip is its own table section, so they let go when the trip ends. */
@@ -982,67 +1022,54 @@ table.data tbody.trip-block > tr.trip-main > td {
   position: sticky;
   top: var(--thead-h, 28px);
   z-index: 4;
-}
-/* Trips follow the colours of the grouped expense records: each trip, with its entries, is blue or white/cream in turn. The trip row is
-   the deeper shade of its colour, and its entries alternate light and a little deeper. */
-table.data tbody.trip-block > tr.trip-main.trip-seg-0 > td {
-  background: color-mix(in srgb, var(--blue) 24%, var(--paper));
-}
-table.data tbody.trip-block > tr.trip-main.trip-seg-1 > td {
-  background: color-mix(in srgb, var(--blue) 9%, var(--paper));
+  background: var(--hover);
+  border-top: 1px solid var(--border);
 }
 table.data .trip-entries-head {
   position: sticky;
   top: calc(var(--thead-h, 28px) + var(--trip-h, 0px));
   z-index: 3;
-  background: var(--paper-2);
+  background: var(--surface);
   padding: 6px 0 4px;
 }
 /* The small table of entries scrolls with the trip; its own header must not stick over the main one. */
 table.data.entry-table th {
   position: static;
 }
-/* The entries inside an opened trip take the colour of their trip. */
-table.data.entry-table.trip-seg-0 tbody tr:nth-child(odd) > td {
-  background: color-mix(in srgb, var(--blue) 8%, var(--paper));
+table.data.entry-table tbody tr:nth-child(odd) > td {
+  background: var(--surface);
 }
-table.data.entry-table.trip-seg-0 tbody tr:nth-child(even) > td {
-  background: color-mix(in srgb, var(--blue) 15%, var(--paper));
+table.data.entry-table tbody tr:nth-child(even) > td {
+  background: var(--zebra);
 }
-table.data.entry-table.trip-seg-1 tbody tr:nth-child(odd) > td {
-  background: var(--paper);
-}
-table.data.entry-table.trip-seg-1 tbody tr:nth-child(even) > td {
-  background: color-mix(in srgb, var(--blue) 3%, var(--paper));
-}
-/* A reimbursement entry is amber; its rows alternate between a lighter and a deeper amber, so they still read as alternating. */
 table.data.entry-table tbody tr.row-reimb:nth-child(odd) > td {
-  background: color-mix(in srgb, var(--amber) 22%, var(--paper));
+  background: color-mix(in srgb, var(--pending) 10%, var(--surface));
 }
 table.data.entry-table tbody tr.row-reimb:nth-child(even) > td {
-  background: color-mix(in srgb, var(--amber) 34%, var(--paper));
+  background: color-mix(in srgb, var(--pending) 16%, var(--surface));
 }
 /* Every other row, where a list asks for it. */
 table.data tr.row-alt > td {
-  background: var(--paper-2);
+  background: var(--zebra);
 }
+/* A reimbursable row: pale amber tint and a thin amber bar on its left edge. */
 table.data tr.row-reimb > td {
-  background: color-mix(in srgb, var(--amber) 11%, transparent);
+  background: color-mix(in srgb, var(--pending) 10%, var(--surface));
 }
 table.data tr.row-reimb > td:first-child {
-  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--amber) 55%, transparent);
+  border-left: 3px solid var(--pending);
 }
 table.data tr.group-header-row td {
-  background: var(--paper-2);
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--ink-soft);
+  background: var(--hover);
+  font-size: var(--text-label);
+  font-weight: 600;
+  color: var(--text);
   padding-top: 8px;
   padding-bottom: 8px;
 }
 .amt {
-  font-family: var(--font-mono);
   text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .pay-btn {
@@ -1205,7 +1232,7 @@ table.data tr.group-header-row td {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(28, 37, 51, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1213,10 +1240,10 @@ table.data tr.group-header-row td {
   z-index: 60;
 }
 .modal-panel {
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.24);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
   width: 100%;
   max-width: 420px;
   max-height: 90vh;
@@ -1298,22 +1325,22 @@ table.data tr.group-header-row td {
   font-weight: 600;
   padding: 7px 16px;
   border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.45);
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
   cursor: pointer;
   flex-shrink: 0;
-  transition: background 0.15s, color 0.15s, box-shadow 0.15s, transform 0.1s;
+  transition: background 0.15s, color 0.15s;
 }
 .cc-switch-btn:hover {
-  background: rgba(255, 255, 255, 0.24);
+  background: var(--hover);
+  color: var(--text);
 }
 .cc-switch-btn.active {
-  background: #fff;
-  color: var(--accent);
-  border-color: #fff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
-  transform: translateY(-1px);
+  background: var(--primary-tint);
+  color: var(--primary);
+  border-color: var(--primary);
+  font-weight: 600;
 }
 
 @media (max-width: 640px) {
@@ -2095,7 +2122,7 @@ tr.row-link:hover td {
 
 @media (max-width: 640px) {
   .module-header-row .module-header-title {
-    font-size: 13px;
+    font-size: var(--text-section);
   }
 }
 
@@ -2220,12 +2247,12 @@ tr[tabindex]:hover {
 }
 .table-search input {
   width: 100%;
-  font-size: 14px;
+  font-size: var(--text-body);
   padding: 8px 28px 8px 10px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--paper-2);
-  color: var(--ink);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
 }
 .table-search-clear {
   position: absolute;
@@ -2236,4 +2263,316 @@ tr[tabindex]:hover {
   line-height: 1;
   color: var(--ink-soft);
   cursor: pointer;
+}
+
+/* ===== Design system components (Phase 1) ===== */
+
+/* Keyboard focus: a clear deep-blue ring everywhere. */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible,
+a:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Tags: small labels. Status colours mean status only; cost-centre colours are their own set. */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: nowrap;
+  background: var(--hover);
+  color: var(--text);
+}
+.tag-success {
+  background: var(--success-tint);
+  color: var(--success-text);
+}
+.tag-pending {
+  background: var(--pending-tint);
+  color: var(--pending-text);
+}
+.tag-error {
+  background: var(--error-tint);
+  color: var(--error-text);
+}
+.tag-info {
+  background: var(--info-tint);
+  color: var(--info-text);
+}
+.tag-cc-admin {
+  background: var(--cc-admin-tint);
+  color: var(--cc-admin);
+}
+.tag-cc-project {
+  background: var(--cc-project-tint);
+  color: var(--cc-project-text);
+}
+.tag-cc-trip {
+  background: var(--cc-trip-tint);
+  color: var(--cc-trip-text);
+}
+
+/* Initials badge: who an entry is for, e.g. the person to be reimbursed. */
+.initials {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--pending-tint);
+  color: var(--pending-text);
+  border: 1px solid var(--pending);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  flex: none;
+}
+.initials-done {
+  background: var(--hover);
+  color: var(--muted);
+  border-color: var(--border);
+}
+.initials-tick {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  background: var(--surface);
+  color: var(--success-text);
+  border-radius: 50%;
+  padding: 1px;
+}
+
+/* Side panel: right-hand panel on a desktop, bottom sheet on a phone. */
+.side-panel-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(28, 37, 51, 0.35);
+  display: flex;
+  justify-content: flex-end;
+}
+.side-panel {
+  display: flex;
+  flex-direction: column;
+  width: min(400px, 100vw);
+  height: 100%;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  animation: side-panel-in 0.18s ease-out;
+}
+.side-panel-grip {
+  display: none;
+}
+.side-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+.side-panel-title {
+  min-width: 0;
+  font-size: var(--text-section);
+  font-weight: 600;
+}
+.side-panel-close {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 32px;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  cursor: pointer;
+}
+.side-panel-close:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+.side-panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.side-panel-footer {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+.side-panel-footer .btn {
+  flex: 1;
+}
+@keyframes side-panel-in {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@media (max-width: 640px) {
+  .side-panel-backdrop {
+    align-items: flex-end;
+  }
+  .side-panel {
+    width: 100%;
+    height: auto;
+    max-height: 88vh;
+    border-left: none;
+    border-top: 1px solid var(--border);
+    border-radius: 16px 16px 0 0;
+    animation-name: sheet-in;
+  }
+  .side-panel-grip {
+    display: block;
+    width: 40px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border);
+    margin: 8px auto 0;
+  }
+  @keyframes sheet-in {
+    from {
+      transform: translateY(24px);
+      opacity: 0;
+    }
+    to {
+      transform: none;
+      opacity: 1;
+    }
+  }
+}
+
+/* Key facts of a record: two columns of label over value. */
+.fact-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3) var(--space-3);
+  margin: 0;
+}
+.fact dt {
+  font-size: var(--text-label);
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+.fact dd {
+  margin: 0;
+  font-size: var(--text-body);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+/* Empty states and loading skeletons. */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-5) var(--space-3);
+  text-align: center;
+  color: var(--muted);
+}
+.empty-state-icon {
+  color: var(--muted);
+}
+.empty-state-title {
+  font-size: var(--text-section);
+  font-weight: 600;
+  color: var(--text);
+}
+.empty-state-text {
+  max-width: 420px;
+  font-size: var(--text-body);
+}
+.empty-state-action {
+  margin-top: var(--space-2);
+}
+.skeleton {
+  display: block;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(90deg, var(--hover) 25%, var(--zebra) 50%, var(--hover) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+.skeleton-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.table-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.table-skeleton-row {
+  display: grid;
+  gap: var(--space-3);
+  padding: 14px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.table-skeleton-row:last-child {
+  border-bottom: none;
+}
+@keyframes skeleton-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+  .side-panel {
+    animation: none;
+  }
+}
+
+/* Touch screens: every control is at least 44px tall. */
+@media (max-width: 640px), (pointer: coarse) {
+  .btn,
+  .cc-switch-btn,
+  .field input,
+  .field select,
+  .table-search input,
+  .toast-action {
+    min-height: var(--tap);
+  }
+  .icon-btn,
+  .icon-btn-sq,
+  .row-menu-btn,
+  .modal-close,
+  .side-panel-close {
+    min-width: var(--tap);
+    min-height: var(--tap);
+  }
 }

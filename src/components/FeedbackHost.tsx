@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
+import { CircleAlert, CircleCheck, Info, X } from 'lucide-react'
 import { onConfirm, onToast, type ConfirmRequest, type ToastItem } from '../lib/feedback'
 import { Button } from './ui'
 import './FeedbackHost.css'
 
 const TOAST_MS: Record<ToastItem['kind'], number> = { success: 3000, info: 4000, error: 7000 }
+const TOAST_WITH_ACTION_MS = 10000
+const TOAST_ICON = { success: CircleCheck, info: Info, error: CircleAlert }
 
 /** Draws toasts and the confirm dialog. Mounted once, near the top of the app. */
 export function FeedbackHost() {
@@ -15,7 +18,7 @@ export function FeedbackHost() {
     () =>
       onToast((t) => {
         setToasts((cur) => [...cur.filter((x) => x.message !== t.message).slice(-3), t])
-        window.setTimeout(() => setToasts((cur) => cur.filter((x) => x.id !== t.id)), TOAST_MS[t.kind])
+        window.setTimeout(() => setToasts((cur) => cur.filter((x) => x.id !== t.id)), t.action ? TOAST_WITH_ACTION_MS : TOAST_MS[t.kind])
       }),
     []
   )
@@ -41,14 +44,31 @@ export function FeedbackHost() {
   return (
     <>
       <div className="toast-stack" role="status" aria-live="polite">
-        {toasts.map((t) => (
-          <div key={t.id} className={`toast toast-${t.kind}`}>
-            <span>{t.message}</span>
-            <button type="button" className="toast-close" aria-label="Dismiss" onClick={() => setToasts((cur) => cur.filter((x) => x.id !== t.id))}>
-              ×
-            </button>
-          </div>
-        ))}
+        {toasts.map((t) => {
+          const Icon = TOAST_ICON[t.kind]
+          const dismiss = () => setToasts((cur) => cur.filter((x) => x.id !== t.id))
+          return (
+            <div key={t.id} className={`toast toast-${t.kind}`}>
+              <Icon size={18} aria-hidden="true" className="toast-icon" />
+              <span className="toast-message">{t.message}</span>
+              {t.action && (
+                <button
+                  type="button"
+                  className="toast-action"
+                  onClick={() => {
+                    t.action?.onClick()
+                    dismiss()
+                  }}
+                >
+                  {t.action.label}
+                </button>
+              )}
+              <button type="button" className="toast-close" aria-label="Dismiss" onClick={dismiss}>
+                <X size={16} aria-hidden="true" />
+              </button>
+            </div>
+          )
+        })}
       </div>
       {request && (
         <div className="modal-backdrop" onClick={() => answer(false)}>
