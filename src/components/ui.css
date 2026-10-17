@@ -939,8 +939,9 @@ table.data.table-compact td {
 }
 /* A transaction recorded as a reimbursement (paid out of someone's own pocket): a faint amber wash and edge, so it
  * stands out in a long list without shouting. */
-/* Admin and project expense records: a month heading, then the dates inside it. Each date group is blue or green in turn, and its
-   rows alternate light and a little deeper, so neighbouring groups cannot be mistaken for each other. Reimbursements stay amber. */
+/* Grouped records (Admin and Project expenses, Activity by user): a month heading, then the dates inside it. Date groups are blue and
+   white/cream in turn, and the rows of a group alternate light and a little deeper, so neighbouring groups cannot be mistaken for
+   each other. Reimbursements stay amber, deeper than the cream. */
 table.data tr.expense-month-group-row > td {
   background: color-mix(in srgb, var(--ink) 13%, var(--paper));
   font-size: 15px;
@@ -952,7 +953,7 @@ table.data tr.expense-date-group-row.grp-head-0 > td {
   background: color-mix(in srgb, var(--blue) 24%, var(--paper));
 }
 table.data tr.expense-date-group-row.grp-head-1 > td {
-  background: color-mix(in srgb, var(--green) 20%, var(--paper));
+  background: color-mix(in srgb, var(--ink) 8%, var(--paper-2));
 }
 table.data tr.grp-row.grp-seg-0.grp-alt-0 > td {
   background: color-mix(in srgb, var(--blue) 5%, var(--paper));
@@ -961,16 +962,16 @@ table.data tr.grp-row.grp-seg-0.grp-alt-1 > td {
   background: color-mix(in srgb, var(--blue) 12%, var(--paper));
 }
 table.data tr.grp-row.grp-seg-1.grp-alt-0 > td {
-  background: color-mix(in srgb, var(--green) 5%, var(--paper));
+  background: var(--paper);
 }
 table.data tr.grp-row.grp-seg-1.grp-alt-1 > td {
-  background: color-mix(in srgb, var(--green) 13%, var(--paper));
+  background: var(--paper-2);
 }
 table.data tr.grp-row.row-reimb.grp-alt-0 > td {
-  background: color-mix(in srgb, var(--amber) 13%, var(--paper));
+  background: color-mix(in srgb, var(--amber) 22%, var(--paper));
 }
 table.data tr.grp-row.row-reimb.grp-alt-1 > td {
-  background: color-mix(in srgb, var(--amber) 25%, var(--paper));
+  background: color-mix(in srgb, var(--amber) 34%, var(--paper));
 }
 /* A trip row and the heading of its entries stay in view while that trip's entries scroll: the row sticks under the table header,
    the heading under the row. Each trip is its own table section, so they let go when the trip ends. */
@@ -1005,14 +1006,14 @@ table.data.entry-table tbody tr:nth-child(even) > td {
 }
 /* A reimbursement entry is amber; its rows alternate between a lighter and a deeper amber, so they still read as alternating. */
 table.data.entry-table tbody tr.row-reimb:nth-child(odd) > td {
-  background: color-mix(in srgb, var(--amber) 11%, var(--paper));
+  background: color-mix(in srgb, var(--amber) 20%, var(--paper));
 }
 table.data.entry-table tbody tr.row-reimb:nth-child(even) > td {
-  background: color-mix(in srgb, var(--amber) 24%, var(--paper));
+  background: color-mix(in srgb, var(--amber) 32%, var(--paper));
 }
 /* Every other row, where a list asks for it. */
 table.data tr.row-alt > td {
-  background: color-mix(in srgb, var(--accent) 6%, var(--paper));
+  background: var(--paper-2);
 }
 table.data tr.row-reimb > td {
   background: color-mix(in srgb, var(--amber) 11%, transparent);

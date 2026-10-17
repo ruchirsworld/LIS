@@ -57,7 +57,7 @@ BT
 12.6499999999999986 TL
 0.439 0.424 0.384 rg
 56.6929133858267775 371.3388188976377364 Td
-(Laavin Internal System, version 2.1.26) Tj
+(Laavin Internal System, version 2.1.27) Tj
 ET
 BT
 /F1 11 Tf
@@ -4443,7 +4443,7 @@ endobj
 endobj
 42 0 obj
 <<
-/Length 10018
+/Length 10032
 >>
 stream
 0.5669291338582678 w
@@ -4512,10 +4512,10 @@ BT
 0.165 0.173 0.161 rg
 70.8661417322834666 604.0632283464566399 Td
 (The Admin and Project expense records, and Activity by user, are grouped by month and, inside each) Tj
-T* (month, by date. Click a month or a date to fold it. Each date group is blue or green in turn and its rows) Tj
-T* (alternate light and slightly deeper, so one date is easy to tell from the next. Reimbursements stay) Tj
-T* (amber. In Trip Records, the trip row and the heading of its entries stay at the top while you scroll) Tj
-T* (through that trip's entries.) Tj
+T* (month, by date. Click a month or a date to fold it. Each date group is blue, then white or cream, in turn,) Tj
+T* (and its rows alternate light and slightly deeper, so one date is easy to tell from the next.) Tj
+T* (Reimbursements stay amber. In Trip Records, the trip row and the heading of its entries stay at the top) Tj
+T* (while you scroll through that trip's entries.) Tj
 ET
 0.97 0.95 0.91 rg
 60.944881889763785 523.2758267716534419 m
@@ -6541,7 +6541,7 @@ endobj
 70 0 obj
 <<
 /Producer (jsPDF 4.2.1)
-/CreationDate (D:20261017170520+05'30')
+/CreationDate (D:20261017171635+05'30')
 >>
 endobj
 71 0 obj
@@ -6555,8 +6555,8 @@ endobj
 xref
 0 72
 0000000000 65535 f 
-0000203118 00000 n 
-0000252465 00000 n 
+0000203132 00000 n 
+0000252479 00000 n 
 0000000015 00000 n 
 0000000152 00000 n 
 0000001383 00000 n 
@@ -6597,42 +6597,42 @@ xref
 0000137773 00000 n 
 0000147733 00000 n 
 0000147872 00000 n 
-0000157944 00000 n 
-0000158083 00000 n 
-0000168289 00000 n 
-0000168428 00000 n 
-0000170015 00000 n 
-0000170154 00000 n 
-0000175524 00000 n 
-0000175663 00000 n 
-0000189433 00000 n 
-0000189572 00000 n 
-0000196253 00000 n 
-0000196392 00000 n 
-0000203348 00000 n 
-0000203474 00000 n 
-0000203605 00000 n 
-0000203739 00000 n 
-0000203877 00000 n 
-0000204001 00000 n 
-0000204130 00000 n 
-0000204262 00000 n 
-0000204398 00000 n 
-0000204526 00000 n 
-0000204653 00000 n 
-0000204782 00000 n 
-0000204915 00000 n 
-0000205017 00000 n 
-0000205113 00000 n 
-0000252729 00000 n 
-0000252815 00000 n 
+0000157958 00000 n 
+0000158097 00000 n 
+0000168303 00000 n 
+0000168442 00000 n 
+0000170029 00000 n 
+0000170168 00000 n 
+0000175538 00000 n 
+0000175677 00000 n 
+0000189447 00000 n 
+0000189586 00000 n 
+0000196267 00000 n 
+0000196406 00000 n 
+0000203362 00000 n 
+0000203488 00000 n 
+0000203619 00000 n 
+0000203753 00000 n 
+0000203891 00000 n 
+0000204015 00000 n 
+0000204144 00000 n 
+0000204276 00000 n 
+0000204412 00000 n 
+0000204540 00000 n 
+0000204667 00000 n 
+0000204796 00000 n 
+0000204929 00000 n 
+0000205031 00000 n 
+0000205127 00000 n 
+0000252743 00000 n 
+0000252829 00000 n 
 trailer
 <<
 /Size 72
 /Root 71 0 R
 /Info 70 0 R
-/ID [ <E2C9802AE3C6F38F651E2EE3F58E36D0> <E2C9802AE3C6F38F651E2EE3F58E36D0> ]
+/ID [ <E8ABCEF28D4A423541C714B8AED288FA> <E8ABCEF28D4A423541C714B8AED288FA> ]
 >>
 startxref
-252919
+252933
 %%EOF
