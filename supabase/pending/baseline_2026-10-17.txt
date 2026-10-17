@@ -25,3 +25,5 @@ wage_payments                  23    104535
 Applied on 2026-10-17 (migration phase3_on_behalf_trip_dates). After: every table above identical (rows and totals); new on_behalf_of / duplicate_reason columns empty on all existing rows; trigger trg_check_trip_entry_date present.
 
 Phase 4 migration (phase4_trash_and_reviews) applied on 2026-10-17. After: every table above identical in rows and totals (expense_reimbursements 2 rows, 3295 also unchanged); trashed rows 0; record_reviews 0; 3 functions, 7 zz_trash_unpost triggers, 7 read policies hiding trashed rows. Guard test (rolled back): a reconciled transfer and a loan with a reconciled payment are both refused.
+
+Phase 5 migration (phase5_activity_feed_duplicates) applied on 2026-10-17. After: every table above identical in rows and totals; duplicate_dismissals (new) 0 rows; functions activity_feed and possible_duplicates present.
