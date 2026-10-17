@@ -35,7 +35,15 @@ function todayStr() {
   return new Date().toISOString().slice(0, 10)
 }
 
-const COL_SPAN = 10
+const COL_SPAN = 8
+
+const DAY_MS = 86400000
+/** Days a trip took, counting both its first and last day; an open trip counts up to today. */
+function tripDays(start: string, end: string | null): number {
+  const to = end ?? new Date().toISOString().slice(0, 10)
+  const days = Math.round((Date.UTC(+to.slice(0, 4), +to.slice(5, 7) - 1, +to.slice(8, 10)) - Date.UTC(+start.slice(0, 4), +start.slice(5, 7) - 1, +start.slice(8, 10))) / DAY_MS) + 1
+  return Math.max(1, days)
+}
 
 /** The month a trip belongs to: the one it started in. */
 const monthOf = (date: string) => date.slice(0, 7)
@@ -244,8 +252,13 @@ export function TripRecordsTable() {
     }
   }
 
-  const travelerName = (id: string | null) => (id ? profiles?.find((p) => p.id === id)?.name ?? '—' : '—')
   const projectName = (id: string | null) => (id ? projects?.find((p) => p.id === id)?.name ?? '—' : '—')
+  const locationOf = (t: Trip) => (t.project_id ? projects?.find((p) => p.id === t.project_id)?.project_location ?? '' : '')
+  // Who travelled: the person named on the trip, and anyone else who logged an entry on it.
+  const travellersOf = (t: Trip): string[] => {
+    const ids = [t.traveler_id, ...(expenses ?? []).filter((e) => e.trip_id === t.id).map((e) => e.created_by)]
+    return [...new Set(ids.filter((id): id is string => !!id))].map((id) => profiles?.find((p) => p.id === id)?.name ?? '—')
+  }
   const subHeadName = (id: string | null) => (id ? subHeads?.find((s) => s.id === id)?.name ?? '—' : '—')
 
   const expensesByTrip = (tripId: string) => (expenses ?? []).filter((e) => e.trip_id === tripId)
@@ -264,7 +277,8 @@ export function TripRecordsTable() {
           t.status,
           t.start_date,
           t.end_date,
-          travelerName(t.traveler_id),
+          locationOf(t),
+          ...travellersOf(t),
           projectName(t.project_id),
           ...expensesByTrip(t.id).flatMap((e) => [e.display_id, e.description, e.remarks, e.amount]),
         ]))
@@ -276,12 +290,10 @@ export function TripRecordsTable() {
     rangeFilteredTrips,
     {
       id: (t) => t.display_id,
+      location: (t) => locationOf(t),
       name: (t) => t.name,
-      traveler: (t) => travelerName(t.traveler_id),
-      project: (t) => projectName(t.project_id),
+      traveler: (t) => travellersOf(t).join(', '),
       start: (t) => t.start_date,
-      end: (t) => t.end_date,
-      status: (t) => t.status,
       total: (t) => tripTotal(t.id),
     },
     'start',
@@ -317,14 +329,16 @@ export function TripRecordsTable() {
   const exportSections: ExportSection[] = [
     {
       title: 'Trip records',
-      columns: ['ID', 'Trip', 'Traveler', 'Project', 'Start', 'End', 'Status', 'Total'],
+      columns: ['ID', 'Location', 'Purpose', 'Project', 'From', 'To', 'Days', 'Travellers', 'Status', 'Total'],
       rows: sortedTrips.map((t) => [
         t.display_id ?? '',
+        locationOf(t),
         t.name,
-        travelerName(t.traveler_id),
         projectName(t.project_id),
         fmtDate(t.start_date),
         t.end_date ? fmtDate(t.end_date) : '—',
+        tripDays(t.start_date, t.end_date),
+        travellersOf(t).join(', '),
         t.status,
         tripTotal(t.id),
       ]),
@@ -348,21 +362,19 @@ export function TripRecordsTable() {
       </div>
 
       <SpendBySource expenses={shownExpenses} label="All trips shown, spent via" />
-      <TableSearch value={search} onChange={setSearch} placeholder="Search trips by ID, name, traveler, project or any entry on them…" />
+      <TableSearch value={search} onChange={setSearch} placeholder="Search trips by ID, location, purpose, traveller, project or any entry on them…" />
 
       <TableScroll>
         <table className="data table-compact">
           <thead>
             <tr>
               <th></th>
-              <SortableTh label="ID" sortKey="id" activeKey={sortKey} direction={direction} onSort={toggleSort} />
-              <SortableTh label="Trip" sortKey="name" activeKey={sortKey} direction={direction} onSort={toggleSort} />
-              <SortableTh label="Traveler" sortKey="traveler" activeKey={sortKey} direction={direction} onSort={toggleSort} />
-              <SortableTh label="Project" sortKey="project" activeKey={sortKey} direction={direction} onSort={toggleSort} />
-              <SortableTh label="Start" sortKey="start" activeKey={sortKey} direction={direction} onSort={toggleSort} />
-              <SortableTh label="End" sortKey="end" activeKey={sortKey} direction={direction} onSort={toggleSort} />
-              <SortableTh label="Status" sortKey="status" activeKey={sortKey} direction={direction} onSort={toggleSort} />
-              <SortableTh label="Total" sortKey="total" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
+              <SortableTh label="Trip ID" sortKey="id" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Location" sortKey="location" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Purpose" sortKey="name" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Dates (days)" sortKey="start" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Traveller" sortKey="traveler" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Amount" sortKey="total" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
               <th></th>
             </tr>
           </thead>
@@ -415,13 +427,27 @@ export function TripRecordsTable() {
                         {isExpanded ? '▾' : '▸'}
                       </button>
                     </td>
-                    <td>{t.display_id ?? '—'}</td>
-                    <td>{t.name}</td>
-                    <td>{travelerName(t.traveler_id)}</td>
-                    <td>{projectName(t.project_id)}</td>
-                    <td>{fmtDate(t.start_date)}</td>
-                    <td>{t.end_date ? fmtDate(t.end_date) : '—'}</td>
-                    <td>{t.status}</td>
+                    <td>
+                      {t.display_id ?? '—'}
+                      {t.status === 'open' && <div className="retention-note">open</div>}
+                    </td>
+                    <td>{locationOf(t) || '—'}</td>
+                    <td>
+                      {t.name}
+                      {t.project_id && <div className="retention-note">{projectName(t.project_id)}</div>}
+                    </td>
+                    <td>
+                      {fmtDate(t.start_date)} – {t.end_date ? fmtDate(t.end_date) : 'ongoing'}
+                      <div className="retention-note">
+                        {tripDays(t.start_date, t.end_date)} day{tripDays(t.start_date, t.end_date) === 1 ? '' : 's'}
+                        {t.end_date ? '' : ' so far'}
+                      </div>
+                    </td>
+                    <td>
+                      {travellersOf(t).map((n) => (
+                        <div key={n}>{n}</div>
+                      ))}
+                    </td>
                     <td className="amt">{fmt(tripTotal(t.id))}</td>
                     <td style={{ width: 40, textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
                       <RowMenu
@@ -481,7 +507,7 @@ export function TripRecordsTable() {
                         ) : (
                           <>
                           <SpendBySource expenses={tripExpenses} style={{ marginTop: 0 }} />
-                          <table className="data">
+                          <table className="data entry-table">
                             <thead>
                               <tr>
                                 <th>Date</th>

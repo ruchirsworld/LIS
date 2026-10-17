@@ -1,6 +1,6 @@
 # LIS changes since v2.0.1
 
-Version 2.0.1 was released on 3 September 2026. This list covers everything after it, up to 2.1.22. It is put together from the project history, grouped by area. Version numbers are shown where a release carried one.
+Version 2.0.1 was released on 3 September 2026. This list covers everything after it, up to 2.1.23. It is put together from the project history, grouped by area. Version numbers are shown where a release carried one.
 
 ## 2.0.2 – 2.0.3 (3 – 4 September)
 
@@ -166,3 +166,7 @@ Version 2.0.1 was released on 3 September 2026. This list covers everything afte
 ## 2.1.22 (17 October): trip ID format, trip details in the menu
 - **Trip IDs are now TRP-#/mmyy** (for example TRP-3/1026), still numbered within the month the trip starts in and renumbered when the start date moves to another month. Existing trips were renumbered (database change).
 - **Trip Records:** the arrow on a trip shows only its entries. The trip's own details (traveler, project, dates, who recorded it) are under "Details" in the trip's menu. The month headings are slightly smaller.
+
+## 2.1.23 (17 October): trip row layout
+- Each trip row shows Trip ID, Location (the project's location), Purpose (the trip name, with its project under it), Dates with the number of days (an open trip counts up to today), Traveller(s) and Amount. When more than one person travelled (the person on the trip plus anyone else who logged an entry on it), every name is shown. The search and the exports cover the new columns.
+- The entries under an opened trip are shaded in alternate colours (white and a light blue tint), different from the green tint on the trip rows.

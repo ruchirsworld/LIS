@@ -939,6 +939,16 @@ table.data.table-compact td {
 }
 /* A transaction recorded as a reimbursement (paid out of someone's own pocket): a faint amber wash and edge, so it
  * stands out in a long list without shouting. */
+/* The entries inside an opened trip: alternate rows in a blue tint, so they do not look like the trip rows (green tint). */
+table.data.entry-table tbody tr:nth-child(odd) > td {
+  background: var(--paper);
+}
+table.data.entry-table tbody tr:nth-child(even) > td {
+  background: color-mix(in srgb, var(--blue) 10%, var(--paper));
+}
+table.data.entry-table tbody tr.row-reimb > td {
+  background: color-mix(in srgb, var(--amber) 11%, var(--paper));
+}
 /* Every other row, where a list asks for it. */
 table.data tr.row-alt > td {
   background: color-mix(in srgb, var(--accent) 6%, var(--paper));
