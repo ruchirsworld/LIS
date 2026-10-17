@@ -944,10 +944,14 @@ table.data.entry-table tbody tr:nth-child(odd) > td {
   background: var(--paper);
 }
 table.data.entry-table tbody tr:nth-child(even) > td {
-  background: color-mix(in srgb, var(--blue) 10%, var(--paper));
+  background-color: color-mix(in srgb, var(--blue) 14%, var(--paper));
 }
-table.data.entry-table tbody tr.row-reimb > td {
+/* A reimbursement entry is amber; its rows alternate between a lighter and a deeper amber, so they still read as alternating. */
+table.data.entry-table tbody tr.row-reimb:nth-child(odd) > td {
   background: color-mix(in srgb, var(--amber) 11%, var(--paper));
+}
+table.data.entry-table tbody tr.row-reimb:nth-child(even) > td {
+  background: color-mix(in srgb, var(--amber) 24%, var(--paper));
 }
 /* Every other row, where a list asks for it. */
 table.data tr.row-alt > td {

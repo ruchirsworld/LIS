@@ -1,6 +1,6 @@
 # LIS changes since v2.0.1
 
-Version 2.0.1 was released on 3 September 2026. This list covers everything after it, up to 2.1.23. It is put together from the project history, grouped by area. Version numbers are shown where a release carried one.
+Version 2.0.1 was released on 3 September 2026. This list covers everything after it, up to 2.1.24. It is put together from the project history, grouped by area. Version numbers are shown where a release carried one.
 
 ## 2.0.2 – 2.0.3 (3 – 4 September)
 
@@ -170,3 +170,6 @@ Version 2.0.1 was released on 3 September 2026. This list covers everything afte
 ## 2.1.23 (17 October): trip row layout
 - Each trip row shows Trip ID, Location (the project's location), Purpose (the trip name, with its project under it), Dates with the number of days (an open trip counts up to today), Traveller(s) and Amount. When more than one person travelled (the person on the trip plus anyone else who logged an entry on it), every name is shown. The search and the exports cover the new columns.
 - The entries under an opened trip are shaded in alternate colours (white and a light blue tint), different from the green tint on the trip rows.
+
+## 2.1.24 (17 October): shading of reimbursement entries
+- Under an opened trip, reimbursement entries alternate between a light and a deeper amber, so the alternating rows are still visible when every entry is a reimbursement. Other entries alternate between white and a light blue tint.
