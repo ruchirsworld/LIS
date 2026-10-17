@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Modal } from '../../components/Modal'
 import { VendorForm } from './VendorForm'
 import { VendorTable } from './VendorTable'
 import type { Database } from '../../types/database'
@@ -19,21 +20,20 @@ export function VendorsSection() {
         open={formOpen}
         onToggle={(e) => setFormOpen(e.currentTarget.open)}
       >
-        <summary>{editingVendor ? 'Edit vendor' : 'Add new vendor'}</summary>
-        <VendorForm
-          key={editingVendor?.id ?? 'new'}
-          editingVendor={editingVendor}
-          onDoneEditing={() => setEditingVendor(null)}
-        />
+        <summary>Add new vendor</summary>
+        <VendorForm key="new" editingVendor={null} onDoneEditing={() => {}} />
       </details>
+
+      {editingVendor && (
+        <Modal title="Edit vendor" onClose={() => setEditingVendor(null)}>
+          <VendorForm key={editingVendor.id} editingVendor={editingVendor} onDoneEditing={() => setEditingVendor(null)} />
+        </Modal>
+      )}
 
       <details className="toggle-section" style={{ marginTop: 12 }} open>
         <summary>Vendor list</summary>
         <VendorTable
-          onEdit={(v) => {
-            setFormOpen(true)
-            setEditingVendor(v)
-          }}
+          onEdit={(v) => setEditingVendor(v)}
         />
       </details>
     </details>

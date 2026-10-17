@@ -2,7 +2,10 @@ import { Fragment, useState } from 'react'
 import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
 import { TableScroll } from '../../components/TableScroll'
-import { RowMenu } from '../../components/RowMenu'
+import { RecordRow, useOpenRows } from '../../components/RecordRow'
+import { Modal } from '../../components/Modal'
+import { RecordDetails } from '../reports/RecordDetailModal'
+import { confirmAction } from '../../lib/feedback'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
 import { TableSearch, matchesSearch } from '../../components/TableSearch'
@@ -36,8 +39,19 @@ export function ReimbursementRecordsTable({ costCenter }: { costCenter?: string 
   const approveReimbursement = useApproveExpenseReimbursement()
 
   const [userId, setUserId] = useState('')
+  const openRows = useOpenRows()
   const [search, setSearch] = useState('')
   const [editingReimbursement, setEditingReimbursement] = useState<ExpenseReimbursement | null>(null)
+
+  async function removeReimbursement(r: ExpenseReimbursement) {
+    const ok = await confirmAction({
+      title: 'Delete reimbursement',
+      message: `Delete ${r.display_id ?? 'this reimbursement'} of ${fmt(r.amount)} dated ${fmtDate(r.date)}? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (ok) deleteReimbursement.mutate(r.id)
+  }
 
   const expenseOf = (r: ExpenseReimbursement) => expenses?.find((e) => e.id === r.expense_id)
   const vendorPaymentOf = (r: ExpenseReimbursement) =>
@@ -124,6 +138,7 @@ export function ReimbursementRecordsTable({ costCenter }: { costCenter?: string 
         <table className="data">
           <thead>
             <tr>
+              <th></th>
               <SortableTh label="ID" sortKey="id" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Date" sortKey="date" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="User" sortKey="user" activeKey={sortKey} direction={direction} onSort={toggleSort} />
@@ -138,20 +153,19 @@ export function ReimbursementRecordsTable({ costCenter }: { costCenter?: string 
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={9} className="empty-row">
+                <td colSpan={10} className="empty-row">
                   Loading…
                 </td>
               </tr>
             )}
             {!isLoading && (!sortedReimbursements || sortedReimbursements.length === 0) && (
               <tr>
-                <td colSpan={9} className="empty-row">
+                <td colSpan={10} className="empty-row">
                   No reimbursements recorded
                 </td>
               </tr>
             )}
             {pageRows?.map((r) => {
-              const expense = expenseOf(r)
               const user = userOf(r)
               const against = againstOf(r)
               const approver = approverOf(r)
@@ -159,7 +173,16 @@ export function ReimbursementRecordsTable({ costCenter }: { costCenter?: string 
               const canApprove = !isApproved && r.created_by !== profile?.id
               return (
                 <Fragment key={r.id}>
-                  <tr>
+                  <RecordRow
+                    expanded={openRows.isOpen(r.id)}
+                    onToggle={() => openRows.toggle(r.id)}
+                    colSpan={10}
+                    details={<RecordDetails sourceTable="expense_reimbursements" sourceId={r.id} />}
+                    extraItems={[{ label: 'Approve', disabled: !canApprove, onClick: () => approveReimbursement.mutate({ id: r.id, approverId: profile!.id }) }]}
+                    // An approved reimbursement is final: it can no longer be changed or deleted.
+                    onEdit={isApproved ? undefined : () => setEditingReimbursement(r)}
+                    onDelete={isApproved ? undefined : () => void removeReimbursement(r)}
+                  >
                     <td>{r.display_id ?? '—'}</td>
                     <td>{fmtDate(r.date)}</td>
                     <td>{user?.name ?? '—'}</td>
@@ -168,25 +191,7 @@ export function ReimbursementRecordsTable({ costCenter }: { costCenter?: string 
                     <td>{r.reference ?? '—'}</td>
                     <td>{r.payment_mode ?? '—'}</td>
                     <td>{isApproved ? `Approved · ${approver?.name ?? '—'}` : 'Pending'}</td>
-                    <td>
-                      <RowMenu
-                        items={[
-                          { label: 'Approve', disabled: !canApprove, onClick: () => approveReimbursement.mutate({ id: r.id, approverId: profile!.id }) },
-                          { label: 'Edit', disabled: isApproved, onClick: () => setEditingReimbursement(r) },
-                          { label: 'Remove', disabled: isApproved, onClick: () => deleteReimbursement.mutate(r.id) },
-                        ]}
-                      />
-                    </td>
-                  </tr>
-                  {editingReimbursement?.id === r.id && (expense || vendorPaymentOf(r)) && (
-                    <ExpenseReimbursementForm
-                      expenseId={expense?.id}
-                      due={0}
-                      editingReimbursement={editingReimbursement}
-                      colSpan={9}
-                      onClose={() => setEditingReimbursement(null)}
-                    />
-                  )}
+                  </RecordRow>
                 </Fragment>
               )
             })}
@@ -194,6 +199,22 @@ export function ReimbursementRecordsTable({ costCenter }: { costCenter?: string 
         </table>
       </TableScroll>
       <Pagination page={page} totalPages={totalPages} totalCount={totalCount} onChange={setPage} />
+
+      {editingReimbursement && (expenseOf(editingReimbursement) || vendorPaymentOf(editingReimbursement)) && (
+        <Modal title={`Edit reimbursement ${editingReimbursement.display_id ?? ''}`} onClose={() => setEditingReimbursement(null)}>
+          <table className="data">
+            <tbody>
+              <ExpenseReimbursementForm
+                expenseId={expenseOf(editingReimbursement)?.id}
+                due={0}
+                editingReimbursement={editingReimbursement}
+                colSpan={1}
+                onClose={() => setEditingReimbursement(null)}
+              />
+            </tbody>
+          </table>
+        </Modal>
+      )}
     </details>
   )
 }

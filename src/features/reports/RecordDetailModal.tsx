@@ -27,6 +27,12 @@ const READABLE = new Set([
   'staff_salary_advances',
   'trips',
   'account_openings',
+  'clients',
+  'projects',
+  'staff',
+  'vendors',
+  'bank_accounts',
+  'profiles',
 ])
 export const canShowRecord = (table: string | null | undefined) => !!table && READABLE.has(table)
 
@@ -96,22 +102,8 @@ const REF_SOURCES: Record<string, { table: string; select: string; label: (r: Re
   vendor_bill_payment_id: { table: 'vendor_bill_payments', select: 'display_id', label: (r) => String(r.display_id ?? '') },
 }
 
-/** Shows every detail of one record in a popup, so it can be checked without leaving the page. Read only. */
-export function RecordDetailModal({
-  title,
-  sourceTable,
-  sourceId,
-  recordedBy,
-  onClose,
-  onOpenScreen,
-}: {
-  title: string
-  sourceTable: string
-  sourceId: string
-  recordedBy?: string
-  onClose: () => void
-  onOpenScreen?: () => void
-}) {
+/** Every detail of one record, laid out as a list. Used inside a popup and when a row of a records list is opened with its arrow. Read only. */
+export function RecordDetails({ sourceTable, sourceId, recordedBy }: { sourceTable: string; sourceId: string; recordedBy?: string }) {
   const { data: vendors } = useVendors()
   const { data: clients } = useClients()
   const { data: projects } = useProjects()
@@ -193,7 +185,7 @@ export function RecordDetailModal({
   const createdAt = typeof row?.created_at === 'string' ? new Date(row.created_at as string) : null
 
   return (
-    <Modal title={title} onClose={onClose}>
+    <div>
       {isLoading && <div className="note">Loading…</div>}
       {!isLoading && (error || !row) && <div className="note" style={{ color: 'var(--red)' }}>Could not load this record. It may have been deleted.</div>}
       {row && (
@@ -260,6 +252,29 @@ export function RecordDetailModal({
           )}
         </>
       )}
+    </div>
+  )
+}
+
+/** Shows every detail of one record in a popup, so it can be checked without leaving the page. Read only. */
+export function RecordDetailModal({
+  title,
+  sourceTable,
+  sourceId,
+  recordedBy,
+  onClose,
+  onOpenScreen,
+}: {
+  title: string
+  sourceTable: string
+  sourceId: string
+  recordedBy?: string
+  onClose: () => void
+  onOpenScreen?: () => void
+}) {
+  return (
+    <Modal title={title} onClose={onClose}>
+      <RecordDetails sourceTable={sourceTable} sourceId={sourceId} recordedBy={recordedBy} />
       <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
         {onOpenScreen && (
           <Button type="button" variant="secondary" onClick={onOpenScreen}>

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Modal } from '../../components/Modal'
 import { StaffForm } from './StaffForm'
 import { StaffTable } from './StaffTable'
 import type { Database } from '../../types/database'
@@ -19,17 +20,20 @@ export function StaffSection() {
         open={formOpen}
         onToggle={(e) => setFormOpen(e.currentTarget.open)}
       >
-        <summary>{editingStaff ? 'Edit staff' : 'Add new staff'}</summary>
-        <StaffForm key={editingStaff?.id ?? 'new'} editingStaff={editingStaff} onDoneEditing={() => setEditingStaff(null)} />
+        <summary>Add new staff</summary>
+        <StaffForm key="new" editingStaff={null} onDoneEditing={() => {}} />
       </details>
+
+      {editingStaff && (
+        <Modal title="Edit staff" onClose={() => setEditingStaff(null)}>
+          <StaffForm key={editingStaff.id} editingStaff={editingStaff} onDoneEditing={() => setEditingStaff(null)} />
+        </Modal>
+      )}
 
       <details className="toggle-section" style={{ marginTop: 12 }} open>
         <summary>Staff list</summary>
         <StaffTable
-          onEdit={(s) => {
-            setFormOpen(true)
-            setEditingStaff(s)
-          }}
+          onEdit={(s) => setEditingStaff(s)}
         />
       </details>
     </details>

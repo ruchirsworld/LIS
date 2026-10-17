@@ -4,6 +4,14 @@ import type { DateRange } from '../calc/period'
 import type { Database } from '../../types/database'
 
 type TransferInsert = Database['public']['Tables']['transfers']['Insert']
+type TransferUpdate = Database['public']['Tables']['transfers']['Update']
+
+/** A transfer moves money between accounts, so everything that shows a balance is refreshed. */
+function refreshBalances(qc: ReturnType<typeof useQueryClient>) {
+  for (const key of ['transfers', 'ledger_lines', 'bank_lines', 'dashboard-kpis', 'trial_balance', 'books_health', 'gl_balances']) {
+    qc.invalidateQueries({ queryKey: [key] })
+  }
+}
 
 export function useTransfers(range: DateRange | null) {
   return useQuery({
@@ -31,6 +39,18 @@ export function useCreateTransfer() {
   })
 }
 
+export function useUpdateTransfer() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, patch }: { id: string; patch: TransferUpdate }) => {
+      const { data, error } = await supabase.from('transfers').update(patch).eq('id', id).select().single()
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => refreshBalances(qc),
+  })
+}
+
 export function useDeleteTransfer() {
   const qc = useQueryClient()
   return useMutation({
@@ -38,6 +58,6 @@ export function useDeleteTransfer() {
       const { error } = await supabase.from('transfers').delete().eq('id', id)
       if (error) throw error
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['transfers'] }),
+    onSuccess: () => refreshBalances(qc),
   })
 }

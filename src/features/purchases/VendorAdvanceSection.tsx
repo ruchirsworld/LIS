@@ -2,18 +2,105 @@ import { useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
 import { SearchableSelect } from '../../components/SearchableSelect'
-import { PaymentAccountPicker, bankAccountIdOf, paymentModeOf } from '../../components/PaymentAccountPicker'
+import { PaymentAccountPicker, bankAccountIdOf, paymentModeOf, CASH_ACCOUNT, REIMBURSE_ACCOUNT } from '../../components/PaymentAccountPicker'
 import { TableScroll } from '../../components/TableScroll'
-import { RowMenu } from '../../components/RowMenu'
+import { RecordRow, useOpenRows } from '../../components/RecordRow'
+import { Modal } from '../../components/Modal'
+import { RecordDetails } from '../reports/RecordDetailModal'
+import type { Database } from '../../types/database'
 import { useVendors } from '../../lib/queries/masters'
-import { useCreateVendorAdvance, useDeleteVendorAdvance, useVendorAdvances, useVendorBillPayments } from '../../lib/queries/purchases'
+import { useCreateVendorAdvance, useDeleteVendorAdvance, useUpdateVendorAdvance, useVendorAdvances, useVendorBillPayments } from '../../lib/queries/purchases'
 import { advanceBalance, advanceUsed } from '../../lib/calc/vendorAdvances'
 import { fmt, fmtDate, parseINR } from '../../lib/calc/format'
 import { getErrorMessage } from '../../lib/errors'
 import { confirmAction, toast } from '../../lib/feedback'
 
+type VendorAdvance = Database['public']['Tables']['vendor_advances']['Row']
+
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
+}
+
+/** Changes one advance, in a popup. Changing the amount or date re-sets the advance against the vendor's bills. */
+function EditAdvanceForm({ advance, onDone }: { advance: VendorAdvance; onDone: () => void }) {
+  const { data: vendors } = useVendors()
+  const update = useUpdateVendorAdvance()
+  const [vendorId, setVendorId] = useState(advance.vendor_id)
+  const [date, setDate] = useState(advance.date)
+  const [amount, setAmount] = useState(String(advance.amount))
+  const [accountId, setAccountId] = useState(advance.payment_mode === 'Reimbursement' ? REIMBURSE_ACCOUNT : advance.bank_account_id ?? CASH_ACCOUNT)
+  const [reference, setReference] = useState(advance.reference ?? '')
+  const [notes, setNotes] = useState(advance.notes ?? '')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    setError(null)
+    const amt = parseINR(amount)
+    if (!vendorId) return setError('Pick the vendor.')
+    if (amt <= 0) return setError('Enter the amount paid.')
+    if (!accountId) return setError('Pick the account the money was paid from.')
+    setSubmitting(true)
+    try {
+      await update.mutateAsync({
+        id: advance.id,
+        patch: {
+          vendor_id: vendorId,
+          date,
+          amount: amt,
+          reference: reference.trim() || null,
+          notes: notes.trim() || null,
+          payment_mode: paymentModeOf(accountId),
+          bank_account_id: bankAccountIdOf(accountId),
+        },
+      })
+      onDone()
+    } catch (err) {
+      setError(getErrorMessage(err, 'Could not save the changes.'))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <form className="form-grid" onSubmit={submit}>
+      <div className="field">
+        <label>Vendor</label>
+        <SearchableSelect items={vendors} value={vendorId} onChange={setVendorId} getId={(v) => v.id} getLabel={(v) => v.name} getSearchValue={(v) => `${v.name} ${v.phone ?? ''}`} placeholder="— Select vendor —" />
+      </div>
+      <div className="field">
+        <label>Amount paid (₹)</label>
+        <CurrencyInput value={amount} onValueChange={setAmount} required />
+      </div>
+      <div className="field">
+        <label>Date paid</label>
+        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+      </div>
+      <div className="field">
+        <label>Reference</label>
+        <input type="text" value={reference} onChange={(e) => setReference(e.target.value)} />
+      </div>
+      <PaymentAccountPicker className="full" value={accountId} onChange={setAccountId} allowReimbursement />
+      <div className="field full">
+        <label>What it is for (optional)</label>
+        <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} />
+      </div>
+      <div className="field full" style={{ display: 'flex', gap: 8 }}>
+        <Button type="submit" disabled={submitting}>
+          {submitting ? 'Saving…' : 'Save changes'}
+        </Button>
+        <Button type="button" variant="secondary" onClick={onDone}>
+          Cancel
+        </Button>
+      </div>
+      {error && (
+        <div className="note full" role="alert" style={{ color: 'var(--red)' }}>
+          {error}
+        </div>
+      )}
+    </form>
+  )
 }
 
 /** Money paid to a vendor before there is a bill. When the vendor's bill is entered, the oldest advance is set
@@ -24,6 +111,8 @@ export function VendorAdvanceSection() {
   const { data: payments } = useVendorBillPayments()
   const createAdvance = useCreateVendorAdvance()
   const deleteAdvance = useDeleteVendorAdvance()
+  const openRows = useOpenRows()
+  const [editing, setEditing] = useState<VendorAdvance | null>(null)
 
   const [vendorId, setVendorId] = useState('')
   const [date, setDate] = useState(todayStr())
@@ -130,6 +219,7 @@ export function VendorAdvanceSection() {
         <table className="data">
           <thead>
             <tr>
+              <th></th>
               <th>ID</th>
               <th>Date</th>
               <th>Vendor</th>
@@ -143,14 +233,14 @@ export function VendorAdvanceSection() {
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={8} className="empty-row">
+                <td colSpan={9} className="empty-row">
                   Loading…
                 </td>
               </tr>
             )}
             {!isLoading && (advances ?? []).length === 0 && (
               <tr>
-                <td colSpan={8} className="empty-row">
+                <td colSpan={9} className="empty-row">
                   No advances recorded
                 </td>
               </tr>
@@ -158,7 +248,15 @@ export function VendorAdvanceSection() {
             {(advances ?? []).map((a) => {
               const used = advanceUsed(a, payments ?? [])
               return (
-                <tr key={a.id}>
+                <RecordRow
+                  key={a.id}
+                  expanded={openRows.isOpen(a.id)}
+                  onToggle={() => openRows.toggle(a.id)}
+                  colSpan={9}
+                  details={<RecordDetails sourceTable="vendor_advances" sourceId={a.id} />}
+                  onEdit={() => setEditing(a)}
+                  onDelete={() => void remove(a.id, used)}
+                >
                   <td>{a.display_id ?? '—'}</td>
                   <td>{fmtDate(a.date)}</td>
                   <td>{vendorName(a.vendor_id)}</td>
@@ -166,15 +264,18 @@ export function VendorAdvanceSection() {
                   <td className="amt">{fmt(used)}</td>
                   <td className="amt">{fmt(advanceBalance(a, payments ?? []))}</td>
                   <td>{a.reference ?? '—'}</td>
-                  <td>
-                    <RowMenu items={[{ label: 'Remove', onClick: () => void remove(a.id, used) }]} />
-                  </td>
-                </tr>
+                </RecordRow>
               )
             })}
           </tbody>
         </table>
       </TableScroll>
+
+      {editing && (
+        <Modal title={`Edit advance ${editing.display_id ?? ''}`} onClose={() => setEditing(null)}>
+          <EditAdvanceForm advance={editing} onDone={() => setEditing(null)} />
+        </Modal>
+      )}
     </details>
   )
 }

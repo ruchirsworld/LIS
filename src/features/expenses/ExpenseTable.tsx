@@ -6,6 +6,8 @@ import { SearchableSelect } from '../../components/SearchableSelect'
 import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
 import { TableScroll } from '../../components/TableScroll'
+import { RowMenu } from '../../components/RowMenu'
+import { Modal } from '../../components/Modal'
 import { CostCenterPicker } from '../../components/CostCenterPicker'
 import { useSort } from '../../lib/useSort'
 import { PeriodFilterToggle } from '../../components/PeriodFilterToggle'
@@ -36,7 +38,7 @@ import type { Database } from '../../types/database'
 
 type ExpenseReimbursement = Database['public']['Tables']['expense_reimbursements']['Row']
 
-const COL_SPAN = 7
+const COL_SPAN = 8
 
 export function ExpenseTable({
   costCenterFilter,
@@ -142,6 +144,16 @@ export function ExpenseTable({
     if (!ok) return
     await bulkDeleteExpenses.mutateAsync(Array.from(selectedIds))
     clearSelection()
+  }
+
+  async function removeOne(e: NonNullable<typeof expenses>[number]) {
+    const ok = await confirmAction({
+      title: 'Delete expense',
+      message: `Delete ${e.display_id ?? 'this expense'} of ${fmt(e.amount)} dated ${fmtDate(e.date)}? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (ok) deleteExpense.mutate(e.id)
   }
 
   function closePayForm() {
@@ -340,6 +352,7 @@ export function ExpenseTable({
               ) : (
                 <SortableTh label="Cost center" sortKey="costCenter" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               )}
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -415,15 +428,17 @@ export function ExpenseTable({
                         </div>
                       )}
                     </td>
+                    <td style={{ width: 40, textAlign: 'right' }}>
+                      <RowMenu
+                        items={[
+                          { label: 'Record reimbursement', disabled: !e.reimbursable || due <= 0, onClick: () => openAddReimbursement(e.id) },
+                          ...(canEdit ? [{ label: 'Edit', onClick: () => setEditingId(e.id) }] : []),
+                          ...(canDelete ? [{ label: 'Delete', onClick: () => void removeOne(e) }] : []),
+                        ]}
+                      />
+                    </td>
                   </tr>
-                  {isExpanded && editingId === e.id && (
-                    <tr className="pay-form-row">
-                      <td colSpan={COL_SPAN}>
-                        <ExpenseForm editingExpense={e} onDoneEditing={() => setEditingId(null)} />
-                      </td>
-                    </tr>
-                  )}
-                  {isExpanded && editingId !== e.id && (
+                  {isExpanded && (
                     <tr className="pay-form-row">
                       <td colSpan={COL_SPAN}>
                         <div className="row-menu-info" style={{ padding: 0, border: 'none' }}>
@@ -512,26 +527,6 @@ export function ExpenseTable({
                             })}
                           </div>
                         )}
-                        <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
-                          {canEdit && (
-                            <button type="button" className="pay-btn" onClick={() => setEditingId(e.id)}>
-                              Edit
-                            </button>
-                          )}
-                          {canDelete && (
-                            <button type="button" className="btn danger-link" onClick={() => deleteExpense.mutate(e.id)}>
-                              Remove
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            className="pay-btn"
-                            disabled={!e.reimbursable || due <= 0}
-                            onClick={() => openAddReimbursement(e.id)}
-                          >
-                            Record reimbursement
-                          </button>
-                        </div>
                       </td>
                     </tr>
                   )}
@@ -553,6 +548,12 @@ export function ExpenseTable({
         </table>
       </TableScroll>
       <Pagination page={page} totalPages={totalPages} totalCount={totalCount} onChange={setPage} />
+
+      {editingId && expenses?.find((x) => x.id === editingId) && (
+        <Modal title={`Edit expense ${expenses.find((x) => x.id === editingId)?.display_id ?? ''}`} onClose={() => setEditingId(null)}>
+          <ExpenseForm editingExpense={expenses.find((x) => x.id === editingId) ?? null} onDoneEditing={() => setEditingId(null)} />
+        </Modal>
+      )}
     </details>
   )
 }

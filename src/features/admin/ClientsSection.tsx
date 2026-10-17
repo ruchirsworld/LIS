@@ -1,4 +1,8 @@
 import { useState, type FormEvent } from 'react'
+import { RecordRow, useOpenRows } from '../../components/RecordRow'
+import { Modal } from '../../components/Modal'
+import { confirmAction } from '../../lib/feedback'
+import { RecordDetails } from '../reports/RecordDetailModal'
 import { Button } from '../../components/ui'
 import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
@@ -50,6 +54,7 @@ export function ClientsSection() {
   const updateClient = useUpdateClient()
   const setHold = useSetClientGstHold()
   const deleteClient = useDeleteClient()
+  const openRows = useOpenRows()
 
   const [formOpen, setFormOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -78,6 +83,16 @@ export function ClientsSection() {
     setEmail('')
     setGstOnProof(false)
     setApplyToExisting(false)
+  }
+
+  async function removeClient(c: NonNullable<typeof clients>[number]) {
+    const ok = await confirmAction({
+      title: 'Delete client',
+      message: `Delete ${c.name}? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (ok) deleteClient.mutate(c.id)
   }
 
   function startEdit(c: NonNullable<typeof clients>[number]) {
@@ -130,18 +145,8 @@ export function ClientsSection() {
     }
   }
 
-  return (
-    <details className="toggle-section">
-      <summary>Clients</summary>
-
-      <details
-        className="toggle-section"
-        style={{ marginTop: 16 }}
-        open={formOpen}
-        onToggle={(e) => setFormOpen(e.currentTarget.open)}
-      >
-        <summary>{editingId ? 'Edit client' : 'Add new client'}</summary>
-
+  const formBody = (
+    <>
       <form className="form-grid" onSubmit={handleSubmit} style={{ marginTop: 16 }}>
         <div className="field full">
           <label>Client name</label>
@@ -218,7 +223,24 @@ export function ClientsSection() {
           {formError}
         </div>
       )}
-      </details>
+    </>
+  )
+
+  return (
+    <details className="toggle-section">
+      <summary>Clients</summary>
+
+      {!editingId && (
+        <details className="toggle-section" style={{ marginTop: 16 }} open={formOpen} onToggle={(e) => setFormOpen(e.currentTarget.open)}>
+          <summary>Add new client</summary>
+          {formBody}
+        </details>
+      )}
+      {editingId && (
+        <Modal title="Edit client" onClose={resetForm}>
+          {formBody}
+        </Modal>
+      )}
 
       <details className="toggle-section" style={{ marginTop: 12 }} open>
         <summary>Client list</summary>
@@ -230,6 +252,7 @@ export function ClientsSection() {
         <table className="data">
           <thead>
             <tr>
+              <th></th>
               <SortableTh label="ID" sortKey="id" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Client" sortKey="name" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Client code" sortKey="code" activeKey={sortKey} direction={direction} onSort={toggleSort} />
@@ -245,20 +268,28 @@ export function ClientsSection() {
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={10} className="empty-row">
+                <td colSpan={11} className="empty-row">
                   Loading…
                 </td>
               </tr>
             )}
             {!isLoading && (!clients || clients.length === 0) && (
               <tr>
-                <td colSpan={10} className="empty-row">
+                <td colSpan={11} className="empty-row">
                   No clients yet — add your first one above
                 </td>
               </tr>
             )}
             {pageRows?.map((c) => (
-              <tr key={c.id}>
+              <RecordRow
+                key={c.id}
+                expanded={openRows.isOpen(c.id)}
+                onToggle={() => openRows.toggle(c.id)}
+                colSpan={11}
+                details={<RecordDetails sourceTable="clients" sourceId={c.id} />}
+                onEdit={() => startEdit(c)}
+                onDelete={() => void removeClient(c)}
+              >
                 <td>{c.display_id ?? '—'}</td>
                 <td>{c.name}</td>
                 <td>{c.client_code ?? '—'}</td>
@@ -268,15 +299,7 @@ export function ClientsSection() {
                 <td>{c.pincode ?? '—'}</td>
                 <td>{c.gst ?? '—'}</td>
                 <td>{c.email ?? '—'}</td>
-                <td>
-                  <button type="button" className="pay-btn" onClick={() => startEdit(c)}>
-                    Edit
-                  </button>
-                  <button type="button" className="btn danger-link" onClick={() => deleteClient.mutate(c.id)}>
-                    Remove
-                  </button>
-                </td>
-              </tr>
+              </RecordRow>
             ))}
           </tbody>
         </table>

@@ -2,14 +2,18 @@ import { activateProps } from '../../lib/a11y'
 import { Fragment, useEffect, useState } from 'react'
 import { ModuleHeader, KpiCard } from '../../components/ui'
 import { SearchableSelect } from '../../components/SearchableSelect'
+import { RowMenu } from '../../components/RowMenu'
+import { Modal } from '../../components/Modal'
+import { useAuth } from '../../lib/auth'
+import { confirmAction } from '../../lib/feedback'
 import { ReceiptLink } from '../../components/ReceiptLink'
 import { ExpenseForm } from '../expenses/ExpenseForm'
 import { VendorBillForm } from '../purchases/VendorBillForm'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
 import { useProjects, useClients, useVendors, useExpenseSubHeads, useStaff } from '../../lib/queries/masters'
-import { useExpenses } from '../../lib/queries/expenses'
-import { useVendorBills } from '../../lib/queries/purchases'
+import { useExpenses, useDeleteExpense } from '../../lib/queries/expenses'
+import { useVendorBills, useDeleteVendorBill } from '../../lib/queries/purchases'
 import { useInvoices, useInvoicePayments } from '../../lib/queries/invoices'
 import { useAllStaffAttendance, useAllStaffProjectAssignments } from '../../lib/queries/teamTracking'
 import { useHolidays } from '../../lib/queries/hr'
@@ -30,6 +34,10 @@ function todayStr() {
 }
 
 export function ProjectsPage() {
+  // Deleting is for Admin only.
+  const isAdmin = useAuth().profile?.role === 'admin'
+  const deleteBill = useDeleteVendorBill()
+  const deleteExpense = useDeleteExpense()
   const { data: projects } = useProjects()
   const { data: clients } = useClients()
   const { data: vendors } = useVendors()
@@ -365,6 +373,7 @@ export function ProjectsPage() {
                               <th>Vendor</th>
                               <th>Description</th>
                               <th style={{ textAlign: 'right' }}>Amount</th>
+                              <th></th>
                             </tr>
                           </thead>
                           <tbody>
@@ -393,17 +402,28 @@ export function ProjectsPage() {
                                       <td>{vendor?.name ?? '—'}</td>
                                       <td>{b.description ?? '—'}</td>
                                       <td className="amt">{fmt(billTotal(b))}</td>
+                                      <td style={{ width: 40, textAlign: 'right' }} onClick={(ev) => ev.stopPropagation()}>
+                                        <RowMenu
+                                          items={[
+                                            { label: 'Edit', onClick: () => setEditingBillId(b.id) },
+                                            ...(isAdmin
+                                              ? [
+                                                  {
+                                                    label: 'Delete',
+                                                    onClick: async () => {
+                                                      const ok = await confirmAction({ title: 'Delete vendor bill', message: `Delete bill ${b.display_id ?? ''}? Its payments go with it. This cannot be undone.`, confirmLabel: 'Delete', danger: true })
+                                                      if (ok) deleteBill.mutate(b.id)
+                                                    },
+                                                  },
+                                                ]
+                                              : []),
+                                          ]}
+                                        />
+                                      </td>
                                     </tr>
-                                    {isExpanded && editingBillId === b.id && (
+                                    {isExpanded && (
                                       <tr className="pay-form-row">
-                                        <td colSpan={5}>
-                                          <VendorBillForm editingBill={b} onDoneEditing={() => setEditingBillId(null)} />
-                                        </td>
-                                      </tr>
-                                    )}
-                                    {isExpanded && editingBillId !== b.id && (
-                                      <tr className="pay-form-row">
-                                        <td colSpan={5}>
+                                        <td colSpan={6}>
                                           <div className="row-menu-info" style={{ padding: 0, border: 'none' }}>
                                             <div>
                                               <strong>ID:</strong> {b.display_id ?? '—'}
@@ -429,9 +449,6 @@ export function ProjectsPage() {
                                               <strong>Receipt:</strong> {b.receipt_path ? <ReceiptLink path={b.receipt_path} /> : '—'}
                                             </div>
                                           </div>
-                                          <button type="button" className="pay-btn" style={{ marginTop: 8 }} onClick={() => setEditingBillId(b.id)}>
-                                            Edit
-                                          </button>
                                         </td>
                                       </tr>
                                     )}
@@ -480,6 +497,7 @@ export function ProjectsPage() {
                               <th>Date</th>
                               <th>Description</th>
                               <th style={{ textAlign: 'right' }}>Amount</th>
+                              <th></th>
                             </tr>
                           </thead>
                           <tbody>
@@ -512,17 +530,28 @@ export function ProjectsPage() {
                                       <td>{e.date ? fmtDate(e.date) : '—'}</td>
                                       <td>{e.description ?? '—'}</td>
                                       <td className="amt">{fmt(e.amount)}</td>
+                                      <td style={{ width: 40, textAlign: 'right' }} onClick={(ev) => ev.stopPropagation()}>
+                                        <RowMenu
+                                          items={[
+                                            { label: 'Edit', onClick: () => setEditingExpenseId(e.id) },
+                                            ...(isAdmin
+                                              ? [
+                                                  {
+                                                    label: 'Delete',
+                                                    onClick: async () => {
+                                                      const ok = await confirmAction({ title: 'Delete expense', message: `Delete ${e.display_id ?? 'this expense'} of ${fmt(e.amount)}? This cannot be undone.`, confirmLabel: 'Delete', danger: true })
+                                                      if (ok) deleteExpense.mutate(e.id)
+                                                    },
+                                                  },
+                                                ]
+                                              : []),
+                                          ]}
+                                        />
+                                      </td>
                                     </tr>
-                                    {isExpanded && editingExpenseId === e.id && (
+                                    {isExpanded && (
                                       <tr className="pay-form-row">
-                                        <td colSpan={4}>
-                                          <ExpenseForm editingExpense={e} onDoneEditing={() => setEditingExpenseId(null)} />
-                                        </td>
-                                      </tr>
-                                    )}
-                                    {isExpanded && editingExpenseId !== e.id && (
-                                      <tr className="pay-form-row">
-                                        <td colSpan={4}>
+                                        <td colSpan={5}>
                                           <div className="row-menu-info" style={{ padding: 0, border: 'none' }}>
                                             <div>
                                               <strong>ID:</strong> {e.display_id ?? '—'}
@@ -556,9 +585,6 @@ export function ProjectsPage() {
                                               <strong>Receipt:</strong> {e.receipt_path ? <ReceiptLink path={e.receipt_path} /> : '—'}
                                             </div>
                                           </div>
-                                          <button type="button" className="pay-btn" style={{ marginTop: 8 }} onClick={() => setEditingExpenseId(e.id)}>
-                                            Edit
-                                          </button>
                                         </td>
                                       </tr>
                                     )}
@@ -631,6 +657,17 @@ export function ProjectsPage() {
             </details>
           )}
         </>
+      )}
+
+      {editingBillId && (vendorBills ?? []).find((x) => x.id === editingBillId) && (
+        <Modal title="Edit vendor bill" onClose={() => setEditingBillId(null)}>
+          <VendorBillForm editingBill={(vendorBills ?? []).find((x) => x.id === editingBillId) ?? null} onDoneEditing={() => setEditingBillId(null)} inModal />
+        </Modal>
+      )}
+      {editingExpenseId && (expenses ?? []).find((x) => x.id === editingExpenseId) && (
+        <Modal title="Edit expense" onClose={() => setEditingExpenseId(null)}>
+          <ExpenseForm editingExpense={(expenses ?? []).find((x) => x.id === editingExpenseId) ?? null} onDoneEditing={() => setEditingExpenseId(null)} />
+        </Modal>
       )}
     </div>
   )

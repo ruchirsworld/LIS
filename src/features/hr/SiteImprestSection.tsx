@@ -30,6 +30,9 @@ import type { DateRange } from '../../lib/calc/reportPeriod'
 import { fmt, fmtDate, parseINR } from '../../lib/calc/format'
 import { getErrorMessage } from '../../lib/errors'
 import { TableSearch, matchesSearch } from '../../components/TableSearch'
+import { RecordRow, useOpenRows } from '../../components/RecordRow'
+import { Modal } from '../../components/Modal'
+import { RecordDetails } from '../reports/RecordDetailModal'
 import type { Database } from '../../types/database'
 
 type StaffImprestTransaction = Database['public']['Tables']['staff_imprest_transactions']['Row']
@@ -86,6 +89,7 @@ export function SiteImprestSection() {
   const [formError, setFormError] = useState<string | null>(null)
   const [paymentsRange, setPaymentsRange] = useState<DateRange | null>(null)
   const [recordSearch, setRecordSearch] = useState('')
+  const openRows = useOpenRows()
   const [requestBusyId, setRequestBusyId] = useState<string | null>(null)
   const [requestError, setRequestError] = useState<Record<string, string>>({})
   const [editingRequestId, setEditingRequestId] = useState<string | null>(null)
@@ -614,6 +618,7 @@ export function SiteImprestSection() {
               <table className="data">
                 <thead>
                   <tr>
+                    <th></th>
                     <th>Date</th>
                     <th>Type</th>
                     <th style={{ textAlign: 'right' }}>Amount</th>
@@ -624,127 +629,43 @@ export function SiteImprestSection() {
                 <tbody>
                   {recordsShown.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="empty-row">
+                      <td colSpan={6} className="empty-row">
                         No transactions recorded yet
                       </td>
                     </tr>
                   )}
                   {recordsShown.length > 0 && searchedRecords.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="empty-row">
+                      <td colSpan={6} className="empty-row">
                         Nothing matches your search
                       </td>
                     </tr>
                   )}
-                  {searchedRecords.map((t) =>
-                    editingTxnId === t.id ? (
-                      <Fragment key={t.id}>
-                        <tr>
-                          <td>
-                            <input
-                              type="date"
-                              aria-label="Date"
-                              value={txnDraft.date}
-                              onChange={(e) => setTxnDraft((d) => ({ ...d, date: e.target.value }))}
-                            />
-                          </td>
-                          <td>
-                            <select
-                              aria-label="Type"
-                              value={txnDraft.kind}
-                              onChange={(e) => {
-                                const k = e.target.value as 'advance' | 'return'
-                                setTxnDraft((d) => ({
-                                  ...d,
-                                  kind: k,
-                                  bankAccountId: k === 'return' && d.bankAccountId === REIMBURSE_ID ? '' : d.bankAccountId,
-                                }))
-                              }}
-                            >
-                              <option value="advance">Advance</option>
-                              <option value="return">Return</option>
-                            </select>
-                          </td>
-                          <td>
-                            <CurrencyInput
-                              value={txnDraft.amount}
-                              onValueChange={(v) => setTxnDraft((d) => ({ ...d, amount: v }))}
-                            />
-                          </td>
-                          <td></td>
-                        </tr>
-                        <tr>
-                          <td colSpan={5}>
-                            <PaymentAccountPicker
-                              style={{ marginBottom: 8 }}
-                              label={txnDraft.kind === 'return' ? 'Receiving account' : 'Payment account'}
-                              value={txnDraft.bankAccountId}
-                              onChange={(id) => setTxnDraft((d) => ({ ...d, bankAccountId: id }))}
-                              allowReimbursement={txnDraft.kind === 'advance'}
-                            />
-
-                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                              <Button type="button" disabled={txnBusyId === t.id} onClick={() => handleSaveTxn(t.id)}>
-                                Save
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="secondary"
-                                disabled={txnBusyId === t.id}
-                                onClick={() => setEditingTxnId(null)}
-                              >
-                                Cancel
-                              </Button>
-                            </div>
-                            {txnError[t.id] && (
-                              <div className="note" style={{ color: 'var(--red)', marginTop: 4 }}>
-                                {txnError[t.id]}
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      </Fragment>
-                    ) : (
-                      <tr key={t.id} className={t.reimbursable ? 'row-reimb' : undefined} title={t.reimbursable ? 'Recorded as reimbursement' : undefined}>
-                        <td>{fmtDate(t.date)}</td>
-                        <td>{t.kind === 'advance' ? 'Advance' : 'Return'}</td>
-                        <td className="amt">{fmt(t.amount)}</td>
-                        <td>{accountLabel(t)}</td>
-                        <td>
-                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                            <Button
-                              type="button"
-                              variant="secondary"
-                              className="icon-btn-sq"
-                              onClick={() => startEditTxn(t)}
-                              title="Edit"
-                              aria-label="Edit"
-                            >
-                              ✎
-                            </Button>
-                            {canDelete && (
-                              <Button
-                                type="button"
-                                variant="secondary"
-                                className="icon-btn-sq"
-                                disabled={txnBusyId === t.id}
-                                onClick={() => handleDeleteTxn(t)}
-                                title="Delete"
-                                aria-label="Delete"
-                              >
-                                🗑
-                              </Button>
-                            )}
+                  {searchedRecords.map((t) => (
+                    <RecordRow
+                      key={t.id}
+                      expanded={openRows.isOpen(t.id)}
+                      onToggle={() => openRows.toggle(t.id)}
+                      colSpan={6}
+                      details={<RecordDetails sourceTable="staff_imprest_transactions" sourceId={t.id} />}
+                      className={t.reimbursable ? 'row-reimb' : undefined}
+                      title={t.reimbursable ? 'Recorded as reimbursement' : undefined}
+                      onEdit={() => startEditTxn(t)}
+                      onDelete={() => void handleDeleteTxn(t)}
+                    >
+                      <td>{fmtDate(t.date)}</td>
+                      <td>{t.kind === 'advance' ? 'Advance' : 'Return'}</td>
+                      <td className="amt">{fmt(t.amount)}</td>
+                      <td>
+                        {accountLabel(t)}
+                        {txnError[t.id] && (
+                          <div className="note" style={{ color: 'var(--red)', marginTop: 4 }}>
+                            {txnError[t.id]}
                           </div>
-                          {txnError[t.id] && (
-                            <div className="note" style={{ color: 'var(--red)', marginTop: 4 }}>
-                              {txnError[t.id]}
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    )
-                  )}
+                        )}
+                      </td>
+                    </RecordRow>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -761,6 +682,55 @@ export function SiteImprestSection() {
           />
         )}
       </div>
+
+      {editingTxnId && (allTransactions ?? []).find((x) => x.id === editingTxnId) && (
+        <Modal title="Edit imprest transaction" onClose={() => setEditingTxnId(null)}>
+          <div className="form-grid">
+            <div className="field">
+              <label>Date</label>
+              <input type="date" aria-label="Date" value={txnDraft.date} onChange={(e) => setTxnDraft((d) => ({ ...d, date: e.target.value }))} />
+            </div>
+            <div className="field">
+              <label>Type</label>
+              <select
+                aria-label="Type"
+                value={txnDraft.kind}
+                onChange={(e) => {
+                  const k = e.target.value as 'advance' | 'return'
+                  setTxnDraft((d) => ({ ...d, kind: k, bankAccountId: k === 'return' && d.bankAccountId === REIMBURSE_ID ? '' : d.bankAccountId }))
+                }}
+              >
+                <option value="advance">Advance</option>
+                <option value="return">Return</option>
+              </select>
+            </div>
+            <div className="field">
+              <label>Amount (₹)</label>
+              <CurrencyInput value={txnDraft.amount} onValueChange={(v) => setTxnDraft((d) => ({ ...d, amount: v }))} />
+            </div>
+            <PaymentAccountPicker
+              className="full"
+              label={txnDraft.kind === 'return' ? 'Receiving account' : 'Payment account'}
+              value={txnDraft.bankAccountId}
+              onChange={(id) => setTxnDraft((d) => ({ ...d, bankAccountId: id }))}
+              allowReimbursement={txnDraft.kind === 'advance'}
+            />
+            <div className="field full" style={{ display: 'flex', gap: 8 }}>
+              <Button type="button" disabled={txnBusyId === editingTxnId} onClick={() => void handleSaveTxn(editingTxnId)}>
+                Save changes
+              </Button>
+              <Button type="button" variant="secondary" disabled={txnBusyId === editingTxnId} onClick={() => setEditingTxnId(null)}>
+                Cancel
+              </Button>
+            </div>
+            {txnError[editingTxnId] && (
+              <div className="note full" style={{ color: 'var(--red)' }}>
+                {txnError[editingTxnId]}
+              </div>
+            )}
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }

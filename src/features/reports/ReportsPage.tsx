@@ -276,6 +276,7 @@ const CATEGORIES: ReportCategory[] = [
         title: 'Activity by user',
         description: 'Everything one person recorded, in one list: expenses, bills, payments, receipts, transfers and more.',
         Component: ActivityByUserReport,
+        periodless: true,
       },
       {
         id: 'audit-log',

@@ -3,8 +3,11 @@ import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
 import { SearchableSelect } from '../../components/SearchableSelect'
 import { useBankAccounts } from '../../lib/queries/masters'
-import { useCreateTransfer } from '../../lib/queries/transfers'
+import { useCreateTransfer, useUpdateTransfer } from '../../lib/queries/transfers'
 import { parseINR } from '../../lib/calc/format'
+import type { Database } from '../../types/database'
+
+type Transfer = Database['public']['Tables']['transfers']['Row']
 
 const CASH = 'cash'
 
@@ -12,16 +15,18 @@ function todayStr() {
   return new Date().toISOString().slice(0, 10)
 }
 
-export function TransferForm() {
+/** Adds a transfer, or (with `editing`) changes one in place. When editing it is shown without its section heading, for a popup. */
+export function TransferForm({ editing, onDone }: { editing?: Transfer; onDone?: () => void } = {}) {
   const { data: accounts } = useBankAccounts()
   const createTransfer = useCreateTransfer()
+  const updateTransfer = useUpdateTransfer()
   const accountOptions = [{ id: CASH, name: 'Cash' }, ...(accounts ?? [])]
 
-  const [fromId, setFromId] = useState('')
-  const [toId, setToId] = useState('')
-  const [amount, setAmount] = useState('0')
-  const [date, setDate] = useState(todayStr())
-  const [notes, setNotes] = useState('')
+  const [fromId, setFromId] = useState(editing ? editing.from_account_id ?? CASH : '')
+  const [toId, setToId] = useState(editing ? editing.to_account_id ?? CASH : '')
+  const [amount, setAmount] = useState(editing ? String(editing.amount) : '0')
+  const [date, setDate] = useState(editing?.date ?? todayStr())
+  const [notes, setNotes] = useState(editing?.notes ?? '')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -43,13 +48,19 @@ export function TransferForm() {
     }
     setSubmitting(true)
     try {
-      await createTransfer.mutateAsync({
+      const fields = {
         from_account_id: fromId === CASH ? null : fromId,
         to_account_id: toId === CASH ? null : toId,
         amount: amt,
         date,
         notes: notes.trim() || null,
-      })
+      }
+      if (editing) {
+        await updateTransfer.mutateAsync({ id: editing.id, patch: fields })
+        onDone?.()
+        return
+      }
+      await createTransfer.mutateAsync(fields)
       setFromId('')
       setToId('')
       setAmount('0')
@@ -62,11 +73,9 @@ export function TransferForm() {
     }
   }
 
-  return (
-    <details className="toggle-section" open>
-      <summary>Transfers</summary>
-
-      <form className="form-grid" onSubmit={handleSubmit} style={{ marginTop: 16 }}>
+  const body = (
+    <>
+      <form className="form-grid" onSubmit={handleSubmit} style={{ marginTop: editing ? 0 : 16 }}>
         <div className="field">
           <label>From</label>
           <SearchableSelect
@@ -106,7 +115,7 @@ export function TransferForm() {
 
         <div className="field full">
           <Button type="submit" disabled={submitting}>
-            {submitting ? 'Adding…' : 'Add transfer'}
+            {submitting ? (editing ? 'Saving…' : 'Adding…') : editing ? 'Save changes' : 'Add transfer'}
           </Button>
         </div>
       </form>
@@ -116,6 +125,15 @@ export function TransferForm() {
           {formError}
         </div>
       )}
+    </>
+  )
+
+  return editing ? (
+    <div>{body}</div>
+  ) : (
+    <details className="toggle-section" open>
+      <summary>Transfers</summary>
+      {body}
     </details>
   )
 }

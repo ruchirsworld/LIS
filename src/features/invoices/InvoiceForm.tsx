@@ -18,9 +18,12 @@ function todayStr() {
 export function InvoiceForm({
   editingInvoice,
   onDoneEditing,
+  inModal = false,
 }: {
   editingInvoice: Invoice | null
   onDoneEditing: () => void
+  /** Shown inside a popup: without the section heading around it. */
+  inModal?: boolean
 }) {
   const { data: clients } = useClients()
   const { data: projects } = useProjects()
@@ -176,9 +179,8 @@ export function InvoiceForm({
     }
   }
 
-  return (
-    <details className="toggle-section" open>
-      <summary>Invoices</summary>
+  const body = (
+    <>
 
       <form className="form-grid" onSubmit={handleSubmit} style={{ marginTop: 16 }}>
         {/* Row 1: Client, Project */}
@@ -328,6 +330,15 @@ export function InvoiceForm({
           {formError}
         </div>
       )}
+    </>
+  )
+
+  return inModal ? (
+    <div>{body}</div>
+  ) : (
+    <details className="toggle-section" open>
+      <summary>Invoices</summary>
+      {body}
     </details>
   )
 }

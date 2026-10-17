@@ -3,7 +3,10 @@ import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
 import { PaymentAccountPicker, bankAccountIdOf, paymentModeOf } from '../../components/PaymentAccountPicker'
 import { PeriodFilter } from '../../components/PeriodFilter'
-import { RowMenu } from '../../components/RowMenu'
+import { RecordRow, useOpenRows } from '../../components/RecordRow'
+import { Modal } from '../../components/Modal'
+import { RecordDetails } from '../reports/RecordDetailModal'
+import type { Database } from '../../types/database'
 import { TableScroll } from '../../components/TableScroll'
 import { fmt, fmtDate, parseINR } from '../../lib/calc/format'
 import { OTHER_RECEIPT_KINDS, otherReceiptAccount, otherReceiptLabel, type OtherReceiptKind } from '../../lib/calc/otherReceipts'
@@ -11,11 +14,106 @@ import type { DateRange } from '../../lib/calc/period'
 import { getErrorMessage } from '../../lib/errors'
 import { confirmAction, toast } from '../../lib/feedback'
 import { useBankAccounts } from '../../lib/queries/masters'
-import { useCreateOtherReceipt, useDeleteOtherReceipt, useOtherReceipts } from '../../lib/queries/otherReceipts'
+import { useCreateOtherReceipt, useDeleteOtherReceipt, useOtherReceipts, useUpdateOtherReceipt } from '../../lib/queries/otherReceipts'
+import { CASH_ACCOUNT } from '../../components/PaymentAccountPicker'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
 
+type OtherReceipt = Database['public']['Tables']['other_receipts']['Row']
+
 const todayStr = () => new Date().toISOString().slice(0, 10)
+
+/** Changes one entry of "other money received", in a popup. */
+function EditOtherReceiptForm({ receipt, onDone }: { receipt: OtherReceipt; onDone: () => void }) {
+  const update = useUpdateOtherReceipt()
+  const [kind, setKind] = useState<OtherReceiptKind>(receipt.kind as OtherReceiptKind)
+  const [date, setDate] = useState(receipt.date)
+  const [amount, setAmount] = useState(String(receipt.amount))
+  const [payer, setPayer] = useState(receipt.payer ?? '')
+  const [notes, setNotes] = useState(receipt.notes ?? '')
+  const [reference, setReference] = useState(receipt.reference ?? '')
+  const [accountId, setAccountId] = useState(receipt.bank_account_id ?? CASH_ACCOUNT)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    setError(null)
+    const amt = parseINR(amount)
+    if (amt <= 0) return setError('Enter the amount received.')
+    if (!accountId) return setError('Pick the account the money came into.')
+    setSubmitting(true)
+    try {
+      await update.mutateAsync({
+        id: receipt.id,
+        patch: {
+          kind,
+          date,
+          amount: amt,
+          payer: payer.trim() || null,
+          notes: notes.trim() || null,
+          reference: reference.trim() || null,
+          payment_mode: paymentModeOf(accountId) === 'Cash' ? 'Cash' : 'Bank',
+          bank_account_id: bankAccountIdOf(accountId),
+        },
+      })
+      onDone()
+    } catch (err) {
+      setError(getErrorMessage(err, 'Could not save the changes.'))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <form className="form-grid" onSubmit={submit}>
+      <div className="field full">
+        <label htmlFor="eor-kind">What was it?</label>
+        <select id="eor-kind" value={kind} onChange={(e) => setKind(e.target.value as OtherReceiptKind)}>
+          {OTHER_RECEIPT_KINDS.map((k) => (
+            <option key={k.value} value={k.value}>
+              {k.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="field">
+        <label htmlFor="eor-amount">Amount (₹)</label>
+        <CurrencyInput id="eor-amount" value={amount} onValueChange={setAmount} required />
+      </div>
+      <div className="field">
+        <label htmlFor="eor-date">Date received</label>
+        <input id="eor-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+      </div>
+      <PaymentAccountPicker className="full" label="Received into" value={accountId} onChange={setAccountId} />
+      <div className="field">
+        <label htmlFor="eor-payer">Received from (optional)</label>
+        <input id="eor-payer" value={payer} onChange={(e) => setPayer(e.target.value)} />
+      </div>
+      <div className="field">
+        <label htmlFor="eor-ref">Reference (optional)</label>
+        <input id="eor-ref" value={reference} onChange={(e) => setReference(e.target.value)} />
+      </div>
+      <div className="field full">
+        <label htmlFor="eor-notes">Note (optional)</label>
+        <input id="eor-notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
+      </div>
+      <div className="field full" style={{ display: 'flex', gap: 8 }}>
+        <Button type="submit" disabled={submitting}>
+          {submitting ? 'Saving…' : 'Save changes'}
+        </Button>
+        <Button type="button" variant="secondary" onClick={onDone}>
+          Cancel
+        </Button>
+      </div>
+      {error && (
+        <div className="note full" role="alert" style={{ color: 'var(--red)' }}>
+          {error}
+        </div>
+      )}
+    </form>
+  )
+}
 
 /** Money received that is not a client payment, a loan, partner capital or a transfer: a deposit given back, interest,
  * a refund, scrap sold, or other income. */
@@ -25,6 +123,8 @@ export function OtherReceiptsSection() {
   const { data: banks } = useBankAccounts()
   const create = useCreateOtherReceipt()
   const remove = useDeleteOtherReceipt()
+  const openRows = useOpenRows()
+  const [editing, setEditing] = useState<OtherReceipt | null>(null)
 
   const [kind, setKind] = useState<OtherReceiptKind>('security_deposit')
   const [date, setDate] = useState(todayStr())
@@ -149,6 +249,7 @@ export function OtherReceiptsSection() {
         <table className="data">
           <thead>
             <tr>
+              <th></th>
               <th>ID</th>
               <th>Date</th>
               <th>What</th>
@@ -161,20 +262,28 @@ export function OtherReceiptsSection() {
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={7} className="empty-row">
+                <td colSpan={8} className="empty-row">
                   Loading…
                 </td>
               </tr>
             )}
             {!isLoading && (receipts ?? []).length === 0 && (
               <tr>
-                <td colSpan={7} className="empty-row">
+                <td colSpan={8} className="empty-row">
                   Nothing recorded in this period
                 </td>
               </tr>
             )}
             {(receipts ?? []).map((r) => (
-              <tr key={r.id}>
+              <RecordRow
+                key={r.id}
+                expanded={openRows.isOpen(r.id)}
+                onToggle={() => openRows.toggle(r.id)}
+                colSpan={8}
+                details={<RecordDetails sourceTable="other_receipts" sourceId={r.id} />}
+                onEdit={() => setEditing(r)}
+                onDelete={() => void askRemove(r.id, `${otherReceiptLabel(r.kind)} of ${fmt(r.amount)} on ${fmtDate(r.date)}`)}
+              >
                 <td>{r.display_id ?? '—'}</td>
                 <td>{fmtDate(r.date)}</td>
                 <td>
@@ -187,14 +296,17 @@ export function OtherReceiptsSection() {
                 </td>
                 <td>{bankName(r.bank_account_id)}</td>
                 <td className="amt">{fmt(r.amount)}</td>
-                <td>
-                  <RowMenu items={[{ label: 'Remove', onClick: () => void askRemove(r.id, `${otherReceiptLabel(r.kind)} of ${fmt(r.amount)} on ${fmtDate(r.date)}`) }]} />
-                </td>
-              </tr>
+              </RecordRow>
             ))}
           </tbody>
         </table>
       </TableScroll>
+
+      {editing && (
+        <Modal title={`Edit ${editing.display_id ?? 'entry'}`} onClose={() => setEditing(null)}>
+          <EditOtherReceiptForm receipt={editing} onDone={() => setEditing(null)} />
+        </Modal>
+      )}
     </details>
   )
 }

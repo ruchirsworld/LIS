@@ -6,6 +6,12 @@ import { TableScroll } from '../../components/TableScroll'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
 import { TableSearch, matchesSearch } from '../../components/TableSearch'
+import { RecordRow, useOpenRows } from '../../components/RecordRow'
+import { Modal } from '../../components/Modal'
+import { RecordDetails } from '../reports/RecordDetailModal'
+import { CapitalForm } from './CapitalForm'
+import { confirmAction } from '../../lib/feedback'
+import type { Database } from '../../types/database'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
 import { useCapitalTx, useDeleteCapitalTx } from '../../lib/queries/capital'
@@ -13,14 +19,28 @@ import { useProfiles } from '../../lib/queries/admin'
 import { fmt, fmtDate } from '../../lib/calc/format'
 import type { DateRange } from '../../lib/calc/period'
 
+type CapitalTx = Database['public']['Tables']['capital_transactions']['Row']
+
 export function CapitalTable() {
   const [range, setRange] = useState<DateRange | null>(null)
   const [search, setSearch] = useState('')
+  const openRows = useOpenRows()
+  const [editing, setEditing] = useState<CapitalTx | null>(null)
   const { data: tx, isLoading } = useCapitalTx(range)
   const { data: profiles } = useProfiles()
   const deleteTx = useDeleteCapitalTx()
 
   const partnerNameOf = (t: NonNullable<typeof tx>[number]) => profiles?.find((p) => p.id === t.partner_id)?.name ?? ''
+
+  async function removeTx(t: CapitalTx) {
+    const ok = await confirmAction({
+      title: 'Delete capital entry',
+      message: `Delete ${t.display_id ?? 'this entry'} of ${fmt(t.amount)} dated ${t.date ? fmtDate(t.date) : ''}? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (ok) deleteTx.mutate(t.id)
+  }
 
   const searchedTx = search
     ? tx?.filter((t) => matchesSearch(search, [t.display_id, t.notes, t.date, t.amount, t.type === 'injection' ? 'capital put in injection' : 'capital withdrawn withdrawal', t.payment_mode, partnerNameOf(t)]))
@@ -69,6 +89,7 @@ export function CapitalTable() {
         <table className="data">
           <thead>
             <tr>
+              <th></th>
               <SortableTh label="ID" sortKey="id" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Partner" sortKey="partner" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Type" sortKey="type" activeKey={sortKey} direction={direction} onSort={toggleSort} />
@@ -81,14 +102,14 @@ export function CapitalTable() {
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={7} className="empty-row">
+                <td colSpan={8} className="empty-row">
                   Loading…
                 </td>
               </tr>
             )}
             {!isLoading && (!sortedTx || sortedTx.length === 0) && (
               <tr>
-                <td colSpan={7} className="empty-row">
+                <td colSpan={8} className="empty-row">
                   No capital entries in this period
                 </td>
               </tr>
@@ -96,25 +117,34 @@ export function CapitalTable() {
             {pageRows?.map((t) => {
               const partner = profiles?.find((p) => p.id === t.partner_id)
               return (
-                <tr key={t.id}>
+                <RecordRow
+                  key={t.id}
+                  expanded={openRows.isOpen(t.id)}
+                  onToggle={() => openRows.toggle(t.id)}
+                  colSpan={8}
+                  details={<RecordDetails sourceTable="capital_transactions" sourceId={t.id} />}
+                  onEdit={() => setEditing(t)}
+                  onDelete={() => void removeTx(t)}
+                >
                   <td>{t.display_id ?? '—'}</td>
                   <td>{partner ? partner.name : '—'}</td>
                   <td>{t.type === 'injection' ? 'Injection (in)' : 'Withdrawal (out)'}</td>
                   <td>{t.date ? fmtDate(t.date) : '—'}</td>
                   <td className="amt">{fmt(t.amount)}</td>
                   <td>{t.notes ?? '—'}</td>
-                  <td>
-                    <button type="button" className="btn danger-link" onClick={() => deleteTx.mutate(t.id)}>
-                      Remove
-                    </button>
-                  </td>
-                </tr>
+                </RecordRow>
               )
             })}
           </tbody>
         </table>
       </TableScroll>
       <Pagination page={page} totalPages={totalPages} totalCount={totalCount} onChange={setPage} />
+
+      {editing && (
+        <Modal title={`Edit capital entry ${editing.display_id ?? ''}`} onClose={() => setEditing(null)}>
+          <CapitalForm editing={editing} onDone={() => setEditing(null)} />
+        </Modal>
+      )}
     </details>
   )
 }

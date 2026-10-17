@@ -5,7 +5,6 @@ import { SearchableSelect } from '../../components/SearchableSelect'
 import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
 import { TableScroll } from '../../components/TableScroll'
-import { RowMenu } from '../../components/RowMenu'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
 import { TableSearch, matchesSearch } from '../../components/TableSearch'
@@ -19,13 +18,18 @@ import { billGstAmt, billTdsAmt, billTotal, billPaid, billDue, billDueRaw } from
 import type { DateRange } from '../../lib/calc/period'
 import { VendorBillPaymentForm } from './VendorBillPaymentForm'
 import { ReceiptLink } from '../../components/ReceiptLink'
+import { RecordRow, useOpenRows } from '../../components/RecordRow'
+import { Modal } from '../../components/Modal'
+import { RecordDetails } from '../reports/RecordDetailModal'
+import { VendorBillForm } from './VendorBillForm'
+import { confirmAction } from '../../lib/feedback'
 import { clientLabel, clientFullName } from '../../lib/labels'
 import type { Database } from '../../types/database'
 
 type VendorBill = Database['public']['Tables']['vendor_bills']['Row']
 type VendorBillPayment = Database['public']['Tables']['vendor_bill_payments']['Row']
 
-export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void }) {
+export function VendorBillTable() {
   const [range, setRange] = useState<DateRange | null>(null)
   const { data: bills, isLoading } = useVendorBills(range)
   const { data: payments } = useVendorBillPayments()
@@ -36,7 +40,8 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
   const { data: billItems } = useVendorBillItems()
   const deleteBill = useDeleteVendorBill()
   const [payFormId, setPayFormId] = useState<string | null>(null)
-  const [itemsOpenId, setItemsOpenId] = useState<string | null>(null)
+  const openRows = useOpenRows()
+  const [editingBill, setEditingBill] = useState<VendorBill | null>(null)
   const [editingPayment, setEditingPayment] = useState<VendorBillPayment | null>(null)
   const [editListId, setEditListId] = useState<string | null>(null)
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
@@ -47,6 +52,16 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
   useEffect(() => {
     if (nav) setUnpaidOnly(nav.filter.vendorView === 'unpaid')
   }, [nav])
+
+  async function removeBill(b: VendorBill) {
+    const ok = await confirmAction({
+      title: 'Delete vendor bill',
+      message: `Delete bill ${b.display_id ?? ''}? Its payments go with it. This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (ok) deleteBill.mutate(b.id)
+  }
 
   function closePayForm() {
     setPayFormId(null)
@@ -202,179 +217,104 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
         <table className="data">
           <thead>
             <tr>
+              <th></th>
               <SortableTh label="Ref ID" sortKey="id" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Vendor" sortKey="vendor" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Description" sortKey="description" activeKey={sortKey} direction={direction} onSort={toggleSort} />
-              <th>Sub-head</th>
-              <th>Remarks</th>
-              <SortableTh label="Client" sortKey="client" activeKey={sortKey} direction={direction} onSort={toggleSort} />
-              <SortableTh label="Project" sortKey="project" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Date" sortKey="date" activeKey={sortKey} direction={direction} onSort={toggleSort} />
-              <th style={{ textAlign: 'right' }}>Qty</th>
-              <th style={{ textAlign: 'right' }}>Rate</th>
-              <th style={{ textAlign: 'right' }}>Other cost</th>
-              <SortableTh label="Amount" sortKey="amount" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
-              <SortableTh label="GST" sortKey="gst" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
-              <SortableTh label="TDS" sortKey="tds" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
               <SortableTh label="Total" sortKey="total" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
               <SortableTh label="Paid" sortKey="paid" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
               <SortableTh label="Due" sortKey="due" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
-              <th></th>
-              <th>Receipt</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={20} className="empty-row">
+                <td colSpan={9} className="empty-row">
                   Loading…
                 </td>
               </tr>
             )}
             {!isLoading && (!sortedBills || sortedBills.length === 0) && (
               <tr>
-                <td colSpan={20} className="empty-row">
+                <td colSpan={9} className="empty-row">
                   No vendor bills in this period
                 </td>
               </tr>
             )}
             {pageRows?.map((b) => {
               const vendor = vendors?.find((v) => v.id === b.vendor_id)
-              const client = b.client_id ? clients?.find((c) => c.id === b.client_id) : null
-              const project = b.project_id ? projects?.find((p) => p.id === b.project_id) : null
               const billPayments = payments?.filter((p) => p.bill_id === b.id) ?? []
               const paid = billPaid(billPayments)
               const due = billDue(b, billPayments)
               const rawDue = billDueRaw(b, billPayments)
               const hasHistory = billPayments.length > 0
-
               const showEditList = editListId === b.id
+              const billItemRows = itemsOf(b)
 
               return (
                 <Fragment key={b.id}>
-                  <tr>
+                  <RecordRow
+                    expanded={openRows.isOpen(b.id)}
+                    onToggle={() => openRows.toggle(b.id)}
+                    colSpan={9}
+                    details={
+                      <>
+                        <RecordDetails sourceTable="vendor_bills" sourceId={b.id} />
+                        {b.receipt_path && (
+                          <div style={{ marginTop: 10 }}>
+                            Receipt: <ReceiptLink path={b.receipt_path} />
+                          </div>
+                        )}
+                        {hasHistory && (
+                          <div className="pay-history" style={{ marginTop: 10 }}>
+                            <strong>Payments</strong>
+                            {billPayments.map((p) => (
+                              <div key={p.id} className="pay-history-line">
+                                <span>
+                                  {p.display_id} — {fmtDate(p.date)} — {fmt(p.amount)}
+                                  {p.payment_mode ? ` · ${p.payment_mode === 'Advance' ? 'from advance' : p.payment_mode}` : ''}
+                                  {p.reference ? ` · ${p.reference}` : ''}
+                                </span>
+                                {showEditList && p.payment_mode !== 'Advance' && (
+                                  <button type="button" className="pay-history-edit" onClick={() => openEditPayment(b.id, p)}>
+                                    Edit
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    }
+                    extraItems={[
+                      { label: 'Add payment', disabled: due <= 0, onClick: () => openAddPayment(b.id) },
+                      {
+                        label: 'Edit payments',
+                        disabled: !hasHistory,
+                        onClick: () => {
+                          setEditListId(b.id)
+                          openRows.open(b.id)
+                        },
+                      },
+                    ]}
+                    onEdit={() => setEditingBill(b)}
+                    onDelete={() => void removeBill(b)}
+                  >
                     <td>{b.display_id ?? '—'}</td>
                     <td>{vendor ? vendor.name : '—'}</td>
                     <td>
                       {b.description ?? '—'}
-                      {itemsOf(b).length > 0 && (
-                        <div>
-                          <button
-                            type="button"
-                            className="btn link"
-                            style={{ padding: 0, fontSize: 12 }}
-                            aria-expanded={itemsOpenId === b.id}
-                            onClick={() => setItemsOpenId(itemsOpenId === b.id ? null : b.id)}
-                          >
-                            {itemsOpenId === b.id ? '▾' : '▸'} {itemsOf(b).length} item{itemsOf(b).length === 1 ? '' : 's'}
-                          </button>
-                        </div>
-                      )}
+                      {billItemRows.length > 0 && <div className="retention-note">{billItemRows.length} item{billItemRows.length === 1 ? '' : 's'}</div>}
                     </td>
-                    <td>{subHeadNameOf(b) || '—'}</td>
-                    <td>{b.remarks ?? '—'}</td>
-                    <td>{clientLabel(client)}</td>
-                    <td>{project ? project.name : '—'}</td>
                     <td>{b.date ? fmtDate(b.date) : '—'}</td>
-                    <td className="amt">{b.qty ?? '—'}</td>
-                    <td className="amt">{b.rate != null ? fmt(b.rate) : '—'}</td>
-                    <td className="amt">{b.other_cost ? fmt(b.other_cost) : '—'}</td>
-                    <td className="amt">{fmt(b.amount)}</td>
-                    <td className="amt">{fmt(billGstAmt(b))}</td>
-                    <td className="amt">{billTdsAmt(b) > 0 ? fmt(billTdsAmt(b)) : '—'}</td>
                     <td className="amt">{fmt(billTotal(b))}</td>
                     <td className="amt">{fmt(paid)}</td>
                     <td className="amt">{fmt(rawDue)}</td>
-                    <td>
-                      <RowMenu
-                        items={[
-                          { label: 'Add payment', disabled: due <= 0, onClick: () => openAddPayment(b.id) },
-                          { label: 'Edit payments', disabled: !hasHistory, onClick: () => setEditListId(b.id) },
-                        ]}
-                      />
-                    </td>
-                    <td>{b.receipt_path ? <ReceiptLink path={b.receipt_path} /> : '—'}</td>
-                    <td>
-                      <button type="button" className="pay-btn" onClick={() => onEdit(b)}>
-                        Edit
-                      </button>
-                      <button type="button" className="btn danger-link" onClick={() => deleteBill.mutate(b.id)}>
-                        Remove
-                      </button>
-                      {hasHistory && (
-                        <div className="pay-history">
-                          {billPayments.map((p) => (
-                            <div key={p.id} className="pay-history-line">
-                              <span>
-                                {p.display_id} — {fmtDate(p.date)} — {fmt(p.amount)}
-                                {p.payment_mode ? ` · ${p.payment_mode === 'Advance' ? 'from advance' : p.payment_mode}` : ''}
-                                {p.reference ? ` · ${p.reference}` : ''}
-                              </span>
-                              {showEditList && p.payment_mode !== 'Advance' && (
-                                <button
-                                  type="button"
-                                  className="pay-history-edit"
-                                  onClick={() => openEditPayment(b.id, p)}
-                                >
-                                  Edit
-                                </button>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                  {itemsOpenId === b.id && itemsOf(b).length > 0 && (
-                    <tr className="pay-form-row">
-                      <td colSpan={20}>
-                        <div className="note" style={{ margin: '0 0 6px', fontWeight: 600 }}>
-                          Items on {b.display_id ?? 'this bill'}
-                        </div>
-                        <table className="data">
-                          <thead>
-                            <tr>
-                              <th>Item</th>
-                              <th style={{ textAlign: 'right' }}>Qty</th>
-                              <th>Unit</th>
-                              <th style={{ textAlign: 'right' }}>Rate</th>
-                              <th style={{ textAlign: 'right' }}>Amount</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {itemsOf(b).map((i) => (
-                              <tr key={i.id}>
-                                <td>{i.name}</td>
-                                <td className="amt">{i.qty ?? '—'}</td>
-                                <td>{i.unit ?? '—'}</td>
-                                <td className="amt">{i.rate != null ? fmt(i.rate) : '—'}</td>
-                                <td className="amt">{fmt(i.amount)}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                          <tfoot>
-                            <tr>
-                              <td colSpan={4} style={{ fontWeight: 600 }}>
-                                Total before GST
-                              </td>
-                              <td className="amt" style={{ fontWeight: 600 }}>
-                                {fmt(itemsOf(b).reduce((s, i) => s + Number(i.amount || 0), 0))}
-                              </td>
-                            </tr>
-                          </tfoot>
-                        </table>
-                      </td>
-                    </tr>
-                  )}
+                  </RecordRow>
                   {payFormId === b.id && (
-                    <VendorBillPaymentForm
-                      billId={b.id}
-                      due={due}
-                      editingPayment={editingPayment}
-                      colSpan={20}
-                      onClose={closePayForm}
-                    />
+                    <VendorBillPaymentForm billId={b.id} due={due} editingPayment={editingPayment} colSpan={9} onClose={closePayForm} />
                   )}
                 </Fragment>
               )
@@ -383,6 +323,12 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
         </table>
       </TableScroll>
       <Pagination page={page} totalPages={totalPages} totalCount={totalCount} onChange={setPage} />
+
+      {editingBill && (
+        <Modal title={`Edit vendor bill ${editingBill.display_id ?? ''}`} onClose={() => setEditingBill(null)}>
+          <VendorBillForm editingBill={editingBill} onDoneEditing={() => setEditingBill(null)} inModal />
+        </Modal>
+      )}
     </details>
   )
 }

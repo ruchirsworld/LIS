@@ -1,4 +1,8 @@
 import { useState, type FormEvent } from 'react'
+import { RecordRow, useOpenRows } from '../../components/RecordRow'
+import { Modal } from '../../components/Modal'
+import { confirmAction } from '../../lib/feedback'
+import { RecordDetails } from '../reports/RecordDetailModal'
 import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
 import { SortableTh } from '../../components/SortableTh'
@@ -19,6 +23,17 @@ export function BankAccountsSection() {
   const createAccount = useCreateBankAccount()
   const updateAccount = useUpdateBankAccount()
   const deleteAccount = useDeleteBankAccount()
+  const openRows = useOpenRows()
+
+  async function removeAccount(a: NonNullable<typeof accounts>[number]) {
+    const ok = await confirmAction({
+      title: 'Delete bank account',
+      message: `Delete ${a.name}? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (ok) deleteAccount.mutate(a.id)
+  }
 
   const [search, setSearch] = useState('')
   const searched = search ? accounts?.filter((r) => matchesSearch(search, Object.values(r))) : accounts
@@ -85,10 +100,8 @@ export function BankAccountsSection() {
     }
   }
 
-  return (
-    <details className="toggle-section">
-      <summary>Bank accounts</summary>
-
+  const formBody = (
+    <>
       <form className="form-grid" onSubmit={handleSubmit} style={{ marginTop: 16 }}>
         <div className="field">
           <label>Account name</label>
@@ -127,6 +140,19 @@ export function BankAccountsSection() {
           {formError}
         </div>
       )}
+    </>
+  )
+
+  return (
+    <details className="toggle-section">
+      <summary>Bank accounts</summary>
+
+      {!editingId && formBody}
+      {editingId && (
+        <Modal title="Edit bank account" onClose={resetForm}>
+          {formBody}
+        </Modal>
+      )}
 
       <ReportExportButtons title="Bank accounts" sections={exportSections} range={null} />
 
@@ -135,6 +161,7 @@ export function BankAccountsSection() {
         <table className="data">
           <thead>
             <tr>
+              <th></th>
               <SortableTh label="Name" sortKey="name" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Account number" sortKey="accountNumber" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Opening balance" sortKey="openingBalance" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
@@ -144,32 +171,32 @@ export function BankAccountsSection() {
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={4} className="empty-row">
+                <td colSpan={5} className="empty-row">
                   Loading…
                 </td>
               </tr>
             )}
             {!isLoading && (!sortedAccounts || sortedAccounts.length === 0) && (
               <tr>
-                <td colSpan={4} className="empty-row">
+                <td colSpan={5} className="empty-row">
                   No bank accounts yet — add your first one above
                 </td>
               </tr>
             )}
             {pageRows?.map((a) => (
-              <tr key={a.id}>
+              <RecordRow
+                key={a.id}
+                expanded={openRows.isOpen(a.id)}
+                onToggle={() => openRows.toggle(a.id)}
+                colSpan={5}
+                details={<RecordDetails sourceTable="bank_accounts" sourceId={a.id} />}
+                onEdit={() => startEdit(a)}
+                onDelete={() => void removeAccount(a)}
+              >
                 <td>{a.name}</td>
                 <td>{a.account_number ?? '—'}</td>
                 <td className="amt">{fmt(a.opening_balance)}</td>
-                <td>
-                  <button type="button" className="pay-btn" onClick={() => startEdit(a)}>
-                    Edit
-                  </button>
-                  <button type="button" className="btn danger-link" onClick={() => deleteAccount.mutate(a.id)}>
-                    Remove
-                  </button>
-                </td>
-              </tr>
+              </RecordRow>
             ))}
           </tbody>
         </table>

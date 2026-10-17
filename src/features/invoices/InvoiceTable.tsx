@@ -8,6 +8,10 @@ import { TableScroll } from '../../components/TableScroll'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
 import { TableSearch, matchesSearch } from '../../components/TableSearch'
+import { RecordRow, useOpenRows } from '../../components/RecordRow'
+import { Modal } from '../../components/Modal'
+import { RecordDetails } from '../reports/RecordDetailModal'
+import { InvoiceForm } from './InvoiceForm'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import { useInvoices, useInvoicePayments, useDeleteInvoice, useCycleInvoiceStatus, useMovePaymentExcess } from '../../lib/queries/invoices'
 import { useClients, useProjects } from '../../lib/queries/masters'
@@ -27,7 +31,7 @@ import type { Database } from '../../types/database'
 
 type Invoice = Database['public']['Tables']['invoices']['Row']
 
-export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void }) {
+export function InvoiceTable() {
   const [range, setRange] = useState<DateRange | null>(null)
   const [clientFilter, setClientFilter] = useState('')
   const [search, setSearch] = useState('')
@@ -45,12 +49,24 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
   const { data: clients } = useClients()
   const { data: projects } = useProjects()
   const deleteInvoice = useDeleteInvoice()
+  const openRows = useOpenRows()
+  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null)
   const { profile } = useAuth()
   const isAdmin = profile?.role === 'admin'
   const { data: notes } = useInvoiceNotes()
   const { data: company } = useCompanyProfile()
   const deleteNote = useDeleteInvoiceNote()
   const [pdfError, setPdfError] = useState<string | null>(null)
+
+  async function removeInvoice(inv: Invoice) {
+    const ok = await confirmAction({
+      title: 'Delete invoice',
+      message: `Delete invoice ${inv.invoice_number ?? inv.display_id ?? ''}? Its receipts and notes go with it. This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (ok) deleteInvoice.mutate(inv.id)
+  }
 
   // The tax invoice (or a credit / debit note) as a PDF for the client.
   async function downloadDocument(inv: Invoice, note?: NonNullable<typeof notes>[number]) {
@@ -220,17 +236,13 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
         <table className="data">
           <thead>
             <tr>
+              <th></th>
               <SortableTh label="ID" sortKey="id" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Invoice no." sortKey="invoiceNo" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Client" sortKey="client" activeKey={sortKey} direction={direction} onSort={toggleSort} />
-              <SortableTh label="Project" sortKey="project" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Invoice date" sortKey="invoiceDate" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Due date" sortKey="dueDate" activeKey={sortKey} direction={direction} onSort={toggleSort} />
-              <SortableTh label="Amount" sortKey="amount" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
-              <SortableTh label="GST" sortKey="gst" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
-              <SortableTh label="TDS" sortKey="tds" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
               <SortableTh label="Net payable" sortKey="netPayable" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
-              <SortableTh label="Retention" sortKey="retention" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
               <SortableTh label="Paid" sortKey="paid" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
               <SortableTh label="Due" sortKey="due" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
               <SortableTh label="Status" sortKey="status" activeKey={sortKey} direction={direction} onSort={toggleSort} />
@@ -240,14 +252,14 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={15} className="empty-row">
+                <td colSpan={11} className="empty-row">
                   Loading…
                 </td>
               </tr>
             )}
             {!isLoading && (!sortedInvoices || sortedInvoices.length === 0) && (
               <tr>
-                <td colSpan={15} className="empty-row">
+                <td colSpan={11} className="empty-row">
                   No invoices in this period
                 </td>
               </tr>
@@ -260,162 +272,109 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
               const due = dueAmount(inv, invPayments)
               const extra = extraPaid(inv, invPayments)
               const held = retentionHeld(inv, invPayments)
-              const releaseDue = isRetentionReleaseDue(inv, invPayments)
               const gstHeldAmt = gstHeldOf(inv, invPayments)
               const nextInvoice = extra > 0 ? nextOpenInvoiceFor(inv) : undefined
               const status = effectiveStatus(inv, invPayments)
               const dueDateDisplay = effectiveDueDate(inv)
               const hasHistory = invPayments.length > 0
               const canCycle = status === 'draft' || status === 'sent'
+              const invNotes = (notes ?? []).filter((n) => n.invoice_id === inv.id)
+              const startPayment = (release: boolean, gst: number) => {
+                setPayFormRelease(release)
+                setPayFormGst(gst)
+                setPayFormId(inv.id)
+              }
+              // Everything else that can be done with this invoice, besides Edit and Delete.
+              const extraItems = [
+                ...(due > 0 ? [{ label: 'Record payment', onClick: () => startPayment(false, 0) }] : []),
+                ...(gstHeldAmt > 0 ? [{ label: 'GST received', onClick: () => startPayment(false, gstHeldAmt) }] : []),
+                ...(inv.status === 'sent' && (inv.gst_on_hold || Number(inv.gst_pct) > 0)
+                  ? [{ label: 'GST release', onClick: () => setGstFormId(gstFormId === inv.id ? null : inv.id) }]
+                  : []),
+                ...(held > 0 ? [{ label: 'Release retention', onClick: () => startPayment(true, 0) }] : []),
+                ...(nextInvoice
+                  ? [{ label: 'Adjust to next invoice', disabled: movePaymentExcess.isPending, onClick: () => adjustExtraToNext(inv, extra, nextInvoice) }]
+                  : []),
+                ...(inv.status === 'sent'
+                  ? [
+                      { label: 'Invoice PDF', onClick: () => downloadDocument(inv) },
+                      { label: 'Credit note', onClick: () => setNoteForm({ invoiceId: inv.id, type: 'credit' as const }) },
+                      { label: 'Debit note', onClick: () => setNoteForm({ invoiceId: inv.id, type: 'debit' as const }) },
+                    ]
+                  : []),
+              ]
 
               return (
                 <Fragment key={inv.id}>
-                  <tr className={status === 'overdue' ? 'row-overdue' : due > 0.01 && inv.status === 'sent' ? 'row-due' : undefined}>
-                    <td>{inv.display_id ?? '—'}</td>
-                    <td>{inv.invoice_number ?? '—'}</td>
-                    <td>{clientLabel(client)}</td>
-                    <td>{project ? project.name : '—'}</td>
-                    <td>{inv.invoice_date ? fmtDate(inv.invoice_date) : '— (not sent yet)'}</td>
-                    <td>{dueDateDisplay ? fmtDate(dueDateDisplay) : '—'}</td>
-                    <td className="amt">
-                      {fmt(inv.amount + inv.adj_amount)}
-                      {inv.adj_amount !== 0 && <div className="retention-note">revised by notes</div>}
-                    </td>
-                    <td className="amt">
-                      {fmt(gstAmt(inv))} <span style={{ color: 'var(--ink-soft)', fontSize: 11 }}>({inv.gst_pct || 0}%)</span>
-                    </td>
-                    <td className="amt">
-                      {fmt(tdsAmt(inv))} <span style={{ color: 'var(--ink-soft)', fontSize: 11 }}>({inv.tds_pct || 0}%)</span>
-                    </td>
-                    <td className="amt">{fmt(netPayable(inv))}</td>
-                    <td className={inv.retention_pct && held > 0 ? 'amt amt-retention' : 'amt'}>
-                      {inv.retention_pct ? (
-                        <>
-                          {fmt(retentionAmt(inv))} <span style={{ fontSize: 11, fontWeight: 400 }}>({inv.retention_pct}%)</span>
-                          {inv.retention_release_date && (
-                            <div className="retention-note">Release {fmtDate(inv.retention_release_date)}</div>
-                          )}
-                          {held > 0 && held < retentionAmt(inv) - 0.01 && (
-                            <div className="retention-note">{fmt(held)} still held</div>
-                          )}
-                          {releaseDue && <div className="retention-note retention-due">Release due</div>}
-                          {held === 0 && <div className="retention-note">Released</div>}
-                        </>
-                      ) : (
-                        '—'
-                      )}
-                    </td>
-                    <td className="amt">{fmt(paid)}</td>
-                    <td className="amt">
-                      {due > 0.01 ? (
-                        <span className="amt-due">{fmt(due)}</span>
-                      ) : extra > 0 ? (
-                        <span className="amt-extra" title="Paid more than the invoice">
-                          +{fmt(extra)} extra
-                        </span>
-                      ) : (
-                        fmt(due)
-                      )}
-                      {inv.gst_on_hold && gstHeldAmt > 0 && (
-                        <div className="gst-held-note" title="The client releases this GST after GSTR-3B proof">
-                          GST held {fmt(gstHeldAmt)}
-                          <span>
-                            {!inv.gstr3b_filed_on
-                              ? ' - not filed yet'
-                              : !inv.gstr3b_sent_on
-                                ? ` - filed ${fmtDate(inv.gstr3b_filed_on)}, proof not sent`
-                                : ` - proof sent ${fmtDate(inv.gstr3b_sent_on)}`}
-                          </span>
-                        </div>
-                      )}
-                    </td>
-                    <td>
-                      {canCycle ? (
-                        <button
-                          type="button"
-                          className={`badge ${status}`}
-                          onClick={() =>
-                            cycleStatus.mutate({ id: inv.id, status: inv.status, invoiceDate: inv.invoice_date })
-                          }
-                        >
-                          {status}
-                        </button>
-                      ) : (
-                        <span className={`badge ${status}`}>{status}</span>
-                      )}
-                    </td>
-                    <td>
-                      {due > 0 && (
-                        <button type="button" className="pay-btn" onClick={() => { setPayFormRelease(false); setPayFormGst(0); setPayFormId(inv.id) }}>
-                          Record payment
-                        </button>
-                      )}
-                      {gstHeldAmt > 0 && (
-                        <button
-                          type="button"
-                          className="pay-btn"
-                          title="The client has released the held GST"
-                          onClick={() => {
-                            setPayFormRelease(false)
-                            setPayFormGst(gstHeldAmt)
-                            setPayFormId(inv.id)
-                          }}
-                        >
-                          GST received
-                        </button>
-                      )}
-                      {inv.status === 'sent' && (inv.gst_on_hold || Number(inv.gst_pct) > 0) && (
-                        <button type="button" className="pay-btn" title="Track the GSTR-3B filing and proof for this invoice's GST" onClick={() => setGstFormId(gstFormId === inv.id ? null : inv.id)}>
-                          GST release
-                        </button>
-                      )}
-                      {held > 0 && (
-                        <button type="button" className="pay-btn" onClick={() => { setPayFormRelease(true); setPayFormGst(0); setPayFormId(inv.id) }}>
-                          Release retention
-                        </button>
-                      )}
-                      {nextInvoice && (
-                        <button
-                          type="button"
-                          className="pay-btn"
-                          disabled={movePaymentExcess.isPending}
-                          title={`Move the extra to ${nextInvoice.invoice_number ?? nextInvoice.display_id ?? 'the next invoice'}`}
-                          onClick={() => adjustExtraToNext(inv, extra, nextInvoice)}
-                        >
-                          Adjust to next invoice
-                        </button>
-                      )}
-                      {inv.status === 'sent' && (
-                        <>
-                          <button type="button" className="pay-btn" title="Download the tax invoice as a PDF" onClick={() => downloadDocument(inv)}>
-                            Invoice PDF
-                          </button>
-                          <button type="button" className="pay-btn" title="Reduce the invoice (GST credit note)" onClick={() => setNoteForm({ invoiceId: inv.id, type: 'credit' })}>
-                            Credit note
-                          </button>
-                          <button type="button" className="pay-btn" title="Increase the invoice (GST debit note)" onClick={() => setNoteForm({ invoiceId: inv.id, type: 'debit' })}>
-                            Debit note
-                          </button>
-                        </>
-                      )}
-                      {(inv.status === 'draft' || isAdmin) && (
-                        <button
-                          type="button"
-                          className="pay-btn"
-                          title={inv.status === 'sent' ? 'Correct the invoice itself — for a typing error. Once the client has it, use a credit or debit note.' : undefined}
-                          onClick={() => onEdit(inv)}
-                        >
-                          {inv.status === 'sent' ? 'Correct' : 'Edit'}
-                        </button>
-                      )}
-                      <button type="button" className="btn danger-link" onClick={() => deleteInvoice.mutate(inv.id)}>
-                        Remove
-                      </button>
-                      {(notes ?? []).filter((n) => n.invoice_id === inv.id).length > 0 && (
-                        <div className="pay-history">
-                          {(notes ?? [])
-                            .filter((n) => n.invoice_id === inv.id)
-                            .map((n) => (
+                  <RecordRow
+                    className={status === 'overdue' ? 'row-overdue' : due > 0.01 && inv.status === 'sent' ? 'row-due' : undefined}
+                    expanded={openRows.isOpen(inv.id)}
+                    onToggle={() => openRows.toggle(inv.id)}
+                    colSpan={11}
+                    details={
+                      <>
+                        <RecordDetails sourceTable="invoices" sourceId={inv.id} />
+                        <table className="data" style={{ marginTop: 10, width: '100%', tableLayout: 'fixed' }}>
+                          <tbody>
+                            <tr>
+                              <th style={{ width: '38%', textAlign: 'left', fontWeight: 600 }}>Project</th>
+                              <td>{project ? project.name : '—'}</td>
+                            </tr>
+                            <tr>
+                              <th style={{ textAlign: 'left', fontWeight: 600 }}>Amount</th>
+                              <td>
+                                {fmt(inv.amount + inv.adj_amount)}
+                                {inv.adj_amount !== 0 && <span className="retention-note"> revised by notes</span>}
+                              </td>
+                            </tr>
+                            <tr>
+                              <th style={{ textAlign: 'left', fontWeight: 600 }}>GST</th>
+                              <td>
+                                {fmt(gstAmt(inv))} ({inv.gst_pct || 0}%)
+                              </td>
+                            </tr>
+                            <tr>
+                              <th style={{ textAlign: 'left', fontWeight: 600 }}>TDS</th>
+                              <td>
+                                {fmt(tdsAmt(inv))} ({inv.tds_pct || 0}%)
+                              </td>
+                            </tr>
+                            {inv.retention_pct ? (
+                              <tr>
+                                <th style={{ textAlign: 'left', fontWeight: 600 }}>Retention</th>
+                                <td>
+                                  {fmt(retentionAmt(inv))} ({inv.retention_pct}%)
+                                  {inv.retention_release_date && <> · release {fmtDate(inv.retention_release_date)}</>}
+                                  {held > 0 ? <> · {fmt(held)} still held</> : <> · released</>}
+                                  {isRetentionReleaseDue(inv, invPayments) && <strong style={{ color: 'var(--red)' }}> · release due</strong>}
+                                </td>
+                              </tr>
+                            ) : null}
+                            {inv.gst_on_hold && gstHeldAmt > 0 && (
+                              <tr>
+                                <th style={{ textAlign: 'left', fontWeight: 600 }}>GST held by the client</th>
+                                <td>
+                                  {fmt(gstHeldAmt)}
+                                  {!inv.gstr3b_filed_on
+                                    ? ' · not filed yet'
+                                    : !inv.gstr3b_sent_on
+                                      ? ` · filed ${fmtDate(inv.gstr3b_filed_on)}, proof not sent`
+                                      : ` · proof sent ${fmtDate(inv.gstr3b_sent_on)}`}
+                                </td>
+                              </tr>
+                            )}
+                            {extra > 0 && (
+                              <tr>
+                                <th style={{ textAlign: 'left', fontWeight: 600 }}>Paid more than the invoice</th>
+                                <td>+{fmt(extra)} extra</td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                        {invNotes.length > 0 && (
+                          <div className="pay-history" style={{ marginTop: 10 }}>
+                            <strong>Credit and debit notes</strong>
+                            {invNotes.map((n) => (
                               <div key={n.id}>
                                 {n.display_id} — {fmtDate(n.date)} — {n.note_type === 'credit' ? '−' : '+'}
                                 {fmt(Number(n.amount) + Number(n.gst_amount))} · {n.reason}{' '}
@@ -441,38 +400,68 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
                                 )}
                               </div>
                             ))}
-                        </div>
-                      )}
-                      {hasHistory && (
-                        <div className="pay-history">
-                          {invPayments.map((p) =>
-                            editingPaymentId === p.id ? (
-                              <EditInvoicePaymentFields key={p.id} payment={p} hasRetention={!!inv.retention_pct} gstOnHold={!!inv.gst_on_hold} onClose={() => setEditingPaymentId(null)} />
-                            ) : (
-                              <div key={p.id}>
-                                {p.display_id} — {fmtDate(p.date)} — {fmt(p.amount)}
-                                {p.reference ? ` · ${p.reference}` : ''}
-                                {p.is_retention_release ? ' · retention release' : ''}
-                                {Number(p.gst_component) > 0 ? ` · incl. GST ${fmt(p.gst_component)}` : ''}
-                                {(() => {
-                                  const parts = p.receipt_id ? (payments ?? []).filter((q) => q.receipt_id === p.receipt_id) : []
-                                  return parts.length > 1
-                                    ? ` · part of a ${fmt(parts.reduce((sum, q) => sum + Number(q.amount || 0), 0))} receipt`
-                                    : ''
-                                })()}{' '}
-                                <button type="button" className="btn link" onClick={() => setEditingPaymentId(p.id)}>
-                                  Edit
-                                </button>
-                              </div>
-                            )
-                          )}
-                        </div>
+                          </div>
+                        )}
+                        {hasHistory && (
+                          <div className="pay-history" style={{ marginTop: 10 }}>
+                            <strong>Payments received</strong>
+                            {invPayments.map((p) =>
+                              editingPaymentId === p.id ? (
+                                <EditInvoicePaymentFields key={p.id} payment={p} hasRetention={!!inv.retention_pct} gstOnHold={!!inv.gst_on_hold} onClose={() => setEditingPaymentId(null)} />
+                              ) : (
+                                <div key={p.id}>
+                                  {p.display_id} — {fmtDate(p.date)} — {fmt(p.amount)}
+                                  {p.reference ? ` · ${p.reference}` : ''}
+                                  {p.is_retention_release ? ' · retention release' : ''}
+                                  {Number(p.gst_component) > 0 ? ` · incl. GST ${fmt(p.gst_component)}` : ''}
+                                  {(() => {
+                                    const parts = p.receipt_id ? (payments ?? []).filter((q) => q.receipt_id === p.receipt_id) : []
+                                    return parts.length > 1 ? ` · part of a ${fmt(parts.reduce((sum, q) => sum + Number(q.amount || 0), 0))} receipt` : ''
+                                  })()}{' '}
+                                  <button type="button" className="btn link" onClick={() => setEditingPaymentId(p.id)}>
+                                    Edit
+                                  </button>
+                                </div>
+                              )
+                            )}
+                          </div>
+                        )}
+                      </>
+                    }
+                    extraItems={extraItems}
+                    // A sent invoice is only corrected by an Admin; the client has it, so otherwise use a credit or debit note.
+                    onEdit={inv.status === 'draft' || isAdmin ? () => setEditingInvoice(inv) : undefined}
+                    onDelete={() => void removeInvoice(inv)}
+                  >
+                    <td>{inv.display_id ?? '—'}</td>
+                    <td>{inv.invoice_number ?? '—'}</td>
+                    <td>{clientLabel(client)}</td>
+                    <td>{inv.invoice_date ? fmtDate(inv.invoice_date) : '— (not sent yet)'}</td>
+                    <td>{dueDateDisplay ? fmtDate(dueDateDisplay) : '—'}</td>
+                    <td className="amt">{fmt(netPayable(inv))}</td>
+                    <td className="amt">{fmt(paid)}</td>
+                    <td className="amt">
+                      {due > 0.01 ? (
+                        <span className="amt-due">{fmt(due)}</span>
+                      ) : extra > 0 ? (
+                        <span className="amt-extra" title="Paid more than the invoice">
+                          +{fmt(extra)} extra
+                        </span>
+                      ) : (
+                        fmt(due)
                       )}
                     </td>
-                  </tr>
-                  {noteForm?.invoiceId === inv.id && (
-                    <InvoiceNoteForm invoice={inv} type={noteForm.type} onClose={() => setNoteForm(null)} />
-                  )}
+                    <td>
+                      {canCycle ? (
+                        <button type="button" className={`badge ${status}`} onClick={() => cycleStatus.mutate({ id: inv.id, status: inv.status, invoiceDate: inv.invoice_date })}>
+                          {status}
+                        </button>
+                      ) : (
+                        <span className={`badge ${status}`}>{status}</span>
+                      )}
+                    </td>
+                  </RecordRow>
+                  {noteForm?.invoiceId === inv.id && <InvoiceNoteForm invoice={inv} type={noteForm.type} onClose={() => setNoteForm(null)} />}
                   {payFormId === inv.id && (
                     <InvoicePaymentForm
                       invoiceId={inv.id}
@@ -483,9 +472,7 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
                       onClose={() => setPayFormId(null)}
                     />
                   )}
-                  {gstFormId === inv.id && (
-                    <GstReleaseForm invoice={inv} onClose={() => setGstFormId(null)} />
-                  )}
+                  {gstFormId === inv.id && <GstReleaseForm invoice={inv} onClose={() => setGstFormId(null)} />}
                 </Fragment>
               )
             })}
@@ -493,6 +480,12 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
         </table>
       </TableScroll>
       <Pagination page={page} totalPages={totalPages} totalCount={totalCount} onChange={setPage} />
+
+      {editingInvoice && (
+        <Modal title={`Edit invoice ${editingInvoice.invoice_number ?? editingInvoice.display_id ?? ''}`} onClose={() => setEditingInvoice(null)}>
+          <InvoiceForm editingInvoice={editingInvoice} onDoneEditing={() => setEditingInvoice(null)} inModal />
+        </Modal>
+      )}
     </details>
   )
 }

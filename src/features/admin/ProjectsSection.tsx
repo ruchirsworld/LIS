@@ -1,4 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { RecordRow, useOpenRows } from '../../components/RecordRow'
+import { Modal } from '../../components/Modal'
+import { confirmAction } from '../../lib/feedback'
+import { RecordDetails } from '../reports/RecordDetailModal'
 import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
 import { SearchableSelect } from '../../components/SearchableSelect'
@@ -26,6 +30,7 @@ export function ProjectsSection() {
   const createProject = useCreateProject()
   const updateProject = useUpdateProject()
   const deleteProject = useDeleteProject()
+  const openRows = useOpenRows()
 
   const [formOpen, setFormOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -112,6 +117,16 @@ export function ProjectsSection() {
     setFormError(null)
   }
 
+  async function removeProject(p: NonNullable<typeof projects>[number]) {
+    const ok = await confirmAction({
+      title: 'Delete project',
+      message: `Delete project ${p.name}? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (ok) await handleDelete(p.id)
+  }
+
   async function handleDelete(id: string) {
     setDeleteError(null)
     try {
@@ -169,18 +184,8 @@ export function ProjectsSection() {
     }
   }
 
-  return (
-    <details className="toggle-section">
-      <summary>Projects</summary>
-
-      <details
-        className="toggle-section"
-        style={{ marginTop: 16 }}
-        open={formOpen}
-        onToggle={(e) => setFormOpen(e.currentTarget.open)}
-      >
-        <summary>{editingId ? 'Edit project' : 'Add new project'}</summary>
-
+  const formBody = (
+    <>
       <form className="form-grid" onSubmit={handleSubmit} style={{ marginTop: 16 }}>
         <div className="field">
           <label>Project name</label>
@@ -266,7 +271,24 @@ export function ProjectsSection() {
           {formError}
         </div>
       )}
-      </details>
+    </>
+  )
+
+  return (
+    <details className="toggle-section">
+      <summary>Projects</summary>
+
+      {!editingId && (
+        <details className="toggle-section" style={{ marginTop: 16 }} open={formOpen} onToggle={(e) => setFormOpen(e.currentTarget.open)}>
+          <summary>Add new project</summary>
+          {formBody}
+        </details>
+      )}
+      {editingId && (
+        <Modal title="Edit project" onClose={resetForm}>
+          {formBody}
+        </Modal>
+      )}
 
       <details className="toggle-section" style={{ marginTop: 12 }} open>
         <summary>Project list</summary>
@@ -284,6 +306,7 @@ export function ProjectsSection() {
         <table className="data">
           <thead>
             <tr>
+              <th></th>
               <SortableTh label="Code" sortKey="code" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Project" sortKey="name" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Client" sortKey="client" activeKey={sortKey} direction={direction} onSort={toggleSort} />
@@ -314,7 +337,15 @@ export function ProjectsSection() {
             {pageRows?.map((p) => {
               const client = clients?.find((c) => c.id === p.client_id)
               return (
-                <tr key={p.id}>
+                <RecordRow
+                  key={p.id}
+                  expanded={openRows.isOpen(p.id)}
+                  onToggle={() => openRows.toggle(p.id)}
+                  colSpan={11}
+                  details={<RecordDetails sourceTable="projects" sourceId={p.id} />}
+                  onEdit={() => startEdit(p)}
+                  onDelete={() => void removeProject(p)}
+                >
                   <td>{p.code ?? '—'}</td>
                   <td>{p.name}</td>
                   <td>{clientLabel(client)}</td>
@@ -324,15 +355,7 @@ export function ProjectsSection() {
                   <td>{p.start_date ? fmtDate(p.start_date) : '—'}</td>
                   <td>{p.end_date ? fmtDate(p.end_date) : '—'}</td>
                   <td>{p.status}</td>
-                  <td>
-                    <button type="button" className="pay-btn" onClick={() => startEdit(p)}>
-                      Edit
-                    </button>
-                    <button type="button" className="btn danger-link" onClick={() => handleDelete(p.id)}>
-                      Remove
-                    </button>
-                  </td>
-                </tr>
+                </RecordRow>
               )
             })}
           </tbody>

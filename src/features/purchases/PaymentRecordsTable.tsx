@@ -3,7 +3,10 @@ import { SearchableSelect } from '../../components/SearchableSelect'
 import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
 import { TableScroll } from '../../components/TableScroll'
-import { RowMenu } from '../../components/RowMenu'
+import { RecordRow, useOpenRows } from '../../components/RecordRow'
+import { Modal } from '../../components/Modal'
+import { RecordDetails } from '../reports/RecordDetailModal'
+import { confirmAction } from '../../lib/feedback'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
 import { TableSearch, matchesSearch } from '../../components/TableSearch'
@@ -23,9 +26,20 @@ export function PaymentRecordsTable() {
   const { data: vendors } = useVendors()
   const deletePayment = useDeleteVendorBillPayment()
 
+  const openRows = useOpenRows()
   const [vendorId, setVendorId] = useState('')
   const [search, setSearch] = useState('')
   const [editingPayment, setEditingPayment] = useState<VendorBillPayment | null>(null)
+
+  async function removePayment(p: VendorBillPayment) {
+    const ok = await confirmAction({
+      title: 'Delete payment',
+      message: `Delete payment ${p.display_id ?? ''} of ${fmt(p.amount)} dated ${fmtDate(p.date)}? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (ok) deletePayment.mutate(p.id)
+  }
 
   const billOf = (p: VendorBillPayment) => bills?.find((b) => b.id === p.bill_id)
   const vendorOf = (p: VendorBillPayment) => {
@@ -93,6 +107,7 @@ export function PaymentRecordsTable() {
         <table className="data">
           <thead>
             <tr>
+              <th></th>
               <SortableTh label="ID" sortKey="id" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Date" sortKey="date" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Vendor" sortKey="vendor" activeKey={sortKey} direction={direction} onSort={toggleSort} />
@@ -106,14 +121,14 @@ export function PaymentRecordsTable() {
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={8} className="empty-row">
+                <td colSpan={9} className="empty-row">
                   Loading…
                 </td>
               </tr>
             )}
             {!isLoading && (!sortedPayments || sortedPayments.length === 0) && (
               <tr>
-                <td colSpan={8} className="empty-row">
+                <td colSpan={9} className="empty-row">
                   No payments recorded
                 </td>
               </tr>
@@ -123,38 +138,31 @@ export function PaymentRecordsTable() {
               const vendor = vendorOf(p)
               return (
                 <Fragment key={p.id}>
-                  <tr className={p.payment_mode === 'Reimbursement' ? 'row-reimb' : undefined} title={p.payment_mode === 'Reimbursement' ? 'Recorded as reimbursement' : undefined}>
+                  <RecordRow
+                    expanded={openRows.isOpen(p.id)}
+                    onToggle={() => openRows.toggle(p.id)}
+                    colSpan={9}
+                    details={<RecordDetails sourceTable="vendor_bill_payments" sourceId={p.id} />}
+                    // A payment made automatically from an advance is changed through the advance or the bill, not here.
+                    onEdit={p.payment_mode === 'Advance' ? undefined : () => setEditingPayment(p)}
+                    onDelete={p.payment_mode === 'Advance' ? undefined : () => void removePayment(p)}
+                    className={p.payment_mode === 'Reimbursement' ? 'row-reimb' : undefined}
+                    title={p.payment_mode === 'Reimbursement' ? 'Recorded as reimbursement' : undefined}
+                  >
                     <td>{p.display_id ?? '—'}</td>
                     <td>{fmtDate(p.date)}</td>
                     <td>{vendor?.name ?? '—'}</td>
                     <td>{bill?.display_id ?? '—'}</td>
                     <td className="amt">{fmt(p.amount)}</td>
                     <td>{p.reference ?? '—'}</td>
-                    <td>{p.payment_mode === 'Advance' ? 'From advance' : p.payment_mode ?? '—'}</td>
                     <td>
                       {p.payment_mode === 'Advance' ? (
-                        <span className="retention-note" title="Made automatically from an advance. To change it, change the advance or the bill.">
-                          Automatic
-                        </span>
+                        <span title="Made automatically from an advance. To change it, change the advance or the bill.">From advance (automatic)</span>
                       ) : (
-                        <RowMenu
-                          items={[
-                            { label: 'Edit', onClick: () => setEditingPayment(p) },
-                            { label: 'Remove', onClick: () => deletePayment.mutate(p.id) },
-                          ]}
-                        />
+                        p.payment_mode ?? '—'
                       )}
                     </td>
-                  </tr>
-                  {editingPayment?.id === p.id && bill && (
-                    <VendorBillPaymentForm
-                      billId={bill.id}
-                      due={0}
-                      editingPayment={editingPayment}
-                      colSpan={8}
-                      onClose={() => setEditingPayment(null)}
-                    />
-                  )}
+                  </RecordRow>
                 </Fragment>
               )
             })}
@@ -162,6 +170,22 @@ export function PaymentRecordsTable() {
         </table>
       </TableScroll>
       <Pagination page={page} totalPages={totalPages} totalCount={totalCount} onChange={setPage} />
+
+      {editingPayment && billOf(editingPayment) && (
+        <Modal title={`Edit payment ${editingPayment.display_id ?? ''}`} onClose={() => setEditingPayment(null)}>
+          <table className="data">
+            <tbody>
+              <VendorBillPaymentForm
+                billId={(billOf(editingPayment) as NonNullable<ReturnType<typeof billOf>>).id}
+                due={0}
+                editingPayment={editingPayment}
+                colSpan={1}
+                onClose={() => setEditingPayment(null)}
+              />
+            </tbody>
+          </table>
+        </Modal>
+      )}
     </details>
   )
 }

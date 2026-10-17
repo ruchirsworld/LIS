@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react'
-import { Button } from '../../components/ui'
 import { SearchableSelect } from '../../components/SearchableSelect'
 import { TableScroll } from '../../components/TableScroll'
 import { Pagination } from '../../components/Pagination'
@@ -18,12 +17,16 @@ import type { DateRange } from '../../lib/calc/reportPeriod'
 import type { ExportSection } from '../../lib/export/report'
 import { ReportExportButtons } from './ReportExportButtons'
 import { TableSearch, matchesSearch } from '../../components/TableSearch'
-import { RecordDetailModal, canShowRecord } from './RecordDetailModal'
+import { PeriodFilterToggle } from '../../components/PeriodFilterToggle'
+import { RecordDetailModal, RecordDetails, canShowRecord } from './RecordDetailModal'
+import { RecordRow, useOpenRows } from '../../components/RecordRow'
 
 const dateOf = (iso: string) => iso.slice(0, 10)
 
 /** Everything one person recorded, in one list: expenses, bills, payments, receipts, transfers, loans, capital and so on. */
-export function ActivityByUserReport({ range }: { range: DateRange | null }) {
+export function ActivityByUserReport() {
+  // The dates are chosen here, from the calendar button, rather than from the page-wide period bar.
+  const [range, setRange] = useState<DateRange | null>(null)
   const goTo = useGoTo()
   const { profile: me } = useAuth()
   const isAdmin = me?.role === 'admin'
@@ -37,6 +40,7 @@ export function ActivityByUserReport({ range }: { range: DateRange | null }) {
   const [kind, setKind] = useState('')
   const [search, setSearch] = useState('')
   const [viewing, setViewing] = useState<ActivityRow | null>(null)
+  const openRows = useOpenRows()
   const { data, isLoading, error } = useActivityByUser(userId || null, range, byRecorded)
 
   const person = profiles?.find((p) => p.id === userId)
@@ -65,7 +69,7 @@ export function ActivityByUserReport({ range }: { range: DateRange | null }) {
   }
   const rows = data ?? []
   const shown = rows.filter(
-    (r) => (!kind || r.kind === kind) && matchesSearch(search, [r.display_id, r.description, r.kind, r.status, r.activity_date, r.recorded_at.slice(0, 10), r.amount])
+    (r) => (!kind || r.kind === kind) && matchesSearch(search, [r.display_id, r.description, r.kind, r.activity_date, r.recorded_at.slice(0, 10), r.amount])
   )
 
   const kinds = useMemo(() => [...new Set(rows.map((r) => r.kind))].sort(), [rows])
@@ -118,8 +122,8 @@ export function ActivityByUserReport({ range }: { range: DateRange | null }) {
         },
         {
           title: `What ${person.name} recorded`,
-          columns: ['Date', 'Recorded on', 'Type', 'ID', 'Details', 'Money in', 'Money out', 'Other amount', 'Status', 'Reimburse to'],
-          rows: shown.map((r) => [fmtDate(r.activity_date), fmtDate(dateOf(r.recorded_at)), r.kind, r.display_id ?? '', r.description ?? '', ...amountCells(r), r.status ?? '', r.reimbursable ? nameOf(owedTo(r)) : '']),
+          columns: ['Date', 'Recorded on', 'Type', 'ID', 'Details', 'Money in', 'Money out', 'Other amount', 'Reimburse to'],
+          rows: shown.map((r) => [fmtDate(r.activity_date), fmtDate(dateOf(r.recorded_at)), r.kind, r.display_id ?? '', r.description ?? '', ...amountCells(r), r.reimbursable ? nameOf(owedTo(r)) : '']),
           numericColumns: [5, 6, 7],
         },
       ]
@@ -129,11 +133,11 @@ export function ActivityByUserReport({ range }: { range: DateRange | null }) {
     <div className="report-panel">
       <div className="note" style={{ marginTop: 0 }}>
         Everything one person recorded, in one list. It covers entries they saved themselves: expenses, bills, payments, receipts, transfers, loans, capital, wages, imprest, trips and opening balances. An entry made on someone
-        else&rsquo;s behalf is listed under the person who pressed Save. The dates above filter by the date of each entry, or by the day it was recorded if you choose that below.
+        else&rsquo;s behalf is listed under the person who pressed Save. The calendar button filters by date: by the date of each entry, or by the day it was recorded if you choose that.
       </div>
 
-      <div className="form-grid" style={{ margin: '12px 0' }}>
-        <div className="field">
+      <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap', margin: '12px 0' }}>
+        <div className="field" style={{ flex: '1 1 240px', minWidth: 200 }}>
           <label>Person</label>
           <SearchableSelect
             items={profiles}
@@ -147,14 +151,8 @@ export function ActivityByUserReport({ range }: { range: DateRange | null }) {
             placeholder="— Choose a person —"
           />
         </div>
-        <div className="field">
-          <label htmlFor="act-by">Dates above apply to</label>
-          <select id="act-by" value={byRecorded ? 'recorded' : 'entry'} onChange={(e) => setByRecorded(e.target.value === 'recorded')}>
-            <option value="entry">The date of each entry</option>
-            <option value="recorded">The day it was recorded</option>
-          </select>
-        </div>
-        <div className="field">
+        <PeriodFilterToggle range={range} onChange={setRange} />
+        <div className="field" style={{ flex: '0 1 190px' }}>
           <label htmlFor="act-kind">Type</label>
           <select id="act-kind" value={kind} onChange={(e) => setKind(e.target.value)} disabled={kinds.length === 0}>
             <option value="">All types</option>
@@ -163,6 +161,13 @@ export function ActivityByUserReport({ range }: { range: DateRange | null }) {
                 {k}
               </option>
             ))}
+          </select>
+        </div>
+        <div className="field" style={{ flex: '0 1 190px' }}>
+          <label htmlFor="act-by">Dates are for</label>
+          <select id="act-by" value={byRecorded ? 'recorded' : 'entry'} onChange={(e) => setByRecorded(e.target.value === 'recorded')}>
+            <option value="entry">Date of the entry</option>
+            <option value="recorded">Day it was recorded</option>
           </select>
         </div>
       </div>
@@ -179,6 +184,8 @@ export function ActivityByUserReport({ range }: { range: DateRange | null }) {
           <ReportExportButtons title={`Activity of ${person?.name ?? ''}`} sections={sections} range={range} fileNamePrefix={`Activity_${person?.name ?? 'user'}`} />
 
           {summary.length > 0 && (
+            <details className="toggle-section" style={{ marginBottom: 12 }}>
+              <summary>Summary by type</summary>
             <TableScroll>
               <table className="data" style={{ marginBottom: 16 }}>
                 <thead>
@@ -203,6 +210,7 @@ export function ActivityByUserReport({ range }: { range: DateRange | null }) {
                 </tbody>
               </table>
             </TableScroll>
+            </details>
           )}
 
           <TableSearch value={search} onChange={setSearch} />
@@ -210,6 +218,7 @@ export function ActivityByUserReport({ range }: { range: DateRange | null }) {
             <table className="data">
               <thead>
                 <tr>
+                  <th></th>
                   <th>Date</th>
                   <th>Recorded on</th>
                   <th>Type</th>
@@ -218,7 +227,6 @@ export function ActivityByUserReport({ range }: { range: DateRange | null }) {
                   <th style={{ textAlign: 'right' }}>Money in</th>
                   <th style={{ textAlign: 'right' }}>Money out</th>
                   <th style={{ textAlign: 'right' }}>Other amount</th>
-                  <th>Status</th>
                   <th>Reimburse to</th>
                   <th></th>
                 </tr>
@@ -234,7 +242,26 @@ export function ActivityByUserReport({ range }: { range: DateRange | null }) {
                 {pageRows?.map((r) => {
                   const [moneyIn, moneyOut, other] = amountCells(r)
                   return (
-                    <tr key={`${r.source_table}-${r.source_id}`} className={r.reimbursable ? 'row-reimb' : undefined} title={r.reimbursable ? 'Recorded as reimbursement' : undefined}>
+                    <RecordRow
+                      key={`${r.source_table}-${r.source_id}`}
+                      expanded={openRows.isOpen(`${r.source_table}-${r.source_id}`)}
+                      onToggle={() => openRows.toggle(`${r.source_table}-${r.source_id}`)}
+                      colSpan={11}
+                      details={
+                        canShowRecord(r.source_table) ? (
+                          <RecordDetails sourceTable={r.source_table} sourceId={r.source_id} recordedBy={person?.name} />
+                        ) : (
+                          <div className="note">No more details are kept for this kind of entry.</div>
+                        )
+                      }
+                      // Changing an entry is done on its own screen; the popup and the arrow are for checking it.
+                      extraItems={[
+                        ...(canShowRecord(r.source_table) ? [{ label: 'View in a popup', onClick: () => void open(r) }] : []),
+                        { label: 'Open its screen', onClick: () => void openScreen(r) },
+                      ]}
+                      className={r.reimbursable ? 'row-reimb' : undefined}
+                      title={r.reimbursable ? 'Recorded as reimbursement' : undefined}
+                    >
                       <td style={{ whiteSpace: 'nowrap' }}>{fmtDate(r.activity_date)}</td>
                       <td style={{ whiteSpace: 'nowrap' }}>{fmtDate(dateOf(r.recorded_at))}</td>
                       <td>
@@ -250,7 +277,6 @@ export function ActivityByUserReport({ range }: { range: DateRange | null }) {
                       <td className="amt">{moneyIn === '' ? '' : fmt2(Number(moneyIn))}</td>
                       <td className="amt">{moneyOut === '' ? '' : fmt2(Number(moneyOut))}</td>
                       <td className="amt">{other === '' ? '' : fmt2(Number(other))}</td>
-                      <td>{r.status ?? ''}</td>
                       <td>
                         {r.reimbursable &&
                           (canChangeOwed(r) ? (
@@ -272,12 +298,7 @@ export function ActivityByUserReport({ range }: { range: DateRange | null }) {
                             nameOf(owedTo(r)) || '—'
                           ))}
                       </td>
-                      <td>
-                        <Button type="button" variant="secondary" onClick={() => void open(r)}>
-                          Open
-                        </Button>
-                      </td>
-                    </tr>
+                    </RecordRow>
                   )
                 })}
               </tbody>

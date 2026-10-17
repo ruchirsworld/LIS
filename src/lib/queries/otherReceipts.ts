@@ -4,6 +4,7 @@ import type { DateRange } from '../calc/period'
 import type { Database } from '../../types/database'
 
 type OtherReceiptInsert = Database['public']['Tables']['other_receipts']['Insert']
+type OtherReceiptUpdate = Database['public']['Tables']['other_receipts']['Update']
 
 export function useOtherReceipts(range: DateRange | null) {
   return useQuery({
@@ -31,6 +32,18 @@ export function useCreateOtherReceipt() {
   return useMutation({
     mutationFn: async (row: OtherReceiptInsert) => {
       const { data, error } = await supabase.from('other_receipts').insert(row).select().single()
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => refreshBooks(qc),
+  })
+}
+
+export function useUpdateOtherReceipt() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, patch }: { id: string; patch: OtherReceiptUpdate }) => {
+      const { data, error } = await supabase.from('other_receipts').update(patch).eq('id', id).select().single()
       if (error) throw error
       return data
     },

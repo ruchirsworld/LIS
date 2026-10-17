@@ -1,6 +1,6 @@
 # LIS changes since v2.0.1
 
-Version 2.0.1 was released on 3 September 2026. This list covers everything after it, up to 2.1.20. It is put together from the project history, grouped by area. Version numbers are shown where a release carried one.
+Version 2.0.1 was released on 3 September 2026. This list covers everything after it, up to 2.1.21. It is put together from the project history, grouped by area. Version numbers are shown where a release carried one.
 
 ## 2.0.2 – 2.0.3 (3 – 4 September)
 
@@ -154,3 +154,11 @@ Version 2.0.1 was released on 3 September 2026. This list covers everything afte
 
 ## 2.1.20 (17 October): search in HR, the vendor ledger and the audit log
 - A search box above the HR wage accrual, wage payment and salary advance histories, the site imprest transactions, the Vendor ledger and the Audit log. The vendor ledger's running balance is not affected by a search. The Audit log search covers who changed it, the date, and everything the record held before and after the change (among the 500 most recent changes the report loads).
+
+## 2.1.21 (17 October): one layout for every list, and trip IDs
+- **One layout for records.** Every list of records has an arrow at the start of the row that opens its complete details, and a menu at the end with Edit and Delete. Edit opens the record in a popup on the same page; Delete is for Admin only and asks to confirm. Other actions (Record payment, Approve, Invoice PDF, Credit note and so on) are in the same menu. Applies to expenses, trips and trip entries, project bills and expenses, vendor bills, payments and advances, invoices, receipts, reimbursements, transfers, other money received, capital, loans, site imprest, salary advances, wage payments and payroll runs, clients, projects, staff, vendors, users, bank accounts and Activity by user.
+- New edit popups for transfers, capital, other money received and vendor advances, which could only be removed before.
+- Vendor bills and invoices show the key figures on the row (the rest is under the arrow). Payroll runs and wage payments are final and have no Edit or Delete.
+- **Trip IDs are TRP/MM/YY/#** (for example TRP/10/26/3), numbered within the month the trip starts in, and renumbered if the start date moves to another month. Existing trips were renumbered in start order (database change).
+- **Trip Records:** bigger month headings, every month folded until opened (a search opens them all), smaller text, an ID column and alternate row shading.
+- **Activity by user:** the Status column is removed, the summary by type folds away (closed by default), and Person, the calendar button and Type sit in one row.

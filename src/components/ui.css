@@ -939,6 +939,10 @@ table.data.table-compact td {
 }
 /* A transaction recorded as a reimbursement (paid out of someone's own pocket): a faint amber wash and edge, so it
  * stands out in a long list without shouting. */
+/* Every other row, where a list asks for it. */
+table.data tr.row-alt > td {
+  background: color-mix(in srgb, var(--accent) 6%, var(--paper));
+}
 table.data tr.row-reimb > td {
   background: color-mix(in srgb, var(--amber) 11%, transparent);
 }

@@ -7,7 +7,10 @@ import { SearchableSelect } from '../../components/SearchableSelect'
 import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
 import { TableScroll } from '../../components/TableScroll'
-import { RowMenu } from '../../components/RowMenu'
+import { RecordRow, useOpenRows } from '../../components/RecordRow'
+import { Modal } from '../../components/Modal'
+import { RecordDetails } from '../reports/RecordDetailModal'
+import { confirmAction } from '../../lib/feedback'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
 import { TableSearch, matchesSearch } from '../../components/TableSearch'
@@ -22,7 +25,7 @@ import type { Database } from '../../types/database'
 
 type InvoicePayment = Database['public']['Tables']['invoice_payments']['Row']
 
-const COL_SPAN = 8
+const COL_SPAN = 9
 
 /** Every invoice payment (receipt) across every client/invoice, in one
  * place — InvoiceTable above only ever shows a given invoice's own
@@ -35,6 +38,7 @@ export function InvoicePaymentRecordsTable() {
   const deletePayment = useDeleteInvoicePayment()
 
   const [clientId, setClientId] = useState('')
+  const openRows = useOpenRows()
   const [search, setSearch] = useState('')
   const [range, setRange] = useState<DateRange | null>(null)
   const detailsRef = useRef<HTMLDetailsElement>(null)
@@ -45,6 +49,16 @@ export function InvoicePaymentRecordsTable() {
     if (nav?.filter.range && detailsRef.current) detailsRef.current.open = true
   }, [nav])
   const [editingPayment, setEditingPayment] = useState<InvoicePayment | null>(null)
+
+  async function removePayment(p: InvoicePayment) {
+    const ok = await confirmAction({
+      title: 'Delete receipt',
+      message: `Delete receipt ${p.display_id ?? ''} of ${fmt(p.amount)} dated ${fmtDate(p.date)}? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (ok) deletePayment.mutate(p.id)
+  }
 
   const invoiceOf = (p: InvoicePayment) => invoices?.find((i) => i.id === p.invoice_id)
   const clientOf = (p: InvoicePayment) => {
@@ -151,6 +165,7 @@ export function InvoicePaymentRecordsTable() {
         <table className="data">
           <thead>
             <tr>
+              <th></th>
               <SortableTh label="ID" sortKey="id" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Date" sortKey="date" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Client" sortKey="client" activeKey={sortKey} direction={direction} onSort={toggleSort} />
@@ -178,32 +193,23 @@ export function InvoicePaymentRecordsTable() {
             )}
             {pageRows?.map((entry) => {
               const renderRow = (p: InvoicePayment, nested: boolean) => (
-                <Fragment key={p.id}>
-                  <tr>
-                    <td style={nested ? { paddingLeft: 28 } : undefined}>{p.display_id ?? '—'}</td>
-                    <td>{fmtDate(p.date)}</td>
-                    <td>{clientLabel(clientOf(p))}</td>
-                    <td>{invoiceLabelOf(p)}</td>
-                    <td className="amt">{fmt(p.amount)}</td>
-                    <td>{p.reference ?? '—'}</td>
-                    <td>{p.payment_mode ?? '—'}</td>
-                    <td>
-                      <RowMenu
-                        items={[
-                          { label: 'Edit', onClick: () => setEditingPayment(p) },
-                          { label: 'Remove', onClick: () => deletePayment.mutate(p.id) },
-                        ]}
-                      />
-                    </td>
-                  </tr>
-                  {editingPayment?.id === p.id && (
-                    <tr className="pay-form-row">
-                      <td colSpan={COL_SPAN}>
-                        <EditInvoicePaymentFields payment={editingPayment} onClose={() => setEditingPayment(null)} />
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
+                <RecordRow
+                  key={p.id}
+                  expanded={openRows.isOpen(p.id)}
+                  onToggle={() => openRows.toggle(p.id)}
+                  colSpan={COL_SPAN}
+                  details={<RecordDetails sourceTable="invoice_payments" sourceId={p.id} />}
+                  onEdit={() => setEditingPayment(p)}
+                  onDelete={() => void removePayment(p)}
+                >
+                  <td style={nested ? { paddingLeft: 28 } : undefined}>{p.display_id ?? '—'}</td>
+                  <td>{fmtDate(p.date)}</td>
+                  <td>{clientLabel(clientOf(p))}</td>
+                  <td>{invoiceLabelOf(p)}</td>
+                  <td className="amt">{fmt(p.amount)}</td>
+                  <td>{p.reference ?? '—'}</td>
+                  <td>{p.payment_mode ?? '—'}</td>
+                </RecordRow>
               )
 
               if (entry.payments.length === 1) return renderRow(entry.payments[0], false)
@@ -215,8 +221,21 @@ export function InvoicePaymentRecordsTable() {
               return (
                 <Fragment key={entry.key}>
                   <tr className="row-link" {...activateProps(() => toggleReceipt(entry.key))} aria-expanded={open}>
+                    <td style={{ width: 36 }}>
+                      <button
+                        type="button"
+                        className="row-expand-btn"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          toggleReceipt(entry.key)
+                        }}
+                        aria-label={open ? 'Hide the receipts' : 'Show the receipts'}
+                      >
+                        {open ? '▾' : '▸'}
+                      </button>
+                    </td>
                     <td>
-                      <span aria-hidden="true">{open ? '\u25BE' : '\u25B8'}</span> {first.display_id} – {group[group.length - 1].display_id}
+                      {first.display_id} – {group[group.length - 1].display_id}
                     </td>
                     <td>{fmtDate(first.date)}</td>
                     <td>{clientLabel(clientOf(first))}</td>
@@ -234,6 +253,12 @@ export function InvoicePaymentRecordsTable() {
         </table>
       </TableScroll>
       <Pagination page={page} totalPages={totalPages} totalCount={totalCount} onChange={setPage} />
+
+      {editingPayment && (
+        <Modal title={`Edit receipt ${editingPayment.display_id ?? ''}`} onClose={() => setEditingPayment(null)}>
+          <EditInvoicePaymentFields payment={editingPayment} onClose={() => setEditingPayment(null)} />
+        </Modal>
+      )}
     </details>
   )
 }

@@ -16,9 +16,12 @@ const CASH = 'cash'
 export function LoanForm({
   editingLoan,
   onDoneEditing,
+  inModal = false,
 }: {
   editingLoan: Loan | null
   onDoneEditing: () => void
+  /** Shown inside a popup: without the section heading around it. */
+  inModal?: boolean
 }) {
   const createLoan = useCreateLoan()
   const updateLoan = useUpdateLoan()
@@ -107,11 +110,9 @@ export function LoanForm({
     }
   }
 
-  return (
-    <details className="toggle-section" open>
-      <summary>Loans</summary>
-
-      <form className="form-grid" onSubmit={handleSubmit} style={{ marginTop: 16 }}>
+  const body = (
+    <>
+      <form className="form-grid" onSubmit={handleSubmit} style={{ marginTop: inModal ? 0 : 16 }}>
         {/* Row 1: Loan type */}
         <div className="field full">
           <label>Loan type</label>
@@ -208,6 +209,15 @@ export function LoanForm({
           {formError}
         </div>
       )}
+    </>
+  )
+
+  return inModal ? (
+    <div>{body}</div>
+  ) : (
+    <details className="toggle-section" open>
+      <summary>Loans</summary>
+      {body}
     </details>
   )
 }

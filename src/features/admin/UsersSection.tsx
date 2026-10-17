@@ -1,4 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { RecordRow, useOpenRows } from '../../components/RecordRow'
+import { Modal } from '../../components/Modal'
+import { confirmAction } from '../../lib/feedback'
+import { RecordDetails } from '../reports/RecordDetailModal'
 import { Button } from '../../components/ui'
 import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
@@ -40,6 +44,7 @@ export function UsersSection() {
   const createUser = useCreateUser()
   const updateProfile = useUpdateProfile()
   const deleteUser = useDeleteUser()
+  const openRows = useOpenRows()
   const { data: activeProjects } = useProjects()
   const setSupervisorProjects = useSetSupervisorProjects()
 
@@ -145,14 +150,18 @@ export function UsersSection() {
     }
   }
 
-  function handleRemove(id: string) {
-    deleteUser.mutate(id)
+  async function handleRemove(p: Profile) {
+    const ok = await confirmAction({
+      title: 'Delete user',
+      message: `Delete ${p.name}? They will no longer be able to sign in. This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (ok) deleteUser.mutate(p.id)
   }
 
-  return (
-    <details className="toggle-section">
-      <summary>Users</summary>
-
+  const formBody = (
+    <>
       <form className="form-grid" onSubmit={handleSubmit} style={{ marginTop: 16 }}>
         <div className="field">
           <label>Name</label>
@@ -235,6 +244,19 @@ export function UsersSection() {
           {formError}
         </div>
       )}
+    </>
+  )
+
+  return (
+    <details className="toggle-section">
+      <summary>Users</summary>
+
+      {!editingId && formBody}
+      {editingId && (
+        <Modal title="Edit user" onClose={resetForm}>
+          {formBody}
+        </Modal>
+      )}
 
       <ReportExportButtons title="Users" sections={exportSections} range={null} />
 
@@ -243,6 +265,7 @@ export function UsersSection() {
         <table className="data">
           <thead>
             <tr>
+              <th></th>
               <SortableTh label="Name" sortKey="name" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Phone" sortKey="phone" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Role" sortKey="role" activeKey={sortKey} direction={direction} onSort={toggleSort} />
@@ -252,7 +275,7 @@ export function UsersSection() {
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={4} className="empty-row">
+                <td colSpan={5} className="empty-row">
                   Loading…
                 </td>
               </tr>
@@ -265,21 +288,19 @@ export function UsersSection() {
               </tr>
             )}
             {pageRows?.map((p) => (
-              <tr key={p.id}>
+              <RecordRow
+                key={p.id}
+                expanded={openRows.isOpen(p.id)}
+                onToggle={() => openRows.toggle(p.id)}
+                colSpan={5}
+                details={<RecordDetails sourceTable="profiles" sourceId={p.id} />}
+                onEdit={() => startEdit(p)}
+                onDelete={p.id !== myProfile?.id ? () => void handleRemove(p) : undefined}
+              >
                 <td>{p.name}</td>
                 <td>{p.phone ?? '—'}</td>
                 <td>{ROLE_LABEL[p.role] ?? p.role}</td>
-                <td>
-                  <button type="button" className="pay-btn" onClick={() => startEdit(p)}>
-                    Edit
-                  </button>
-                  {p.id !== myProfile?.id && (
-                    <button type="button" className="btn danger-link" onClick={() => handleRemove(p.id)}>
-                      Remove
-                    </button>
-                  )}
-                </td>
-              </tr>
+              </RecordRow>
             ))}
           </tbody>
         </table>

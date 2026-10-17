@@ -6,6 +6,11 @@ import { TableScroll } from '../../components/TableScroll'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
 import { TableSearch, matchesSearch } from '../../components/TableSearch'
+import { RecordRow, useOpenRows } from '../../components/RecordRow'
+import { Modal } from '../../components/Modal'
+import { RecordDetails } from '../reports/RecordDetailModal'
+import { LoanForm } from './LoanForm'
+import { confirmAction } from '../../lib/feedback'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
 import { useLoans, useLoanPayments, useDeleteLoan } from '../../lib/queries/loans'
@@ -26,13 +31,25 @@ type Loan = Database['public']['Tables']['loans']['Row']
 
 const LOAN_TYPE_LABEL: Record<string, string> = { private: 'Private Party', bank: 'Bank' }
 
-export function LoanTable({ onEdit }: { onEdit: (loan: Loan) => void }) {
+export function LoanTable() {
   const [range, setRange] = useState<DateRange | null>(null)
   const [search, setSearch] = useState('')
   const { data: loans, isLoading } = useLoans(range)
   const { data: payments } = useLoanPayments()
   const deleteLoan = useDeleteLoan()
   const [payFormId, setPayFormId] = useState<string | null>(null)
+  const openRows = useOpenRows()
+  const [editing, setEditing] = useState<Loan | null>(null)
+
+  async function removeLoan(l: Loan) {
+    const ok = await confirmAction({
+      title: 'Delete loan',
+      message: `Delete loan ${l.display_id ?? ''} from ${l.lender}? Its repayments go with it. This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (ok) deleteLoan.mutate(l.id)
+  }
 
   const paymentsOf = (l: NonNullable<typeof loans>[number]) => payments?.filter((p) => p.loan_id === l.id) ?? []
 
@@ -98,6 +115,7 @@ export function LoanTable({ onEdit }: { onEdit: (loan: Loan) => void }) {
         <table className="data">
           <thead>
             <tr>
+              <th></th>
               <SortableTh label="ID" sortKey="id" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Type" sortKey="type" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Lender" sortKey="lender" activeKey={sortKey} direction={direction} onSort={toggleSort} />
@@ -116,14 +134,14 @@ export function LoanTable({ onEdit }: { onEdit: (loan: Loan) => void }) {
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={13} className="empty-row">
+                <td colSpan={14} className="empty-row">
                   Loading…
                 </td>
               </tr>
             )}
             {!isLoading && (!sortedLoans || sortedLoans.length === 0) && (
               <tr>
-                <td colSpan={13} className="empty-row">
+                <td colSpan={14} className="empty-row">
                   No loans in this period
                 </td>
               </tr>
@@ -140,7 +158,30 @@ export function LoanTable({ onEdit }: { onEdit: (loan: Loan) => void }) {
 
               return (
                 <Fragment key={l.id}>
-                  <tr>
+                  <RecordRow
+                    expanded={openRows.isOpen(l.id)}
+                    onToggle={() => openRows.toggle(l.id)}
+                    colSpan={14}
+                    details={
+                      <>
+                        <RecordDetails sourceTable="loans" sourceId={l.id} />
+                        {hasHistory && (
+                          <div className="pay-history" style={{ marginTop: 10 }}>
+                            <strong>Repayments</strong>
+                            {loanPayments.map((p) => (
+                              <div key={p.id}>
+                                {p.display_id} — {fmtDate(p.date)} — principal {fmt(p.principal_paid)}, interest {fmt(p.interest_paid)}
+                                {p.reference ? ` · ${p.reference}` : ''}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    }
+                    extraItems={outstanding > 0 ? [{ label: 'Record payment', onClick: () => setPayFormId(l.id) }] : []}
+                    onEdit={() => setEditing(l)}
+                    onDelete={() => void removeLoan(l)}
+                  >
                     <td>{l.display_id ?? '—'}</td>
                     <td>{LOAN_TYPE_LABEL[l.loan_type] ?? l.loan_type}</td>
                     <td>{l.lender}</td>
@@ -153,33 +194,9 @@ export function LoanTable({ onEdit }: { onEdit: (loan: Loan) => void }) {
                     <td className="amt">{outstanding > 0 ? fmt(monthlyInterest) : '—'}</td>
                     <td className="amt">{outstanding > 0 ? interestDueMonths : '—'}</td>
                     <td className="amt">{outstanding > 0 ? fmt(interestDue) : '—'}</td>
-                    <td>
-                      {outstanding > 0 && (
-                        <button type="button" className="pay-btn" onClick={() => setPayFormId(l.id)}>
-                          Record payment
-                        </button>
-                      )}
-                      <button type="button" className="pay-btn" onClick={() => onEdit(l)}>
-                        Edit
-                      </button>
-                      <button type="button" className="btn danger-link" onClick={() => deleteLoan.mutate(l.id)}>
-                        Remove
-                      </button>
-                      {hasHistory && (
-                        <div className="pay-history">
-                          {loanPayments.map((p) => (
-                            <div key={p.id}>
-                              {p.display_id} — {fmtDate(p.date)} — principal {fmt(p.principal_paid)}, interest{' '}
-                              {fmt(p.interest_paid)}
-                              {p.reference ? ` · ${p.reference}` : ''}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </td>
-                  </tr>
+                  </RecordRow>
                   {payFormId === l.id && (
-                    <LoanPaymentForm loanId={l.id} colSpan={13} onClose={() => setPayFormId(null)} />
+                    <LoanPaymentForm loanId={l.id} colSpan={14} onClose={() => setPayFormId(null)} />
                   )}
                 </Fragment>
               )
@@ -188,6 +205,12 @@ export function LoanTable({ onEdit }: { onEdit: (loan: Loan) => void }) {
         </table>
       </TableScroll>
       <Pagination page={page} totalPages={totalPages} totalCount={totalCount} onChange={setPage} />
+
+      {editing && (
+        <Modal title={`Edit loan ${editing.display_id ?? ''}`} onClose={() => setEditing(null)}>
+          <LoanForm editingLoan={editing} onDoneEditing={() => setEditing(null)} inModal />
+        </Modal>
+      )}
     </details>
   )
 }

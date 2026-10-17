@@ -60,9 +60,12 @@ function IdBadge({ id }: { id: string | null }) {
 export function VendorBillForm({
   editingBill,
   onDoneEditing,
+  inModal = false,
 }: {
   editingBill: VendorBill | null
   onDoneEditing: () => void
+  /** Shown inside a popup: without the section heading around it. */
+  inModal?: boolean
 }) {
   const { profile } = useAuth()
   const canAddVendor = profile?.role === 'admin' || profile?.role === 'cxo'
@@ -371,10 +374,8 @@ export function VendorBillForm({
     }
   }
 
-  return (
-    <details className="toggle-section" open>
-      <summary>Vendor bills</summary>
-
+  const body = (
+    <>
       <form className="form-grid vb-form" onSubmit={handleSubmit} style={{ marginTop: 16 }}>
         {/* Row 1: Project (active only, mandatory) — Client auto-derived, mandatory */}
         <div className="field-row">
@@ -690,6 +691,15 @@ export function VendorBillForm({
           {formError}
         </div>
       )}
+    </>
+  )
+
+  return inModal ? (
+    <div>{body}</div>
+  ) : (
+    <details className="toggle-section" open>
+      <summary>Vendor bills</summary>
+      {body}
     </details>
   )
 }

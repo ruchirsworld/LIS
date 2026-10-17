@@ -8,6 +8,9 @@ import { TableScroll } from '../../components/TableScroll'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
 import { TableSearch, matchesSearch } from '../../components/TableSearch'
+import { RecordRow, useOpenRows } from '../../components/RecordRow'
+import { RecordDetails } from '../reports/RecordDetailModal'
+import { confirmAction } from '../../lib/feedback'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
 import type { Database } from '../../types/database'
@@ -19,6 +22,12 @@ export function VendorTable({ onEdit }: { onEdit: (vendor: Vendor) => void }) {
   const canManage = profile?.role === 'admin'
   const { data: allVendors, isLoading } = useVendors()
   const deleteVendor = useDeleteVendor()
+  const openRows = useOpenRows()
+
+  async function removeVendor(v: Vendor) {
+    const ok = await confirmAction({ title: 'Delete vendor', message: `Delete ${v.name}? This cannot be undone.`, confirmLabel: 'Delete', danger: true })
+    if (ok) deleteVendor.mutate(v.id)
+  }
   const [showOneTime, setShowOneTime] = useState(false)
   const vendors = allVendors?.filter((v) => showOneTime || !v.is_one_time)
 
@@ -66,6 +75,7 @@ export function VendorTable({ onEdit }: { onEdit: (vendor: Vendor) => void }) {
       <table className="data">
         <thead>
           <tr>
+            <th></th>
             <SortableTh label="ID" sortKey="id" activeKey={sortKey} direction={direction} onSort={toggleSort} />
             <SortableTh label="Vendor" sortKey="name" activeKey={sortKey} direction={direction} onSort={toggleSort} />
             <SortableTh label="Category" sortKey="category" activeKey={sortKey} direction={direction} onSort={toggleSort} />
@@ -80,20 +90,28 @@ export function VendorTable({ onEdit }: { onEdit: (vendor: Vendor) => void }) {
         <tbody>
           {isLoading && (
             <tr>
-              <td colSpan={9} className="empty-row">
+              <td colSpan={10} className="empty-row">
                 Loading…
               </td>
             </tr>
           )}
           {!isLoading && (!sortedVendors || sortedVendors.length === 0) && (
             <tr>
-              <td colSpan={9} className="empty-row">
+              <td colSpan={10} className="empty-row">
                 No vendors yet
               </td>
             </tr>
           )}
           {pageRows?.map((v) => (
-            <tr key={v.id}>
+            <RecordRow
+              key={v.id}
+              expanded={openRows.isOpen(v.id)}
+              onToggle={() => openRows.toggle(v.id)}
+              colSpan={10}
+              details={<RecordDetails sourceTable="vendors" sourceId={v.id} />}
+              onEdit={canManage ? () => onEdit(v) : undefined}
+              onDelete={canManage ? () => void removeVendor(v) : undefined}
+            >
               <td>{v.display_id ?? '—'}</td>
               <td>{v.name}</td>
               <td>{v.category ?? '—'}</td>
@@ -102,19 +120,7 @@ export function VendorTable({ onEdit }: { onEdit: (vendor: Vendor) => void }) {
               <td>{v.gstin ?? v.gstpan ?? '—'}</td>
               <td>{v.pan ?? '—'}</td>
               <td>{v.address ?? '—'}</td>
-              <td>
-                {canManage && (
-                  <>
-                    <button type="button" className="pay-btn" onClick={() => onEdit(v)}>
-                      Edit
-                    </button>
-                    <button type="button" className="btn danger-link" onClick={() => deleteVendor.mutate(v.id)}>
-                      Remove
-                    </button>
-                  </>
-                )}
-              </td>
-            </tr>
+            </RecordRow>
           ))}
         </tbody>
       </table>

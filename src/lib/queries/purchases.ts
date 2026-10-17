@@ -171,6 +171,7 @@ export function useDeleteVendorBillPayment() {
 }
 
 type VendorAdvanceInsert = Database['public']['Tables']['vendor_advances']['Insert']
+type VendorAdvanceUpdate = Database['public']['Tables']['vendor_advances']['Update']
 
 // An advance changes the books (cash or bank, the advances account) and, through the database, which
 // bills are settled, so everything that reads those has to refetch.
@@ -199,6 +200,18 @@ export function useCreateVendorAdvance() {
   return useMutation({
     mutationFn: async (row: VendorAdvanceInsert) => {
       const { data, error } = await supabase.from('vendor_advances').insert(row).select().single()
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => invalidateAfterAdvance(qc),
+  })
+}
+
+export function useUpdateVendorAdvance() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, patch }: { id: string; patch: VendorAdvanceUpdate }) => {
+      const { data, error } = await supabase.from('vendor_advances').update(patch).eq('id', id).select().single()
       if (error) throw error
       return data
     },

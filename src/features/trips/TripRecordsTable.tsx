@@ -2,6 +2,7 @@ import { activateProps } from '../../lib/a11y'
 import { confirmAction } from '../../lib/feedback'
 import { Fragment, useEffect, useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui'
+import { RowMenu } from '../../components/RowMenu'
 import { Modal } from '../../components/Modal'
 import { SearchableSelect } from '../../components/SearchableSelect'
 import { TableScroll } from '../../components/TableScroll'
@@ -20,6 +21,7 @@ import { fmt, fmtDate } from '../../lib/calc/format'
 import { getErrorMessage } from '../../lib/errors'
 import { ExpenseForm } from '../expenses/ExpenseForm'
 import { SpendBySource } from './SpendBySource'
+import { RecordDetails } from '../reports/RecordDetailModal'
 import { spendExportSection } from '../../lib/calc/spendByAccount'
 import { PeriodFilterToggle } from '../../components/PeriodFilterToggle'
 import type { DateRange } from '../../lib/calc/period'
@@ -33,7 +35,7 @@ function todayStr() {
   return new Date().toISOString().slice(0, 10)
 }
 
-const COL_SPAN = 9
+const COL_SPAN = 10
 
 /** The month a trip belongs to: the one it started in. */
 const monthOf = (date: string) => date.slice(0, 7)
@@ -182,9 +184,10 @@ export function TripRecordsTable() {
   // Trips are clustered under a heading for the month they started in; a heading folds its trips away.
   const [groupByMonth, setGroupByMonth] = useState(true)
   const [search, setSearch] = useState('')
-  const [collapsedMonths, setCollapsedMonths] = useState<Set<string>>(new Set())
+  // Every month starts folded; the ones the person opens are remembered here.
+  const [openMonths, setOpenMonths] = useState<Set<string>>(new Set())
   function toggleMonth(month: string) {
-    setCollapsedMonths((cur) => {
+    setOpenMonths((cur) => {
       const next = new Set(cur)
       if (next.has(month)) next.delete(month)
       else next.add(month)
@@ -270,6 +273,7 @@ export function TripRecordsTable() {
   const { sorted, sortKey, direction, toggleSort } = useSort(
     rangeFilteredTrips,
     {
+      id: (t) => t.display_id,
       name: (t) => t.name,
       traveler: (t) => travelerName(t.traveler_id),
       project: (t) => projectName(t.project_id),
@@ -297,11 +301,23 @@ export function TripRecordsTable() {
     return { count: tripsInMonth.length, spent, total: spent.reduce((s, e) => s + Number(e.amount || 0), 0) }
   }
 
+  // A month is folded unless it was opened, except while searching, when every month shows what matched.
+  const isMonthFolded = (month: string) => groupByMonth && !search && !openMonths.has(month)
+  // Every other visible trip is shaded, so the rows are easy to follow across the table.
+  const shadedTrips = new Map<string, boolean>()
+  let shown = 0
+  for (const t of pageRows ?? []) {
+    if (isMonthFolded(monthOf(t.start_date))) continue
+    shadedTrips.set(t.id, shown % 2 === 1)
+    shown += 1
+  }
+
   const exportSections: ExportSection[] = [
     {
       title: 'Trip records',
-      columns: ['Trip', 'Traveler', 'Project', 'Start', 'End', 'Status', 'Total'],
+      columns: ['ID', 'Trip', 'Traveler', 'Project', 'Start', 'End', 'Status', 'Total'],
       rows: sortedTrips.map((t) => [
+        t.display_id ?? '',
         t.name,
         travelerName(t.traveler_id),
         projectName(t.project_id),
@@ -333,10 +349,11 @@ export function TripRecordsTable() {
       <TableSearch value={search} onChange={setSearch} placeholder="Search trips by ID, name, traveler, project or any entry on them…" />
 
       <TableScroll>
-        <table className="data">
+        <table className="data table-compact">
           <thead>
             <tr>
               <th></th>
+              <SortableTh label="ID" sortKey="id" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Trip" sortKey="name" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Traveler" sortKey="traveler" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Project" sortKey="project" activeKey={sortKey} direction={direction} onSort={toggleSort} />
@@ -360,19 +377,19 @@ export function TripRecordsTable() {
               const tripExpenses = expensesByTrip(t.id)
               const month = monthOf(t.start_date)
               const isNewMonth = groupByMonth && (idx === 0 || monthOf(pageRows[idx - 1].start_date) !== month)
-              const monthCollapsed = groupByMonth && collapsedMonths.has(month)
+              const monthCollapsed = isMonthFolded(month)
               const summary = isNewMonth ? monthSummary(month) : null
               return (
                 <Fragment key={t.id}>
                   {summary && (
                     <tr className="group-header-row" onClick={() => toggleMonth(month)} style={{ cursor: 'pointer' }}>
-                      <td colSpan={COL_SPAN}>
+                      <td colSpan={COL_SPAN} style={{ fontSize: 15, padding: '12px 10px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
-                          <span>
-                            <span style={{ display: 'inline-block', width: 14, fontSize: 11, opacity: 0.6 }}>{monthCollapsed ? '▸' : '▾'}</span>
+                          <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--ink)' }}>
+                            <span style={{ display: 'inline-block', width: 18, fontSize: 13, opacity: 0.6 }}>{monthCollapsed ? '▸' : '▾'}</span>
                             {monthLabel(month)}
                           </span>
-                          <span style={{ whiteSpace: 'nowrap' }}>
+                          <span style={{ whiteSpace: 'nowrap', fontSize: 14 }}>
                             {summary.count} trip{summary.count === 1 ? '' : 's'} · {fmt(summary.total)}
                           </span>
                         </div>
@@ -382,7 +399,7 @@ export function TripRecordsTable() {
                   )}
                   {!monthCollapsed && (
                   <>
-                  <tr {...activateProps(() => setExpandedId(isExpanded ? null : t.id))} style={{ cursor: 'pointer' }}>
+                  <tr className={shadedTrips.get(t.id) ? 'row-alt' : undefined} {...activateProps(() => setExpandedId(isExpanded ? null : t.id))} style={{ cursor: 'pointer' }}>
                     <td>
                       <button
                         type="button"
@@ -396,6 +413,7 @@ export function TripRecordsTable() {
                         {isExpanded ? '▾' : '▸'}
                       </button>
                     </td>
+                    <td>{t.display_id ?? '—'}</td>
                     <td>{t.name}</td>
                     <td>{travelerName(t.traveler_id)}</td>
                     <td>{projectName(t.project_id)}</td>
@@ -403,38 +421,13 @@ export function TripRecordsTable() {
                     <td>{t.end_date ? fmtDate(t.end_date) : '—'}</td>
                     <td>{t.status}</td>
                     <td className="amt">{fmt(tripTotal(t.id))}</td>
-                    <td>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          className="icon-btn-sq"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setEditingTrip(t)
-                          }}
-                          title="Edit"
-                          aria-label="Edit"
-                        >
-                          ✎
-                        </Button>
-                        {canDelete && (
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            className="icon-btn-sq"
-                            disabled={deleteBusyId === t.id}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleDeleteTrip(t)
-                            }}
-                            title="Delete"
-                            aria-label="Delete"
-                          >
-                            🗑
-                          </Button>
-                        )}
-                      </div>
+                    <td style={{ width: 40, textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
+                      <RowMenu
+                        items={[
+                          { label: 'Edit', onClick: () => setEditingTrip(t) },
+                          ...(canDelete ? [{ label: 'Delete', disabled: deleteBusyId === t.id, onClick: () => void handleDeleteTrip(t) }] : []),
+                        ]}
+                      />
                       {deleteError[t.id] && (
                         <div className="note" style={{ color: 'var(--red)', marginTop: 4 }}>
                           {deleteError[t.id]}
@@ -445,7 +438,8 @@ export function TripRecordsTable() {
                   {isExpanded && (
                     <tr className="pay-form-row">
                       <td colSpan={COL_SPAN}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
+                        <RecordDetails sourceTable="trips" sourceId={t.id} />
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, margin: '12px 0 10px' }}>
                           <div className="note" style={{ margin: 0, fontWeight: 600 }}>
                             Entries on this trip
                           </div>
@@ -503,40 +497,15 @@ export function TripRecordsTable() {
                                     <td>{e.description}</td>
                                     <td>{subHeadName(e.sub_head_id)}</td>
                                     <td className="amt">{fmt(e.amount)}</td>
-                                    <td>
-                                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                                        <Button
-                                          type="button"
-                                          variant="secondary"
-                                          className="icon-btn-sq"
-                                          onClick={() => setEditingExpenseId(editingExpenseId === e.id ? null : e.id)}
-                                          title="Edit"
-                                          aria-label="Edit"
-                                        >
-                                          ✎
-                                        </Button>
-                                        {canDelete && (
-                                          <Button
-                                            type="button"
-                                            variant="secondary"
-                                            className="icon-btn-sq"
-                                            onClick={() => handleDeleteExpense(e)}
-                                            title="Delete"
-                                            aria-label="Delete"
-                                          >
-                                            🗑
-                                          </Button>
-                                        )}
-                                      </div>
+                                    <td style={{ width: 40, textAlign: 'right' }}>
+                                      <RowMenu
+                                        items={[
+                                          { label: 'Edit', onClick: () => setEditingExpenseId(e.id) },
+                                          ...(canDelete ? [{ label: 'Delete', onClick: () => void handleDeleteExpense(e) }] : []),
+                                        ]}
+                                      />
                                     </td>
                                   </tr>
-                                  {editingExpenseId === e.id && (
-                                    <tr className="pay-form-row">
-                                      <td colSpan={5}>
-                                        <ExpenseForm editingExpense={e} onDoneEditing={() => setEditingExpenseId(null)} />
-                                      </td>
-                                    </tr>
-                                  )}
                                 </Fragment>
                               ))}
                             </tbody>
@@ -557,6 +526,11 @@ export function TripRecordsTable() {
       <Pagination page={page} totalPages={totalPages} totalCount={totalCount} onChange={setPage} />
 
       {editingTrip && <EditTripModal trip={editingTrip} onClose={() => setEditingTrip(null)} />}
+      {editingExpenseId && (expenses ?? []).find((x) => x.id === editingExpenseId) && (
+        <Modal title="Edit entry" onClose={() => setEditingExpenseId(null)}>
+          <ExpenseForm editingExpense={(expenses ?? []).find((x) => x.id === editingExpenseId) ?? null} onDoneEditing={() => setEditingExpenseId(null)} />
+        </Modal>
+      )}
     </details>
   )
 }

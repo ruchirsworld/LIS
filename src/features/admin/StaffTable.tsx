@@ -9,6 +9,9 @@ import { TableScroll } from '../../components/TableScroll'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
 import { TableSearch, matchesSearch } from '../../components/TableSearch'
+import { RecordRow, useOpenRows } from '../../components/RecordRow'
+import { RecordDetails } from '../reports/RecordDetailModal'
+import { confirmAction } from '../../lib/feedback'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
 import { fmt, fmtDate } from '../../lib/calc/format'
@@ -23,6 +26,12 @@ export function StaffTable({ onEdit }: { onEdit: (staff: Staff) => void }) {
   const { data: profiles } = useProfiles()
   const { data: projects } = useProjects()
   const deleteStaff = useDeleteStaff()
+  const openRows = useOpenRows()
+
+  async function removeStaff(s: Staff) {
+    const ok = await confirmAction({ title: 'Delete staff member', message: `Delete ${s.name}? This cannot be undone.`, confirmLabel: 'Delete', danger: true })
+    if (ok) deleteStaff.mutate(s.id)
+  }
 
   const supervisorName = (id: string | null) => (id ? profiles?.find((p) => p.id === id)?.name ?? '—' : '—')
   const projectName = (id: string | null) => (id ? projects?.find((p) => p.id === id)?.name ?? '—' : '—')
@@ -63,6 +72,7 @@ export function StaffTable({ onEdit }: { onEdit: (staff: Staff) => void }) {
         <table className="data">
           <thead>
             <tr>
+              <th></th>
               <SortableTh label="ID" sortKey="id" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Name" sortKey="name" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <SortableTh label="Phone" sortKey="phone" activeKey={sortKey} direction={direction} onSort={toggleSort} />
@@ -77,20 +87,28 @@ export function StaffTable({ onEdit }: { onEdit: (staff: Staff) => void }) {
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={9} className="empty-row">
+                <td colSpan={10} className="empty-row">
                   Loading…
                 </td>
               </tr>
             )}
             {!isLoading && (!sortedStaff || sortedStaff.length === 0) && (
               <tr>
-                <td colSpan={9} className="empty-row">
+                <td colSpan={10} className="empty-row">
                   No staff yet
                 </td>
               </tr>
             )}
             {pageRows?.map((s) => (
-              <tr key={s.id}>
+              <RecordRow
+                key={s.id}
+                expanded={openRows.isOpen(s.id)}
+                onToggle={() => openRows.toggle(s.id)}
+                colSpan={10}
+                details={<RecordDetails sourceTable="staff" sourceId={s.id} />}
+                onEdit={canManage ? () => onEdit(s) : undefined}
+                onDelete={canManage ? () => void removeStaff(s) : undefined}
+              >
                 <td>{s.display_id ?? '—'}</td>
                 <td>{s.name}</td>
                 <td>{s.phone ?? '—'}</td>
@@ -99,19 +117,7 @@ export function StaffTable({ onEdit }: { onEdit: (staff: Staff) => void }) {
                 <td>{projectName(s.default_project_id)}</td>
                 <td>{fmtDate(s.start_date)}</td>
                 <td>{s.end_date ? fmtDate(s.end_date) : '—'}</td>
-                <td>
-                  {canManage && (
-                    <>
-                      <button type="button" className="pay-btn" onClick={() => onEdit(s)}>
-                        Edit
-                      </button>
-                      <button type="button" className="btn danger-link" onClick={() => deleteStaff.mutate(s.id)}>
-                        Remove
-                      </button>
-                    </>
-                  )}
-                </td>
-              </tr>
+              </RecordRow>
             ))}
           </tbody>
         </table>

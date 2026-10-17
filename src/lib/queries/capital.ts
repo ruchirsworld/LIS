@@ -4,6 +4,14 @@ import type { DateRange } from '../calc/period'
 import type { Database } from '../../types/database'
 
 type CapitalTxInsert = Database['public']['Tables']['capital_transactions']['Insert']
+type CapitalTxUpdate = Database['public']['Tables']['capital_transactions']['Update']
+
+/** Capital moves money, so everything that shows a balance is refreshed with it. */
+function refreshAll(qc: ReturnType<typeof useQueryClient>) {
+  for (const key of ['capital_transactions', 'dashboard-kpis', 'ledger_lines', 'bank_lines', 'trial_balance', 'books_health', 'gl_balances']) {
+    qc.invalidateQueries({ queryKey: [key] })
+  }
+}
 
 export function useCapitalTx(range: DateRange | null) {
   return useQuery({
@@ -34,6 +42,18 @@ export function useCreateCapitalTx() {
   })
 }
 
+export function useUpdateCapitalTx() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, patch }: { id: string; patch: CapitalTxUpdate }) => {
+      const { data, error } = await supabase.from('capital_transactions').update(patch).eq('id', id).select().single()
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => refreshAll(qc),
+  })
+}
+
 export function useDeleteCapitalTx() {
   const qc = useQueryClient()
   return useMutation({
@@ -41,9 +61,6 @@ export function useDeleteCapitalTx() {
       const { error } = await supabase.from('capital_transactions').delete().eq('id', id)
       if (error) throw error
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['capital_transactions'] })
-      qc.invalidateQueries({ queryKey: ['dashboard-kpis'] })
-    },
+    onSuccess: () => refreshAll(qc),
   })
 }

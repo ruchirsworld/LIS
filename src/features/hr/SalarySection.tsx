@@ -19,12 +19,14 @@ import {
   useUpdateStaffSalaryAdvance,
   useDeleteStaffSalaryAdvance,
 } from '../../lib/queries/hr'
-import { useAuth } from '../../lib/auth'
 import { PaymentAccountPicker, bankAccountIdOf, CASH_ACCOUNT } from '../../components/PaymentAccountPicker'
 import { computeAccrualBreakdown, nextAccrualStart, todayStr, type AttendanceDayType } from '../../lib/calc/payroll'
 import { fmt, fmtDate, parseINR } from '../../lib/calc/format'
 import { getErrorMessage } from '../../lib/errors'
 import { TableSearch, matchesSearch } from '../../components/TableSearch'
+import { RecordRow, useOpenRows } from '../../components/RecordRow'
+import { Modal } from '../../components/Modal'
+import { RecordDetails } from '../reports/RecordDetailModal'
 
 // The pay-slip is meant for the worker to keep, not just the Admin running
 // payroll — every label on it shows English and Hindi together rather than
@@ -70,16 +72,12 @@ function shiftMonth(ym: string, delta: number): string {
 }
 
 export function SalarySection() {
-  const { profile } = useAuth()
-  // Deleting a salary advance un-does it entirely — Admin-only, matching
-  // the same precedent used for Imprest transactions, Trips, and Expenses.
-  // Editing (fixing a typo) stays open to Admin/CXO like everything else here.
-  const canDeleteAdvance = profile?.role === 'admin'
   const { data: staff } = useStaff()
   const { data: profiles } = useProfiles()
   const { data: allLeave } = useAllStaffAttendance()
   const { data: holidays } = useHolidays()
   const { data: allAssignments } = useAllStaffProjectAssignments()
+  const openRows = useOpenRows()
   const [accrualSearch, setAccrualSearch] = useState('')
   const [paymentSearch, setPaymentSearch] = useState('')
   const [advanceSearch, setAdvanceSearch] = useState('')
@@ -704,29 +702,39 @@ export function SalarySection() {
           <table className="data">
             <thead>
               <tr>
+                <th></th>
                 <th>ID</th>
                 <th>Staff</th>
                 <th>Period</th>
                 <th style={{ textAlign: 'right' }}>Amount</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
               {(!accruals || accruals.length === 0) && (
                 <tr>
-                  <td colSpan={4} className="empty-row">
+                  <td colSpan={6} className="empty-row">
                     No payroll runs yet
                   </td>
                 </tr>
               )}
               {accruals && accruals.length > 0 && accrualRows.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="empty-row">
+                  <td colSpan={6} className="empty-row">
                     Nothing matches your search
                   </td>
                 </tr>
               )}
               {accrualRows.map((a) => (
-                <tr key={a.id}>
+                <RecordRow
+                  key={a.id}
+                  expanded={openRows.isOpen(a.id)}
+                  onToggle={() => openRows.toggle(a.id)}
+                  colSpan={6}
+                  details={<RecordDetails sourceTable="wage_accruals" sourceId={a.id} />}
+                  // A payroll run is final: it is viewed (the pay-slip), not edited or deleted.
+                  extraItems={[{ label: 'View pay-slip', onClick: () => openViewAccrual(a) }]}
+                >
                   <td>{a.display_id ?? '—'}</td>
                   <td>
                     <button type="button" className="btn link" onClick={() => openViewAccrual(a)}>
@@ -737,7 +745,7 @@ export function SalarySection() {
                     {fmtDate(a.period_start)} – {fmtDate(a.period_end)}
                   </td>
                   <td className="amt">{fmt(a.amount)}</td>
-                </tr>
+                </RecordRow>
               ))}
             </tbody>
           </table>
@@ -751,38 +759,46 @@ export function SalarySection() {
           <table className="data">
             <thead>
               <tr>
+                <th></th>
                 <th>ID</th>
                 <th>Staff</th>
                 <th>Date</th>
                 <th>Account</th>
                 <th style={{ textAlign: 'right' }}>Amount</th>
                 <th style={{ textAlign: 'right' }}>Advance recovered</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
               {(!payments || payments.length === 0) && (
                 <tr>
-                  <td colSpan={6} className="empty-row">
+                  <td colSpan={8} className="empty-row">
                     No payments recorded yet
                   </td>
                 </tr>
               )}
               {payments && payments.length > 0 && paymentRows.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="empty-row">
+                  <td colSpan={8} className="empty-row">
                     Nothing matches your search
                   </td>
                 </tr>
               )}
               {paymentRows.map((p) => (
-                <tr key={p.id}>
+                <RecordRow
+                  key={p.id}
+                  expanded={openRows.isOpen(p.id)}
+                  onToggle={() => openRows.toggle(p.id)}
+                  colSpan={8}
+                  details={<RecordDetails sourceTable="wage_payments" sourceId={p.id} />}
+                >
                   <td>{p.display_id ?? '—'}</td>
                   <td>{staffName(p.staff_id)}</td>
                   <td>{fmtDate(p.date)}</td>
                   <td>{bankAccountName(p.bank_account_id)}</td>
                   <td className="amt">{fmt(p.amount)}</td>
                   <td className="amt">{p.advance_recovered ? fmt(p.advance_recovered) : '—'}</td>
-                </tr>
+                </RecordRow>
               ))}
             </tbody>
           </table>
@@ -796,6 +812,7 @@ export function SalarySection() {
           <table className="data">
             <thead>
               <tr>
+                <th></th>
                 <th>ID</th>
                 <th>Staff</th>
                 <th>Date</th>
@@ -807,130 +824,79 @@ export function SalarySection() {
             <tbody>
               {(!salaryAdvances || salaryAdvances.length === 0) && (
                 <tr>
-                  <td colSpan={6} className="empty-row">
+                  <td colSpan={7} className="empty-row">
                     No salary advances given yet
                   </td>
                 </tr>
               )}
               {salaryAdvances && salaryAdvances.length > 0 && advanceRows.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="empty-row">
+                  <td colSpan={7} className="empty-row">
                     Nothing matches your search
                   </td>
                 </tr>
               )}
-              {advanceRows.map((a) =>
-                editingAdvanceId === a.id ? (
-                  <Fragment key={a.id}>
-                    <tr>
-                      <td>{a.display_id ?? '—'}</td>
-                      <td>{staffName(a.staff_id)}</td>
-                      <td>
-                        <input
-                          type="date"
-                          aria-label="Date"
-                          value={advanceEditDraft.date}
-                          onChange={(e) => setAdvanceEditDraft((d) => ({ ...d, date: e.target.value }))}
-                        />
-                      </td>
-                      <td></td>
-                      <td className="amt">
-                        <CurrencyInput
-                          value={advanceEditDraft.amount}
-                          onValueChange={(v) => setAdvanceEditDraft((d) => ({ ...d, amount: v }))}
-                        />
-                      </td>
-                      <td></td>
-                    </tr>
-                    <tr>
-                      <td colSpan={6}>
-                        <div className="field-row" style={{ marginBottom: 8 }}>
-                          <PaymentAccountPicker
-                            style={{ flexBasis: '100%' }}
-                            value={advanceEditDraft.bankAccountId}
-                            onChange={(id) => setAdvanceEditDraft((d) => ({ ...d, bankAccountId: id }))}
-                          />
-
-                          <div className="field">
-                            <label>Remarks (optional)</label>
-                            <input
-                              type="text"
-                              value={advanceEditDraft.remarks}
-                              onChange={(e) => setAdvanceEditDraft((d) => ({ ...d, remarks: e.target.value }))}
-                            />
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                          <Button
-                            type="button"
-                            disabled={advanceEditBusyId === a.id}
-                            onClick={() => handleSaveAdvanceEdit(a.id)}
-                          >
-                            Save
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            disabled={advanceEditBusyId === a.id}
-                            onClick={() => setEditingAdvanceId(null)}
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                        {advanceEditError[a.id] && (
-                          <div className="note" style={{ color: 'var(--red)', marginTop: 4 }}>
-                            {advanceEditError[a.id]}
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  </Fragment>
-                ) : (
-                  <tr key={a.id}>
-                    <td>{a.display_id ?? '—'}</td>
-                    <td>{staffName(a.staff_id)}</td>
-                    <td>{fmtDate(a.date)}</td>
-                    <td>{bankAccountName(a.bank_account_id)}</td>
-                    <td className="amt">{fmt(a.amount)}</td>
-                    <td>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          className="icon-btn-sq"
-                          onClick={() => startEditAdvance(a)}
-                          title="Edit"
-                          aria-label="Edit"
-                        >
-                          ✎
-                        </Button>
-                        {canDeleteAdvance && (
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            className="icon-btn-sq"
-                            disabled={advanceEditBusyId === a.id}
-                            onClick={() => handleDeleteAdvance(a)}
-                            title="Delete"
-                            aria-label="Delete"
-                          >
-                            🗑
-                          </Button>
-                        )}
+              {advanceRows.map((a) => (
+                <RecordRow
+                  key={a.id}
+                  expanded={openRows.isOpen(a.id)}
+                  onToggle={() => openRows.toggle(a.id)}
+                  colSpan={7}
+                  details={<RecordDetails sourceTable="staff_salary_advances" sourceId={a.id} />}
+                  onEdit={() => startEditAdvance(a)}
+                  onDelete={() => void handleDeleteAdvance(a)}
+                >
+                  <td>{a.display_id ?? '—'}</td>
+                  <td>{staffName(a.staff_id)}</td>
+                  <td>{fmtDate(a.date)}</td>
+                  <td>{bankAccountName(a.bank_account_id)}</td>
+                  <td className="amt">
+                    {fmt(a.amount)}
+                    {advanceEditError[a.id] && (
+                      <div className="note" style={{ color: 'var(--red)', marginTop: 4 }}>
+                        {advanceEditError[a.id]}
                       </div>
-                      {advanceEditError[a.id] && (
-                        <div className="note" style={{ color: 'var(--red)', marginTop: 4 }}>
-                          {advanceEditError[a.id]}
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                )
-              )}
+                    )}
+                  </td>
+                </RecordRow>
+              ))}
             </tbody>
           </table>
         </div>
       </div>
+
+      {editingAdvanceId && (salaryAdvances ?? []).find((x) => x.id === editingAdvanceId) && (
+        <Modal title="Edit salary advance" onClose={() => setEditingAdvanceId(null)}>
+          <div className="form-grid">
+            <div className="field">
+              <label>Date</label>
+              <input type="date" aria-label="Date" value={advanceEditDraft.date} onChange={(e) => setAdvanceEditDraft((d) => ({ ...d, date: e.target.value }))} />
+            </div>
+            <div className="field">
+              <label>Amount (₹)</label>
+              <CurrencyInput value={advanceEditDraft.amount} onValueChange={(v) => setAdvanceEditDraft((d) => ({ ...d, amount: v }))} />
+            </div>
+            <PaymentAccountPicker className="full" value={advanceEditDraft.bankAccountId} onChange={(id) => setAdvanceEditDraft((d) => ({ ...d, bankAccountId: id }))} />
+            <div className="field full">
+              <label>Remarks (optional)</label>
+              <input type="text" value={advanceEditDraft.remarks} onChange={(e) => setAdvanceEditDraft((d) => ({ ...d, remarks: e.target.value }))} />
+            </div>
+            <div className="field full" style={{ display: 'flex', gap: 8 }}>
+              <Button type="button" disabled={advanceEditBusyId === editingAdvanceId} onClick={() => void handleSaveAdvanceEdit(editingAdvanceId)}>
+                Save changes
+              </Button>
+              <Button type="button" variant="secondary" disabled={advanceEditBusyId === editingAdvanceId} onClick={() => setEditingAdvanceId(null)}>
+                Cancel
+              </Button>
+            </div>
+            {advanceEditError[editingAdvanceId] && (
+              <div className="note full" style={{ color: 'var(--red)' }}>
+                {advanceEditError[editingAdvanceId]}
+              </div>
+            )}
+          </div>
+        </Modal>
+      )}
 
       {confirmingRow && (
         <div className="modal-backdrop" onClick={() => (runningId ? null : setConfirmingRow(null))}>
