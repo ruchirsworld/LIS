@@ -4,6 +4,7 @@ import { fmt2, fmtDate } from '../../lib/calc/format'
 import { activateProps } from '../../lib/a11y'
 import { ledgerKey, ledgerKeysOf, statementRowsOf, type LedgerCandidate, type MatchResult, type StatementMatch } from '../../lib/calc/bankMatch'
 import type { StatementLine } from '../../lib/import/bankStatement'
+import { canShowRecord } from './RecordDetailModal'
 import './BankSplitView.css'
 
 // green = matched one to one, or a group that has been saved (ticked); yellow = several lines matched with one on the
@@ -74,6 +75,7 @@ export function BankSplitView({
   onUnmatch,
   onRecord,
   onEdit,
+  onView,
 }: {
   lines: StatementLine[]
   ledger: LedgerCandidate[]
@@ -93,6 +95,8 @@ export function BankSplitView({
   onRecord: (line: StatementLine) => void
   /** Change an entry in the books without leaving this screen. */
   onEdit: (line: LedgerCandidate) => void
+  /** Look at every detail of an entry in the books, in a popup. */
+  onView: (line: LedgerCandidate) => void
 }) {
   const [onlyProblems, setOnlyProblems] = useState(false)
   const [sel, setSel] = useState<{ side: Side; ref: number | string } | null>(null)
@@ -243,6 +247,18 @@ export function BankSplitView({
               }}
             >
               Record this
+            </button>
+          )}
+          {r.line?.sourceTable && r.line.sourceId && canShowRecord(r.line.sourceTable) && (
+            <button
+              type="button"
+              className="btn secondary"
+              onClick={(e) => {
+                e.stopPropagation()
+                onView(r.line as LedgerCandidate)
+              }}
+            >
+              View
             </button>
           )}
           {r.line && (

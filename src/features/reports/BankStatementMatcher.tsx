@@ -5,6 +5,7 @@ import { useGoTo } from '../../lib/navContext'
 import { resolveEntryTarget } from '../../lib/entryTarget'
 import { RecordFromStatement } from './RecordFromStatement'
 import { EditEntryModal } from './EditEntryModal'
+import { RecordDetailModal } from './RecordDetailModal'
 import {
   ledgerIdsOf,
   ledgerKeysOf,
@@ -111,6 +112,7 @@ export function BankStatementMatcher({
   const [days, setDays] = useState(restored?.days ?? 0)
   const [recording, setRecording] = useState<StatementLine | null>(null)
   const [editing, setEditing] = useState<LedgerCandidate | null>(null)
+  const [viewing, setViewing] = useState<LedgerCandidate | null>(null)
   const [groups, setGroups] = useState<ManualGroup[]>(
     () => restored?.groups ?? (restored?.forced ?? []).map((f) => ({ statementRows: [f.statementRow], ledgerKeys: [f.ledgerId] }))
   )
@@ -395,6 +397,7 @@ export function BankStatementMatcher({
                 onUnmatch={(m) => void unmatch(m)}
                 onRecord={setRecording}
                 onEdit={setEditing}
+                onView={setViewing}
               />
 
               <div style={{ marginTop: 12, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -426,6 +429,19 @@ export function BankStatementMatcher({
       )}
       {recording && <RecordFromStatement line={recording} bankAccountId={bankId} bankName={bankName} onClose={() => setRecording(null)} />}
       {editing && <EditEntryModal line={editing} onClose={() => setEditing(null)} onOpenScreen={() => void openEntry(editing)} />}
+      {viewing && viewing.sourceTable && viewing.sourceId && (
+        <RecordDetailModal
+          title={viewing.description}
+          sourceTable={viewing.sourceTable}
+          sourceId={viewing.sourceId}
+          onClose={() => setViewing(null)}
+          onOpenScreen={() => {
+            const entry = viewing
+            setViewing(null)
+            void openEntry(entry)
+          }}
+        />
+      )}
     </div>
   )
 }
