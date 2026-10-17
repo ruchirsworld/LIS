@@ -27,3 +27,5 @@ Applied on 2026-10-17 (migration phase3_on_behalf_trip_dates). After: every tabl
 Phase 4 migration (phase4_trash_and_reviews) applied on 2026-10-17. After: every table above identical in rows and totals (expense_reimbursements 2 rows, 3295 also unchanged); trashed rows 0; record_reviews 0; 3 functions, 7 zz_trash_unpost triggers, 7 read policies hiding trashed rows. Guard test (rolled back): a reconciled transfer and a loan with a reconciled payment are both refused.
 
 Phase 5 migration (phase5_activity_feed_duplicates) applied on 2026-10-17. After: every table above identical in rows and totals; duplicate_dismissals (new) 0 rows; functions activity_feed and possible_duplicates present.
+
+Phase 6 migration (phase6_reconciliation) applied on 2026-10-17. After: every table above identical in rows and totals (bank_reconciliations 10, bank_reconciliation_signoffs 1 unchanged); the 5 new tables hold 0 rows; 5 functions and the journal_lines lock trigger present; no locks exist, so nothing is blocked.
