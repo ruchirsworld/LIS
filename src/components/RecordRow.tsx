@@ -1,10 +1,14 @@
-import { Fragment, useState, type ReactNode } from 'react'
+import { Fragment, isValidElement, useState, type MouseEvent, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { useAuth } from '../lib/auth'
 import { RowMenu } from './RowMenu'
+import { RecordDetails } from '../features/reports/RecordDetailModal'
+import { RecordPanel } from '../features/reports/RecordPanel'
 
-/** The one layout every list of records follows: an arrow at the start that opens the complete details of the record, and a
- * menu (hamburger) at the end with Edit and Delete. Edit opens the record in a popup on the same page. Delete is for Admin only,
- * so it is left out of the menu for everyone else. */
+/** The one layout every list of records follows: clicking a row (or its arrow) opens the record in a compact side panel with its ID, status,
+ * amount and date, all its details, and Edit / Looks right / Delete. A menu (hamburger) at the end of the row has the same actions. Edit opens
+ * the record in a popup on the same page. Delete is for Admin only, so it is left out for everyone else. A row whose details are not a
+ * RecordDetails keeps the older open-in-place behaviour. */
 export function RecordRow({
   expanded,
   onToggle,
@@ -35,6 +39,14 @@ export function RecordRow({
 }) {
   const { profile } = useAuth()
   const isAdmin = profile?.role === 'admin'
+  // The details a list passes in say which record this is, so the panel can load its headline figures too.
+  const panelRecord = isValidElement<{ sourceTable: string; sourceId: string }>(details) && details.type === RecordDetails ? details.props : null
+  function handleRowClick(e: MouseEvent) {
+    if (!panelRecord) return
+    // Clicks on the row's own buttons, links and fields do their own thing.
+    if ((e.target as HTMLElement).closest('button, a, input, select, textarea, label')) return
+    onToggle()
+  }
   const items = [
     ...(extraItems ?? []),
     ...(onEdit ? [{ label: 'Edit', onClick: onEdit }] : []),
@@ -42,16 +54,24 @@ export function RecordRow({
   ]
   return (
     <Fragment>
-      <tr className={className} title={title}>
+      <tr className={panelRecord ? [className, 'row-clickable'].filter(Boolean).join(' ') : className} title={title} onClick={handleRowClick}>
         <td style={{ width: 36 }}>
           <button type="button" className="row-expand-btn" onClick={onToggle} aria-label={expanded ? 'Hide details' : 'Show complete details'} aria-expanded={expanded}>
-            {expanded ? '▾' : '▸'}
+            {expanded && !panelRecord ? '▾' : '▸'}
           </button>
         </td>
         {children}
         <td style={{ width: 40, textAlign: 'right' }}>{items.length > 0 && <RowMenu items={items} />}</td>
       </tr>
-      {expanded && (
+      {expanded && panelRecord &&
+        createPortal(
+          // React lets a click inside a portal bubble up to the row it came from, so it is stopped here.
+          <div style={{ display: 'contents' }} onClick={(e) => e.stopPropagation()}>
+            <RecordPanel sourceTable={panelRecord.sourceTable} sourceId={panelRecord.sourceId} onClose={onToggle} onEdit={onEdit} onDelete={onDelete} />
+          </div>,
+          document.body
+        )}
+      {expanded && !panelRecord && (
         <tr className="pay-form-row">
           <td colSpan={colSpan}>{details}</td>
         </tr>

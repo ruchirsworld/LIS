@@ -13,7 +13,9 @@ import {
 import { ReceiptUploadButton } from '../../components/ReceiptUploadButton'
 import { Modal } from '../../components/Modal'
 import { useClients, useProjects, useCostCenters, useExpenseSubHeads, useExpenseUnits } from '../../lib/queries/masters'
-import { useCreateExpense, useDeleteExpense, useUpdateExpense } from '../../lib/queries/expenses'
+import { useQueryClient } from '@tanstack/react-query'
+import { useCreateExpense, useUpdateExpense } from '../../lib/queries/expenses'
+import { refreshAfterTrash, trashRecord } from '../../lib/queries/trash'
 import { useAuth } from '../../lib/auth'
 import { useProfiles } from '../../lib/queries/admin'
 import { toast } from '../../lib/feedback'
@@ -137,7 +139,7 @@ export function ExpenseForm({
 
   const createExpense = useCreateExpense()
   const updateExpense = useUpdateExpense()
-  const deleteExpense = useDeleteExpense()
+  const queryClient = useQueryClient()
   const { profile } = useAuth()
   const saveConfirm = useSaveConfirm()
   const createUnit = useCreateExpenseUnit()
@@ -539,8 +541,11 @@ export function ExpenseForm({
           action: {
             label: 'Undo',
             onClick: () => {
-              deleteExpense.mutateAsync(created.id).then(
-                () => toast('info', `${created.display_id} was removed.`),
+              trashRecord('expenses', created.id, { quiet: true }).then(
+                () => {
+                  refreshAfterTrash(queryClient)
+                  toast('info', `${created.display_id} was moved to the Trash.`)
+                },
                 () => toast('error', 'Could not undo. Delete it from the list instead.')
               )
             },

@@ -38,7 +38,7 @@ export function TransferTable() {
   async function removeTransfer(t: Transfer) {
     const ok = await confirmAction({
       title: 'Delete transfer',
-      message: `Delete transfer ${t.display_id ?? ''} of ${fmt(t.amount)} dated ${t.date ? fmtDate(t.date) : ''}? The money goes back to where it was. This cannot be undone.`,
+      message: `Delete transfer ${t.display_id ?? ''} of ${fmt(t.amount)} dated ${t.date ? fmtDate(t.date) : ''}? The money goes back to where it was. It moves to the Trash and can be restored.`,
       confirmLabel: 'Delete',
       danger: true,
     })

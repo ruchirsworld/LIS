@@ -13,11 +13,12 @@ import { HolidaysSection } from './HolidaysSection'
 import { BankAccountsSection } from './BankAccountsSection'
 import { AppSettingsSection } from './AppSettingsSection'
 import { CompanyProfileSection } from './CompanyProfileSection'
+import { TrashSection } from './TrashSection'
 
 const headerButtonStyle = {
-  background: '#fff',
-  color: 'var(--accent)',
-  border: 'none',
+  background: 'var(--surface)',
+  color: 'var(--primary)',
+  border: '1px solid var(--border)',
   borderRadius: 6,
   padding: '7px 16px',
   fontSize: 14,
@@ -71,6 +72,7 @@ export function AdminPage() {
           <UnitsSection />
           <BankAccountsSection />
           <UsersSection />
+          <TrashSection />
         </>
       )}
     </div>

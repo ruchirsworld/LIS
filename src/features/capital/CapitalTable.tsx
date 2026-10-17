@@ -35,7 +35,7 @@ export function CapitalTable() {
   async function removeTx(t: CapitalTx) {
     const ok = await confirmAction({
       title: 'Delete capital entry',
-      message: `Delete ${t.display_id ?? 'this entry'} of ${fmt(t.amount)} dated ${t.date ? fmtDate(t.date) : ''}? This cannot be undone.`,
+      message: `Delete ${t.display_id ?? 'this entry'} of ${fmt(t.amount)} dated ${t.date ? fmtDate(t.date) : ''}? It moves to the Trash and can be restored.`,
       confirmLabel: 'Delete',
       danger: true,
     })

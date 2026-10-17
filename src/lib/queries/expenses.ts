@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../supabase'
+import { trashRecord } from './trash'
 import type { DateRange } from '../calc/period'
 import type { Database } from '../../types/database'
 
@@ -67,8 +68,7 @@ export function useDeleteExpense() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('expenses').delete().eq('id', id)
-      if (error) throw error
+      await trashRecord('expenses', id, { qc })
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['expenses'] })
@@ -95,8 +95,7 @@ export function useBulkDeleteExpenses() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (ids: string[]) => {
-      const { error } = await supabase.from('expenses').delete().in('id', ids)
-      if (error) throw error
+      for (const id of ids) await trashRecord('expenses', id, { quiet: true })
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['expenses'] })
@@ -150,8 +149,7 @@ export function useDeleteExpenseReimbursement() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('expense_reimbursements').delete().eq('id', id)
-      if (error) throw error
+      await trashRecord('expense_reimbursements', id, { qc })
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['expense_reimbursements'] })

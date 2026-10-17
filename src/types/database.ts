@@ -16,6 +16,9 @@ export type Database = {
     Tables: {
       other_receipts: {
         Row: {
+          deleted_at: string | null
+          deleted_by: string | null
+          delete_reason: string | null
           amount: number
           bank_account_id: string | null
           created_at: string
@@ -30,6 +33,9 @@ export type Database = {
           reference: string | null
         }
         Insert: {
+          deleted_at?: string | null
+          deleted_by?: string | null
+          delete_reason?: string | null
           amount: number
           bank_account_id?: string | null
           created_at?: string
@@ -44,6 +50,9 @@ export type Database = {
           reference?: string | null
         }
         Update: {
+          deleted_at?: string | null
+          deleted_by?: string | null
+          delete_reason?: string | null
           amount?: number
           bank_account_id?: string | null
           created_at?: string
@@ -401,6 +410,9 @@ export type Database = {
       }
       capital_transactions: {
         Row: {
+          deleted_at: string | null
+          deleted_by: string | null
+          delete_reason: string | null
           amount: number
           bank_account_id: string | null
           created_at: string
@@ -414,6 +426,9 @@ export type Database = {
           type: Database["public"]["Enums"]["capital_tx_type"]
         }
         Insert: {
+          deleted_at?: string | null
+          deleted_by?: string | null
+          delete_reason?: string | null
           amount: number
           bank_account_id?: string | null
           created_at?: string
@@ -427,6 +442,9 @@ export type Database = {
           type: Database["public"]["Enums"]["capital_tx_type"]
         }
         Update: {
+          deleted_at?: string | null
+          deleted_by?: string | null
+          delete_reason?: string | null
           amount?: number
           bank_account_id?: string | null
           created_at?: string
@@ -710,6 +728,9 @@ export type Database = {
       }
       expense_reimbursements: {
         Row: {
+          deleted_at: string | null
+          deleted_by: string | null
+          delete_reason: string | null
           amount: number
           approved_at: string | null
           approved_by: string | null
@@ -725,6 +746,9 @@ export type Database = {
           vendor_bill_payment_id: string | null
         }
         Insert: {
+          deleted_at?: string | null
+          deleted_by?: string | null
+          delete_reason?: string | null
           amount: number
           approved_at?: string | null
           approved_by?: string | null
@@ -740,6 +764,9 @@ export type Database = {
           vendor_bill_payment_id?: string | null
         }
         Update: {
+          deleted_at?: string | null
+          deleted_by?: string | null
+          delete_reason?: string | null
           amount?: number
           approved_at?: string | null
           approved_by?: string | null
@@ -895,6 +922,9 @@ export type Database = {
       }
       expenses: {
         Row: {
+          deleted_at: string | null
+          deleted_by: string | null
+          delete_reason: string | null
           duplicate_reason: string | null
           on_behalf_of: string | null
           additional_amount: number | null
@@ -927,6 +957,9 @@ export type Database = {
           vendor_id: string | null
         }
         Insert: {
+          deleted_at?: string | null
+          deleted_by?: string | null
+          delete_reason?: string | null
           duplicate_reason?: string | null
           on_behalf_of?: string | null
           additional_amount?: number | null
@@ -959,6 +992,9 @@ export type Database = {
           vendor_id?: string | null
         }
         Update: {
+          deleted_at?: string | null
+          deleted_by?: string | null
+          delete_reason?: string | null
           duplicate_reason?: string | null
           on_behalf_of?: string | null
           additional_amount?: number | null
@@ -1666,6 +1702,9 @@ export type Database = {
       }
       loan_payments: {
         Row: {
+          deleted_at: string | null
+          deleted_by: string | null
+          delete_reason: string | null
           bank_account_id: string | null
           created_at: string
           created_by: string | null
@@ -1679,6 +1718,9 @@ export type Database = {
           reference: string | null
         }
         Insert: {
+          deleted_at?: string | null
+          deleted_by?: string | null
+          delete_reason?: string | null
           bank_account_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -1692,6 +1734,9 @@ export type Database = {
           reference?: string | null
         }
         Update: {
+          deleted_at?: string | null
+          deleted_by?: string | null
+          delete_reason?: string | null
           bank_account_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -1744,6 +1789,9 @@ export type Database = {
       }
       loans: {
         Row: {
+          deleted_at: string | null
+          deleted_by: string | null
+          delete_reason: string | null
           bank_account_id: string | null
           created_at: string
           created_by: string | null
@@ -1758,6 +1806,9 @@ export type Database = {
           roi_pct: number
         }
         Insert: {
+          deleted_at?: string | null
+          deleted_by?: string | null
+          delete_reason?: string | null
           bank_account_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -1772,6 +1823,9 @@ export type Database = {
           roi_pct: number
         }
         Update: {
+          deleted_at?: string | null
+          deleted_by?: string | null
+          delete_reason?: string | null
           bank_account_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -2358,6 +2412,9 @@ export type Database = {
       }
       transfers: {
         Row: {
+          deleted_at: string | null
+          deleted_by: string | null
+          delete_reason: string | null
           amount: number
           created_at: string
           created_by: string | null
@@ -2369,6 +2426,9 @@ export type Database = {
           to_account_id: string | null
         }
         Insert: {
+          deleted_at?: string | null
+          deleted_by?: string | null
+          delete_reason?: string | null
           amount: number
           created_at?: string
           created_by?: string | null
@@ -2380,6 +2440,9 @@ export type Database = {
           to_account_id?: string | null
         }
         Update: {
+          deleted_at?: string | null
+          deleted_by?: string | null
+          delete_reason?: string | null
           amount?: number
           created_at?: string
           created_by?: string | null
@@ -3499,6 +3562,9 @@ export type Database = {
         }[]
       }
       books_locked: { Args: { p_date: string }; Returns: boolean }
+      trash_record: { Args: { p_table: string; p_id: string; p_reason?: string | null }; Returns: undefined }
+      restore_record: { Args: { p_table: string; p_id: string }; Returns: undefined }
+      list_trash: { Args: never; Returns: Record<string, unknown>[] }
       cash_or_bank: { Args: { p_bank_account_id: string }; Returns: string }
       client_state_code: { Args: { p_client: string }; Returns: string }
       company_state_code: { Args: never; Returns: string }

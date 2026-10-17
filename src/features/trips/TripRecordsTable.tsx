@@ -218,7 +218,7 @@ export function TripRecordsTable() {
   async function handleDeleteExpense(e: ExpenseRow) {
     const ok = await confirmAction({
       title: 'Delete entry',
-      message: `Delete this entry of ${fmt(e.amount)} dated ${fmtDate(e.date)}? This cannot be undone.`,
+      message: `Delete this entry of ${fmt(e.amount)} dated ${fmtDate(e.date)}? It moves to the Trash and can be restored.`,
       confirmLabel: 'Delete',
       danger: true,
     })

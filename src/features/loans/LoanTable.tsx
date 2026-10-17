@@ -44,7 +44,7 @@ export function LoanTable() {
   async function removeLoan(l: Loan) {
     const ok = await confirmAction({
       title: 'Delete loan',
-      message: `Delete loan ${l.display_id ?? ''} from ${l.lender}? Its repayments go with it. This cannot be undone.`,
+      message: `Delete loan ${l.display_id ?? ''} from ${l.lender}? Its repayments go with it. It moves to the Trash and can be restored.`,
       confirmLabel: 'Delete',
       danger: true,
     })

@@ -539,7 +539,7 @@ export function ProjectsPage() {
                                                   {
                                                     label: 'Delete',
                                                     onClick: async () => {
-                                                      const ok = await confirmAction({ title: 'Delete expense', message: `Delete ${e.display_id ?? 'this expense'} of ${fmt(e.amount)}? This cannot be undone.`, confirmLabel: 'Delete', danger: true })
+                                                      const ok = await confirmAction({ title: 'Delete expense', message: `Delete ${e.display_id ?? 'this expense'} of ${fmt(e.amount)}? It moves to the Trash and can be restored.`, confirmLabel: 'Delete', danger: true })
                                                       if (ok) deleteExpense.mutate(e.id)
                                                     },
                                                   },

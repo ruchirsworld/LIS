@@ -149,7 +149,7 @@ export function ExpenseTable({
     if (selectedIds.size === 0) return
     const ok = await confirmAction({
       title: 'Remove expenses',
-      message: `Remove ${selectedIds.size} selected expense${selectedIds.size === 1 ? '' : 's'}? This cannot be undone.`,
+      message: `Remove ${selectedIds.size} selected expense${selectedIds.size === 1 ? '' : 's'}? They move to the Trash and can be restored.`,
       confirmLabel: 'Remove',
       danger: true,
     })
@@ -161,7 +161,7 @@ export function ExpenseTable({
   async function removeOne(e: NonNullable<typeof expenses>[number]) {
     const ok = await confirmAction({
       title: 'Delete expense',
-      message: `Delete ${e.display_id ?? 'this expense'} of ${fmt(e.amount)} dated ${fmtDate(e.date)}? This cannot be undone.`,
+      message: `Delete ${e.display_id ?? 'this expense'} of ${fmt(e.amount)} dated ${fmtDate(e.date)}? It moves to the Trash and can be restored.`,
       confirmLabel: 'Delete',
       danger: true,
     })

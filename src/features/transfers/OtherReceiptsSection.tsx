@@ -170,7 +170,7 @@ export function OtherReceiptsSection() {
   }
 
   async function askRemove(id: string, label: string) {
-    const ok = await confirmAction({ title: 'Remove this entry?', message: `${label}. The money is taken out of the books again.`, confirmLabel: 'Remove', danger: true })
+    const ok = await confirmAction({ title: 'Remove this entry?', message: `${label}. The money is taken out of the books again. It moves to the Trash and can be restored.`, confirmLabel: 'Remove', danger: true })
     if (!ok) return
     try {
       await remove.mutateAsync(id)

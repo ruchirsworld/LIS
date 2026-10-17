@@ -46,7 +46,7 @@ export function ReimbursementRecordsTable({ costCenter }: { costCenter?: string 
   async function removeReimbursement(r: ExpenseReimbursement) {
     const ok = await confirmAction({
       title: 'Delete reimbursement',
-      message: `Delete ${r.display_id ?? 'this reimbursement'} of ${fmt(r.amount)} dated ${fmtDate(r.date)}? This cannot be undone.`,
+      message: `Delete ${r.display_id ?? 'this reimbursement'} of ${fmt(r.amount)} dated ${fmtDate(r.date)}? It moves to the Trash and can be restored.`,
       confirmLabel: 'Delete',
       danger: true,
     })

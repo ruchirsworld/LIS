@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../supabase'
+import { trashRecord } from './trash'
 import type { DateRange } from '../calc/period'
 import type { Database } from '../../types/database'
 
@@ -55,8 +56,7 @@ export function useDeleteTransfer() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('transfers').delete().eq('id', id)
-      if (error) throw error
+      await trashRecord('transfers', id, { qc })
     },
     onSuccess: () => refreshBalances(qc),
   })
