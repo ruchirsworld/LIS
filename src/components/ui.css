@@ -2979,3 +2979,22 @@ table.data tr.row-clickable {
   gap: var(--space-2);
   margin-bottom: var(--space-2);
 }
+
+/* The dashboard's refresh icon turns while the figures reload. */
+.dash-refresh {
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.dash-refreshing svg {
+  animation: dash-spin 0.9s linear infinite;
+}
+@keyframes dash-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dash-refreshing svg {
+    animation: none;
+  }
+}

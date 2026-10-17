@@ -1,6 +1,7 @@
 import { activateProps } from '../../lib/a11y'
 import { Fragment, useState, type ReactNode } from 'react'
 import { useIsFetching, useQueryClient } from '@tanstack/react-query'
+import { RefreshCw } from 'lucide-react'
 import { Button, ModuleHeader, KpiCard, type KpiTone } from '../../components/ui'
 import { fmt, fmtDate } from '../../lib/calc/format'
 import { useDashboardKpis } from '../../lib/queries/dashboard'
@@ -47,14 +48,8 @@ const PERIOD_LABEL: Record<ReportPeriodType, string> = {
   custom: 'selected range',
 }
 
-const JUMP_LINKS: { id: DashSectionId; label: string }[] = [
-  { id: 'attention', label: 'Needs attention' },
-  { id: 'position', label: 'Position today' },
-  { id: 'period', label: 'This period' },
-  { id: 'projects', label: 'Projects' },
-  { id: 'insights', label: 'Trends' },
-  { id: 'reports', label: 'Reports' },
-]
+// Only Projects is offered as a jump link; the other sections are simply on the page, one under another.
+const JUMP_LINKS: { id: DashSectionId; label: string }[] = [{ id: 'projects', label: 'Projects' }]
 
 type ExpandedKpi = 'approvals' | 'draftInvoices' | 'overdueInvoices' | 'outstanding' | 'retention' | 'gstHeld' | 'imprest' | 'gst' | PeriodKpiId | null
 
@@ -262,15 +257,16 @@ export function DashboardPage() {
           ))}
         </nav>
         {updatedAt && <span className="dash-updated">Updated {updatedAt}</span>}
-        <Button
+        <button
           type="button"
-          variant="secondary"
-          className="dash-refresh"
+          className={fetchingCount > 0 ? 'icon-btn dash-refresh dash-refreshing' : 'icon-btn dash-refresh'}
           disabled={fetchingCount > 0}
           onClick={() => queryClient.invalidateQueries()}
+          aria-label={fetchingCount > 0 ? 'Refreshing' : 'Refresh'}
+          title={fetchingCount > 0 ? 'Refreshing…' : 'Refresh the figures'}
         >
-          {fetchingCount > 0 ? 'Refreshing…' : 'Refresh'}
-        </Button>
+          <RefreshCw size={18} aria-hidden="true" />
+        </button>
       </div>
 
       <DashSection id="attention" title="Needs attention" open={sections.isOpen('attention')} onToggle={() => sections.toggle('attention')}>

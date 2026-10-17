@@ -4,13 +4,16 @@ const STORAGE_KEY = 'lis.dash.sections'
 
 export type DashSectionId = 'attention' | 'position' | 'period' | 'projects' | 'insights' | 'reports'
 
+// Needs attention starts folded; once someone opens or folds a section, their choice is remembered.
+const STARTS_CLOSED: Record<string, boolean> = { attention: true }
+
 function loadClosed(): Record<string, boolean> {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     const parsed = raw ? JSON.parse(raw) : {}
-    return parsed && typeof parsed === 'object' ? parsed : {}
+    return { ...STARTS_CLOSED, ...(parsed && typeof parsed === 'object' ? parsed : {}) }
   } catch {
-    return {}
+    return { ...STARTS_CLOSED }
   }
 }
 
