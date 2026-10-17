@@ -15,6 +15,7 @@ import { Modal } from '../../components/Modal'
 import { useClients, useProjects, useCostCenters, useExpenseSubHeads, useExpenseUnits } from '../../lib/queries/masters'
 import { useCreateExpense, useDeleteExpense, useUpdateExpense } from '../../lib/queries/expenses'
 import { useAuth } from '../../lib/auth'
+import { useProfiles } from '../../lib/queries/admin'
 import { toast } from '../../lib/feedback'
 import { useSaveConfirm } from '../../components/SaveConfirm'
 import { entrySentence } from '../../lib/saveChecks'
@@ -168,6 +169,12 @@ export function ExpenseForm({
   // a field in this form.
   const effectiveDate = tripId ? tripDate ?? todayStr() : date
   const [remarks, setRemarks] = useState('')
+  // Optional: the person this entry was made for, when someone else is entering it.
+  const [onBehalfOf, setOnBehalfOf] = useState('')
+  const { data: allProfiles } = useProfiles()
+  // A trip entry can optionally be linked to a project too; it starts from the trip's own project, if it has one.
+  const [linkProject, setLinkProject] = useState(!!fixedProjectId)
+  const [tripProjectId, setTripProjectId] = useState(fixedProjectId ?? '')
   const [receiptBlob, setReceiptBlob] = useState<Blob | null>(null)
   const [receiptStatus, setReceiptStatus] = useState('Take photo')
   // Which Description group's options row is open — a group with options
@@ -219,7 +226,7 @@ export function ExpenseForm({
     : isAdminEntry
       ? ADMIN_QUICK_CATEGORIES
       : []
-  const effectiveProjectId = tripId ? fixedProjectId ?? '' : projectId
+  const effectiveProjectId = tripId ? (linkProject ? tripProjectId : '') : projectId
   const selectedProject = projects?.find((p) => p.id === effectiveProjectId)
   const selectedProjectClient = selectedProject ? clients?.find((c) => c.id === selectedProject.client_id) : null
   // Whether this entry should carry a project_id at all — for a trip that's
@@ -304,6 +311,7 @@ export function ExpenseForm({
     setDescription(editingExpense.description)
     setDate(editingExpense.date)
     setRemarks(editingExpense.remarks ?? '')
+    setOnBehalfOf(editingExpense.on_behalf_of ?? '')
     setAccountId(
       editingExpense.paid_from_imprest
         ? IMPREST
@@ -415,6 +423,7 @@ export function ExpenseForm({
     // of the day (see loadStoredProject), across repeated entries.
     setAccountId('')
     setRemarks('')
+    setOnBehalfOf('')
     setReceiptBlob(null)
     setReceiptStatus('Take photo')
     setDate(todayStr())
@@ -434,6 +443,10 @@ export function ExpenseForm({
 
     if (isProjectCostCenter && !effectiveProjectId) {
       setFormError('Pick a project.')
+      return
+    }
+    if (tripId && linkProject && !tripProjectId) {
+      setFormError('Pick a project, or switch off "Link to project".')
       return
     }
     if (showQtyRateFields && (!qty || Number(qty) <= 0)) {
@@ -466,11 +479,11 @@ export function ExpenseForm({
         ]),
         amount: baseAmount,
         date: effectiveDate,
-        personIds: [profile?.id ?? ''],
+        personIds: [profile?.id ?? '', onBehalfOf],
         subHeadId,
       })
       if (!decision.ok) return
-      if (decision.duplicateReason) duplicateNote = `[Possible duplicate, saved anyway: ${decision.duplicateReason}]`
+      if (decision.duplicateReason) duplicateNote = decision.duplicateReason
     }
 
     setSubmitting(true)
@@ -496,7 +509,10 @@ export function ExpenseForm({
         date: effectiveDate,
         reimbursable: effectiveAccountId === REIMBURSE,
         paid_from_imprest: effectiveAccountId === IMPREST,
-        remarks: [remarks.trim(), duplicateNote].filter(Boolean).join(' ') || null,
+        remarks: remarks.trim() || null,
+        // These two columns come from the Phase 3 migration, so they are only sent when there is something to put in them.
+        ...(onBehalfOf ? { on_behalf_of: onBehalfOf } : editingExpense?.on_behalf_of ? { on_behalf_of: null } : {}),
+        ...(duplicateNote ? { duplicate_reason: duplicateNote } : {}),
         receipt_path: receiptPath,
         payment_mode:
           effectiveAccountId === REIMBURSE || effectiveAccountId === IMPREST
@@ -576,16 +592,36 @@ export function ExpenseForm({
         }}
         style={{ marginTop: 8 }}
       >
+        {/* The date comes first, large and highlighted: a missed or wrong date is the commonest slip. On a trip the date is picked in the
+            Trips header (limited to the trip's dates). */}
+        {!tripId && (
+          <div className="field full date-first">
+            <label htmlFor="exp-date">Date</label>
+            <input id="exp-date" type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
+          </div>
+        )}
+
         {/* Row 1: Cost center — fixed by the trip when entering trip expenses,
             so there's nothing to pick here (the page header already says
             Trips). Date comes from the Trips header's date picker instead of
             a field here; the trip's project, if any, is still noted below. */}
         {tripId ? (
-          hasProject ? (
-            <div className="field full">
-              <div className="note" style={{ margin: 0, fontSize: 11 }}>({selectedProject?.name ?? '—'})</div>
-            </div>
-          ) : null
+          <div className="field full trip-project-link">
+            <label className="check-inline">
+              <input type="checkbox" checked={linkProject} onChange={(e) => setLinkProject(e.target.checked)} />
+              Link to project
+            </label>
+            {linkProject && (
+              <SearchableSelect
+                items={activeProjects}
+                value={tripProjectId}
+                onChange={setTripProjectId}
+                getId={(p) => p.id}
+                getLabel={(p) => p.name}
+                placeholder="— Select project —"
+              />
+            )}
+          </div>
         ) : isAdminEntry || lockToProjects ? null : (
           <div className="field full">
             <label>Cost center</label>
@@ -821,22 +857,10 @@ export function ExpenseForm({
                 <label>Additional amount (₹)</label>
                 <CurrencyInput value={additionalAmount} onValueChange={setAdditionalAmount} />
               </div>
-              <div className="field field-narrow">
-                <label>Date</label>
-                <input type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
-              </div>
             </div>
           </>
         ) : (
           <div className="field-row exp-row4">
-            {/* Date already sits up in the Cost center row on trips —
-                only show it here for non-trip entries. */}
-            {!tripId && (
-              <div className="field field-narrow">
-                <label>Date</label>
-                <input type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
-              </div>
-            )}
             <div className="field">
               <label>Amount (₹)</label>
               <div className="amount-row" style={{ display: 'flex', gap: 8, alignItems: 'center', minWidth: 0 }}>
@@ -1006,16 +1030,27 @@ export function ExpenseForm({
           </Modal>
         )}
 
-        {/* Row 5: Remarks (optional) */}
-        <div className="field full">
-          <label>Remarks (optional)</label>
-          <input
-            type="text"
-            placeholder="Any extra context"
-            value={remarks}
-            onChange={(e) => setRemarks(e.target.value)}
-          />
-        </div>
+        {/* Row 5: the optional details, folded away so the essentials stay in view */}
+        <details className="field full more-details">
+          <summary>More details</summary>
+          <div className="more-details-body">
+            <div className="field">
+              <label>Remarks (optional)</label>
+              <input type="text" placeholder="Any extra context" value={remarks} onChange={(e) => setRemarks(e.target.value)} />
+            </div>
+            <div className="field">
+              <label>Entered on behalf of (optional)</label>
+              <SearchableSelect
+                items={allProfiles}
+                value={onBehalfOf}
+                onChange={setOnBehalfOf}
+                getId={(p) => p.id}
+                getLabel={(p) => p.name}
+                placeholder="— Myself —"
+              />
+            </div>
+          </div>
+        </details>
 
         <hr className="form-divider" />
         {receiptStatus === 'Could not process photo' && (

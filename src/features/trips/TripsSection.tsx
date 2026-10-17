@@ -14,6 +14,7 @@ import { ExpenseForm } from '../expenses/ExpenseForm'
 import { ReimbursementRecordsTable } from '../expenses/ReimbursementRecordsTable'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import { TripRecordsTable } from './TripRecordsTable'
+import { TripPicker } from './TripPicker'
 import { SpendBySource } from './SpendBySource'
 import { spendExportSection } from '../../lib/calc/spendByAccount'
 import type { ExportSection } from '../../lib/export/report'
@@ -114,11 +115,19 @@ export function TripsSection() {
   const expandedTripExpenses = expandedTrip ? (expenses ?? []).filter((e) => e.trip_id === expandedTrip.id) : []
   const expandedTripTotal = expandedTripExpenses.reduce((s, e) => s + Number(e.amount || 0), 0)
 
-  // Reset the entry date back to today whenever a different trip expands —
-  // otherwise a date picked for one trip would silently carry over.
+  // The date for new entries stays inside the trip: today when today is within it, otherwise the trip's first day. It restarts whenever a
+  // different trip is chosen, so a date picked for one trip never carries over to another.
+  const tripLastDay = expandedTrip ? expandedTrip.end_date ?? todayStr() : todayStr()
   useEffect(() => {
-    setEntryDate(todayStr())
+    if (!expandedTrip) {
+      setEntryDate(todayStr())
+      return
+    }
+    const today = todayStr()
+    setEntryDate(today >= expandedTrip.start_date && today <= (expandedTrip.end_date ?? today) ? today : expandedTrip.start_date)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [expandedId])
+  const travellerName = (id: string | null) => profiles?.find((p) => p.id === id)?.name ?? ''
 
   const tripExportSections: ExportSection[] = expandedTrip
     ? [
@@ -135,14 +144,17 @@ export function TripsSection() {
     <div>
       <div className="card" style={{ padding: '10px 14px', marginBottom: 8 }}>
         <div className="toolbar" style={{ marginTop: 0, alignItems: 'center' }}>
-          <strong style={{ fontSize: 14 }}>{expandedTrip ? expandedTrip.name : 'No trip in progress'}</strong>
+          <TripPicker trips={trips ?? []} value={expandedId} onChange={(id) => setExpandedOverride(id)} travellerName={travellerName} />
           {expandedTrip ? (
             <div className="toolbar-group" style={{ alignItems: 'center' }}>
               <input
                 type="date"
                 value={entryDate}
+                min={expandedTrip.start_date}
+                max={tripLastDay}
                 onChange={(e) => setEntryDate(e.target.value)}
                 aria-label="Entry date"
+                title={`This trip runs from ${fmtDate(expandedTrip.start_date)}${expandedTrip.end_date ? ` to ${fmtDate(expandedTrip.end_date)}` : ' until today'}`}
                 style={{ fontSize: 13, padding: '6px 8px', width: 140 }}
               />
               <Button
@@ -156,7 +168,10 @@ export function TripsSection() {
                   setExpandedOverride(undefined)
                 }}
               >
-                End Trip
+                {expandedTrip.status === 'closed' ? 'Reopen trip' : 'End Trip'}
+              </Button>
+              <Button type="button" variant="secondary" onClick={() => setShowStartTrip(true)}>
+                Start trip
               </Button>
             </div>
           ) : (
@@ -227,6 +242,7 @@ export function TripsSection() {
       {expandedTrip && (
         <>
           <ExpenseForm
+            key={expandedTrip.id}
             editingExpense={null}
             onDoneEditing={() => {}}
             tripId={expandedTrip.id}

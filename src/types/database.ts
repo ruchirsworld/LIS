@@ -895,6 +895,8 @@ export type Database = {
       }
       expenses: {
         Row: {
+          duplicate_reason: string | null
+          on_behalf_of: string | null
           additional_amount: number | null
           amount: number
           bank_account_id: string | null
@@ -925,6 +927,8 @@ export type Database = {
           vendor_id: string | null
         }
         Insert: {
+          duplicate_reason?: string | null
+          on_behalf_of?: string | null
           additional_amount?: number | null
           amount: number
           bank_account_id?: string | null
@@ -955,6 +959,8 @@ export type Database = {
           vendor_id?: string | null
         }
         Update: {
+          duplicate_reason?: string | null
+          on_behalf_of?: string | null
           additional_amount?: number | null
           amount?: number
           bank_account_id?: string | null

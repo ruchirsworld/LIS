@@ -38,7 +38,7 @@ export function ExpensesPage({
                   className={costCenter === cc ? 'cc-switch-btn active' : 'cc-switch-btn'}
                   onClick={() => onCostCenterChange(cc)}
                 >
-                  {cc}
+                  {cc === 'Trips' ? 'Trip' : cc}
                 </button>
               ))}
             </div>
