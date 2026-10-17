@@ -115,6 +115,7 @@ export function ReimbursementRecordsTable({ costCenter }: { costCenter?: string 
       <summary>Reimbursement records</summary>
 
       <div className="toolbar">
+        <div className="toolbar-group toolbar-fill">
         <div className="pill-tabs" style={{ flexWrap: 'wrap' }}>
           <button type="button" className={userId === '' ? 'pill active' : 'pill'} onClick={() => setUserId('')}>
             All
@@ -130,10 +131,11 @@ export function ReimbursementRecordsTable({ costCenter }: { costCenter?: string 
             </button>
           ))}
         </div>
+          <TableSearch value={search} onChange={setSearch} inline />
+        </div>
         <ReportExportButtons title="Reimbursement records" sections={exportSections} range={null} iconOnly style={{ marginTop: 0 }} />
       </div>
 
-      <TableSearch value={search} onChange={setSearch} />
       <TableScroll>
         <table className="data">
           <thead>

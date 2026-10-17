@@ -603,8 +603,11 @@ export function SiteImprestSection() {
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-              <ReportPeriodFilter onChange={(r) => setPaymentsRange(r)} />
+            <div className="toolbar">
+              <div className="toolbar-group toolbar-fill">
+                <ReportPeriodFilter onChange={(r) => setPaymentsRange(r)} />
+                <TableSearch value={recordSearch} onChange={setRecordSearch} inline placeholder="Search by ID, date, amount, account or remarks…" />
+              </div>
               <ReportExportButtons
                 title={`${supervisorName(supervisorId)} — Imprest transactions`}
                 sections={recordsExportSections}
@@ -613,7 +616,6 @@ export function SiteImprestSection() {
               />
             </div>
 
-            <TableSearch value={recordSearch} onChange={setRecordSearch} placeholder="Search by ID, date, amount, account or remarks…" />
             <div className="table-scroll">
               <table className="data">
                 <thead>

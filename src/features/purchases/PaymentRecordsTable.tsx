@@ -87,6 +87,7 @@ export function PaymentRecordsTable() {
       <summary>Payment records</summary>
 
       <div className="toolbar">
+        <div className="toolbar-group toolbar-fill">
         <div className="field" style={{ maxWidth: 260, marginBottom: 0 }}>
           <label>Search vendor</label>
           <SearchableSelect
@@ -99,10 +100,11 @@ export function PaymentRecordsTable() {
             placeholder="— All vendors —"
           />
         </div>
-        <ReportExportButtons title="Payment records" sections={exportSections} range={null} style={{ marginTop: 0 }} />
+          <TableSearch value={search} onChange={setSearch} inline />
+        </div>
+        <ReportExportButtons title="Payment records" sections={exportSections} range={null} iconOnly style={{ marginTop: 0 }} />
       </div>
 
-      <TableSearch value={search} onChange={setSearch} />
       <TableScroll>
         <table className="data">
           <thead>

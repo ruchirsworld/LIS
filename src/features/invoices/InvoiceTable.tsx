@@ -1,6 +1,6 @@
 import { confirmAction } from '../../lib/feedback'
 import { Fragment, useEffect, useState } from 'react'
-import { PeriodFilter } from '../../components/PeriodFilter'
+import { PeriodFilterToggle } from '../../components/PeriodFilterToggle'
 import { SearchableSelect } from '../../components/SearchableSelect'
 import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
@@ -184,8 +184,8 @@ export function InvoiceTable() {
       <summary>Ledger</summary>
 
       <div className="toolbar">
-        <div className="toolbar-group">
-          <PeriodFilter onChange={setRange} allowCustom style={{ marginBottom: 0 }} />
+        <div className="toolbar-group toolbar-fill">
+          <PeriodFilterToggle range={range} onChange={setRange} />
           <div className="field" style={{ maxWidth: 200 }}>
             <label>Client</label>
             <SearchableSelect
@@ -208,11 +208,13 @@ export function InvoiceTable() {
               <option value="gst">GST held by client</option>
             </select>
           </div>
+          <TableSearch value={search} onChange={setSearch} inline />
         </div>
         <ReportExportButtons
           title={ledgerTitle}
           sections={exportSections}
           range={range}
+          iconOnly
           style={{ marginTop: 0 }}
           headerNote={companyHeaderLine(company)}
           fileNamePrefix={ledgerFileNamePrefix}
@@ -231,7 +233,6 @@ export function InvoiceTable() {
         </div>
       )}
 
-      <TableSearch value={search} onChange={setSearch} />
       <TableScroll>
         <table className="data">
           <thead>

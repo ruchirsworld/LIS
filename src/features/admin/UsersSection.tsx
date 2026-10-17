@@ -258,9 +258,12 @@ export function UsersSection() {
         </Modal>
       )}
 
-      <ReportExportButtons title="Users" sections={exportSections} range={null} />
-
-      <TableSearch value={search} onChange={setSearch} />
+      <div className="toolbar">
+        <div className="toolbar-group toolbar-fill">
+          <TableSearch value={search} onChange={setSearch} inline />
+        </div>
+        <ReportExportButtons title="Users" sections={exportSections} range={null} iconOnly style={{ marginTop: 0 }} />
+      </div>
       <TableScroll>
         <table className="data">
           <thead>

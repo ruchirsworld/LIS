@@ -63,14 +63,18 @@ export function VendorTable({ onEdit }: { onEdit: (vendor: Vendor) => void }) {
 
   return (
     <>
-      <ReportExportButtons title="Vendors" sections={exportSections} range={null} />
-      {allVendors?.some((v) => v.is_one_time) && (
-        <label style={{ display: 'flex', gap: 6, alignItems: 'center', margin: '8px 0', fontSize: 12, fontWeight: 400 }}>
-          <input type="checkbox" checked={showOneTime} onChange={(e) => setShowOneTime(e.target.checked)} />
-          Show one-time vendors
-        </label>
-      )}
-      <TableSearch value={search} onChange={setSearch} />
+      <div className="toolbar">
+        <div className="toolbar-group toolbar-fill">
+          {allVendors?.some((v) => v.is_one_time) && (
+            <label className="check-inline" style={{ alignSelf: 'flex-end', paddingBottom: 8 }}>
+              <input type="checkbox" checked={showOneTime} onChange={(e) => setShowOneTime(e.target.checked)} />
+              Show one-time vendors
+            </label>
+          )}
+          <TableSearch value={search} onChange={setSearch} inline />
+        </div>
+        <ReportExportButtons title="Vendors" sections={exportSections} range={null} iconOnly style={{ marginTop: 0 }} />
+      </div>
       <TableScroll>
       <table className="data">
         <thead>

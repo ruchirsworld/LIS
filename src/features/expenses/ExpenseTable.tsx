@@ -88,10 +88,12 @@ export function ExpenseTable({
   const [payFormId, setPayFormId] = useState<string | null>(null)
   const [editingReimbursement, setEditingReimbursement] = useState<ExpenseReimbursement | null>(null)
   const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set())
-  const [collapsedMonths, setCollapsedMonths] = useState<Set<string>>(new Set())
+  // Every month starts folded; the months the person opens are kept here. A search opens them all, so its matches show.
+  const [openMonths, setOpenMonths] = useState<Set<string>>(new Set())
+  const isMonthFolded = (month: string) => groupByDate && !search && !openMonths.has(month)
 
   function toggleMonthGroup(month: string) {
-    setCollapsedMonths((prev) => {
+    setOpenMonths((prev) => {
       const next = new Set(prev)
       if (next.has(month)) next.delete(month)
       else next.add(month)
@@ -246,7 +248,7 @@ export function ExpenseTable({
         previousDate = r.date
         groupSegmentOfDate.set(r.date, (segment % 2) as 0 | 1)
       }
-      if (collapsedDates.has(r.date) || collapsedMonths.has(r.date.slice(0, 7))) continue
+      if (collapsedDates.has(r.date) || isMonthFolded(r.date.slice(0, 7))) continue
       rowShade.set(r.id, (alternate % 2) as 0 | 1)
       alternate += 1
     }
@@ -295,7 +297,7 @@ export function ExpenseTable({
       <summary>{title}</summary>
 
       <div className="toolbar">
-        <div className="toolbar-group">
+        <div className="toolbar-group toolbar-fill">
           <PeriodFilterToggle
             range={range}
             onChange={setRange}
@@ -312,6 +314,7 @@ export function ExpenseTable({
               placeholder="— All users —"
             />
           </div>
+          <TableSearch value={search} onChange={setSearch} inline />
         </div>
         <ReportExportButtons title={title} sections={exportSections} range={range} iconOnly style={{ marginTop: 0 }} />
       </div>
@@ -358,7 +361,6 @@ export function ExpenseTable({
         </div>
       )}
 
-      <TableSearch value={search} onChange={setSearch} />
       <TableScroll>
         <table className="data table-compact">
           <thead>
@@ -416,7 +418,7 @@ export function ExpenseTable({
               const isExpanded = expandedIds.has(e.id)
               const month = e.date.slice(0, 7)
               const isNewMonthGroup = groupByDate && (idx === 0 || pageRows[idx - 1].date.slice(0, 7) !== month)
-              const isMonthCollapsed = groupByDate && collapsedMonths.has(month)
+              const isMonthCollapsed = isMonthFolded(month)
               const monthSummary = isNewMonthGroup ? totalOf((r) => r.date.slice(0, 7) === month) : null
               const isNewDateGroup = groupByDate && (idx === 0 || pageRows[idx - 1].date !== e.date)
               const daySummary = isNewDateGroup ? totalOf((r) => r.date === e.date) : null

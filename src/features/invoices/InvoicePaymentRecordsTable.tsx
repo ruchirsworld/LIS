@@ -1,6 +1,6 @@
 import { activateProps } from '../../lib/a11y'
 import { Fragment, useEffect, useRef, useState } from 'react'
-import { PeriodFilter } from '../../components/PeriodFilter'
+import { PeriodFilterToggle } from '../../components/PeriodFilterToggle'
 import { useNavFilter } from '../../lib/navContext'
 import type { DateRange } from '../../lib/calc/period'
 import { SearchableSelect } from '../../components/SearchableSelect'
@@ -138,11 +138,10 @@ export function InvoicePaymentRecordsTable() {
       <summary>Payment records</summary>
 
       <div className="toolbar">
-        <div className="toolbar-group">
-          <PeriodFilter
+        <div className="toolbar-group toolbar-fill">
+          <PeriodFilterToggle
+            range={range}
             onChange={setRange}
-            allowCustom
-            style={{ marginBottom: 0 }}
             preset={nav?.filter.range ? { ...nav.filter.range, nonce: nav.nonce } : undefined}
           />
           <div className="field" style={{ maxWidth: 260, marginBottom: 0 }}>
@@ -156,11 +155,11 @@ export function InvoicePaymentRecordsTable() {
               placeholder="— All clients —"
             />
           </div>
+          <TableSearch value={search} onChange={setSearch} inline />
         </div>
-        <ReportExportButtons title="Payment records" sections={exportSections} range={range} style={{ marginTop: 0 }} />
+        <ReportExportButtons title="Payment records" sections={exportSections} range={range} iconOnly style={{ marginTop: 0 }} />
       </div>
 
-      <TableSearch value={search} onChange={setSearch} />
       <TableScroll>
         <table className="data">
           <thead>

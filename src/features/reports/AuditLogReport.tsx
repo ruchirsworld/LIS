@@ -67,19 +67,22 @@ export function AuditLogReport() {
         Every recorded edit and delete across the tables that matter — who changed what, and what it looked like before.
         Showing the most recent 500.
       </div>
-      <div className="field" style={{ maxWidth: 260 }}>
-        <label>Table</label>
-        <select value={tableFilter} onChange={(e) => setTableFilter(e.target.value)}>
-          <option value="">— All tables —</option>
-          {Object.entries(TABLE_LABELS).map(([key, label]) => (
-            <option key={key} value={key}>
-              {label}
-            </option>
-          ))}
-        </select>
+      <div className="toolbar">
+        <div className="toolbar-group toolbar-fill">
+          <div className="field" style={{ maxWidth: 260 }}>
+            <label>Table</label>
+            <select value={tableFilter} onChange={(e) => setTableFilter(e.target.value)}>
+              <option value="">— All tables —</option>
+              {Object.entries(TABLE_LABELS).map(([key, label]) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <TableSearch value={search} onChange={setSearch} inline placeholder="Search by who, ID, description, amount or date…" />
+        </div>
       </div>
-
-      <TableSearch value={search} onChange={setSearch} placeholder="Search by who, ID, description, amount or date…" />
       <div className="table-scroll" style={{ marginTop: 16 }}>
         <table className="data">
           <thead>

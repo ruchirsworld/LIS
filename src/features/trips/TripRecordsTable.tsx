@@ -317,12 +317,12 @@ export function TripRecordsTable() {
 
   // A month is folded unless it was opened, except while searching, when every month shows what matched.
   const isMonthFolded = (month: string) => groupByMonth && !search && !openMonths.has(month)
-  // Every other visible trip is shaded, so the rows are easy to follow across the table.
-  const shadedTrips = new Map<string, boolean>()
+  // Each visible trip, with its entries, is blue or white/cream in turn, so one trip is easy to tell from the next.
+  const tripSegment = new Map<string, 0 | 1>()
   let shown = 0
   for (const t of pageRows ?? []) {
     if (isMonthFolded(monthOf(t.start_date))) continue
-    shadedTrips.set(t.id, shown % 2 === 1)
+    tripSegment.set(t.id, (shown % 2) as 0 | 1)
     shown += 1
   }
 
@@ -351,18 +351,18 @@ export function TripRecordsTable() {
       <summary>Trip records</summary>
 
       <div className="toolbar">
-        <div className="toolbar-group">
+        <div className="toolbar-group toolbar-fill">
           <PeriodFilterToggle range={range} onChange={setRange} />
           <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
             <input type="checkbox" checked={groupByMonth} onChange={(e) => setGroupByMonth(e.target.checked)} />
             Group trips within months
           </label>
+          <TableSearch value={search} onChange={setSearch} inline placeholder="Search trips by ID, location, purpose, traveller, project or any entry on them…" />
         </div>
         <ReportExportButtons title="Trip records" sections={exportSections} range={range} iconOnly style={{ marginTop: 0 }} />
       </div>
 
       <SpendBySource expenses={shownExpenses} label="All trips shown, spent via" />
-      <TableSearch value={search} onChange={setSearch} placeholder="Search trips by ID, location, purpose, traveller, project or any entry on them…" />
 
       <TableScroll>
         <table
@@ -403,14 +403,14 @@ export function TripRecordsTable() {
                 <Fragment key={t.id}>
                   {summary && (
                     <tbody>
-                    <tr className="group-header-row" onClick={() => toggleMonth(month)} style={{ cursor: 'pointer' }}>
-                      <td colSpan={COL_SPAN} style={{ fontSize: 14, padding: '10px 10px' }}>
+                    <tr className="expense-month-group-row" onClick={() => toggleMonth(month)} style={{ cursor: 'pointer' }}>
+                      <td colSpan={COL_SPAN}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
-                          <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>
+                          <span>
                             <span style={{ display: 'inline-block', width: 16, fontSize: 12, opacity: 0.6 }}>{monthCollapsed ? '▸' : '▾'}</span>
                             {monthLabel(month)}
                           </span>
-                          <span style={{ whiteSpace: 'nowrap', fontSize: 13 }}>
+                          <span style={{ whiteSpace: 'nowrap', fontSize: 13, fontWeight: 600 }}>
                             {summary.count} trip{summary.count === 1 ? '' : 's'} · {fmt(summary.total)}
                           </span>
                         </div>
@@ -427,7 +427,7 @@ export function TripRecordsTable() {
                       if (el) el.style.setProperty('--trip-h', `${el.querySelector<HTMLElement>('tr.trip-main')?.offsetHeight ?? 0}px`)
                     }}
                   >
-                  <tr className={`trip-main${shadedTrips.get(t.id) ? ' row-alt' : ''}`} {...activateProps(() => setExpandedId(isExpanded ? null : t.id))} style={{ cursor: 'pointer' }}>
+                  <tr className={`trip-main trip-seg-${tripSegment.get(t.id) ?? 0}`} {...activateProps(() => setExpandedId(isExpanded ? null : t.id))} style={{ cursor: 'pointer' }}>
                     <td>
                       <button
                         type="button"
@@ -520,7 +520,7 @@ export function TripRecordsTable() {
                           <div className="empty-state">No entries on this trip.</div>
                         ) : (
                           <>
-                          <table className="data entry-table">
+                          <table className={`data entry-table trip-seg-${tripSegment.get(t.id) ?? 0}`}>
                             <thead>
                               <tr>
                                 <th>Date</th>

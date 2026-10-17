@@ -90,7 +90,9 @@ export function ActivityByUserReport() {
 
   // Grouped the same way as the Admin and Project expense records: a month heading, then the dates inside it. Each date group is
   // blue or green in turn and its rows alternate light and a little deeper.
-  const [collapsedMonths, setCollapsedMonths] = useState<Set<string>>(new Set())
+  // Every month starts folded; the months the person opens are kept here. A search opens them all, so its matches show.
+  const [openMonths, setOpenMonths] = useState<Set<string>>(new Set())
+  const isMonthFolded = (month: string) => !search && !openMonths.has(month)
   const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set())
   const flip = (set: Set<string>, key: string) => {
     const next = new Set(set)
@@ -112,7 +114,7 @@ export function ActivityByUserReport() {
         previousDate = r.activity_date
         segmentOfDate.set(r.activity_date, (segment % 2) as 0 | 1)
       }
-      if (collapsedDates.has(r.activity_date) || collapsedMonths.has(r.activity_date.slice(0, 7))) continue
+      if (collapsedDates.has(r.activity_date) || isMonthFolded(r.activity_date.slice(0, 7))) continue
       rowShade.set(rowKeyOf(r), (alternate % 2) as 0 | 1)
       alternate += 1
     }
@@ -174,8 +176,9 @@ export function ActivityByUserReport() {
         else&rsquo;s behalf is listed under the person who pressed Save. The calendar button filters by date: by the date of each entry, or by the day it was recorded if you choose that.
       </div>
 
-      <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap', margin: '12px 0' }}>
-        <div className="field" style={{ flex: '1 1 240px', minWidth: 200 }}>
+      <div className="toolbar">
+        <div className="toolbar-group toolbar-fill">
+        <div className="field" style={{ flex: '0 1 240px', minWidth: 200 }}>
           <label>Person</label>
           <SearchableSelect
             items={profiles}
@@ -208,6 +211,11 @@ export function ActivityByUserReport() {
             <option value="recorded">Day it was recorded</option>
           </select>
         </div>
+        {userId && data && <TableSearch value={search} onChange={setSearch} inline />}
+        </div>
+        {userId && data && (
+          <ReportExportButtons title={`Activity of ${person?.name ?? ''}`} sections={sections} range={range} iconOnly style={{ marginTop: 0 }} fileNamePrefix={`Activity_${person?.name ?? 'user'}`} />
+        )}
       </div>
 
       {!userId && <div className="empty-row">Choose a person to see what they recorded.</div>}
@@ -219,7 +227,6 @@ export function ActivityByUserReport() {
           <div className="note" style={{ fontWeight: 600 }}>
             {person?.name}: {rows.length} entr{rows.length === 1 ? 'y' : 'ies'} in this period.
           </div>
-          <ReportExportButtons title={`Activity of ${person?.name ?? ''}`} sections={sections} range={range} fileNamePrefix={`Activity_${person?.name ?? 'user'}`} />
 
           {summary.length > 0 && (
             <details className="toggle-section" style={{ marginBottom: 12 }}>
@@ -251,7 +258,6 @@ export function ActivityByUserReport() {
             </details>
           )}
 
-          <TableSearch value={search} onChange={setSearch} />
           <TableScroll>
             <table className="data">
               <thead>
@@ -281,7 +287,7 @@ export function ActivityByUserReport() {
                   const [moneyIn, moneyOut, other] = amountCells(r)
                   const month = r.activity_date.slice(0, 7)
                   const isNewMonth = idx === 0 || pageRows[idx - 1].activity_date.slice(0, 7) !== month
-                  const monthFolded = collapsedMonths.has(month)
+                  const monthFolded = isMonthFolded(month)
                   const isNewDate = idx === 0 || pageRows[idx - 1].activity_date !== r.activity_date
                   const dateFolded = collapsedDates.has(r.activity_date)
                   const segment = segmentOfDate.get(r.activity_date) ?? 0
@@ -289,7 +295,7 @@ export function ActivityByUserReport() {
                   return (
                     <Fragment key={rowKeyOf(r)}>
                     {isNewMonth && (
-                      <tr className="expense-month-group-row" onClick={() => setCollapsedMonths((cur) => flip(cur, month))} style={{ cursor: 'pointer' }}>
+                      <tr className="expense-month-group-row" onClick={() => setOpenMonths((cur) => flip(cur, month))} style={{ cursor: 'pointer' }}>
                         <td colSpan={11}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
                             <span>

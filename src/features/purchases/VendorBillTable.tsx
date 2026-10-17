@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useState } from 'react'
 import { useNavFilter } from '../../lib/navContext'
-import { PeriodFilter } from '../../components/PeriodFilter'
+import { PeriodFilterToggle } from '../../components/PeriodFilterToggle'
 import { SearchableSelect } from '../../components/SearchableSelect'
 import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
@@ -167,11 +167,10 @@ export function VendorBillTable() {
       <summary>Bill records</summary>
 
       <div className="toolbar">
-        <div className="toolbar-group">
-          <PeriodFilter
+        <div className="toolbar-group toolbar-fill">
+          <PeriodFilterToggle
+            range={range}
             onChange={setRange}
-            allowCustom
-            style={{ marginBottom: 0 }}
             preset={nav?.filter.range ? { ...nav.filter.range, nonce: nav.nonce } : undefined}
           />
           <div className="field" style={{ maxWidth: 220, marginBottom: 0 }}>
@@ -190,8 +189,9 @@ export function VendorBillTable() {
             <input type="checkbox" checked={unpaidOnly} onChange={(e) => setUnpaidOnly(e.target.checked)} />
             Unpaid only
           </label>
+          <TableSearch value={search} onChange={setSearch} inline />
         </div>
-        <ReportExportButtons title="Bill records" sections={exportSections} range={range} style={{ marginTop: 0 }} />
+        <ReportExportButtons title="Bill records" sections={exportSections} range={range} iconOnly style={{ marginTop: 0 }} />
       </div>
 
       {categories.length > 0 && (
@@ -212,7 +212,6 @@ export function VendorBillTable() {
         </div>
       )}
 
-      <TableSearch value={search} onChange={setSearch} />
       <TableScroll>
         <table className="data">
           <thead>

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { PeriodFilter } from '../../components/PeriodFilter'
+import { PeriodFilterToggle } from '../../components/PeriodFilterToggle'
 import { SortableTh } from '../../components/SortableTh'
 import { Pagination } from '../../components/Pagination'
 import { TableScroll } from '../../components/TableScroll'
@@ -80,11 +80,13 @@ export function CapitalTable() {
       <summary>Capital records</summary>
 
       <div className="toolbar">
-        <PeriodFilter onChange={setRange} allowCustom style={{ marginBottom: 0 }} />
-        <ReportExportButtons title="Capital records" sections={exportSections} range={range} style={{ marginTop: 0 }} />
+        <div className="toolbar-group toolbar-fill">
+          <PeriodFilterToggle range={range} onChange={setRange} />
+          <TableSearch value={search} onChange={setSearch} inline />
+        </div>
+        <ReportExportButtons title="Capital records" sections={exportSections} range={range} iconOnly style={{ marginTop: 0 }} />
       </div>
 
-      <TableSearch value={search} onChange={setSearch} />
       <TableScroll>
         <table className="data">
           <thead>

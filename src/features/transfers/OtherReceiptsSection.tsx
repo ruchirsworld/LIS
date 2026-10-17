@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui'
 import { CurrencyInput } from '../../components/CurrencyInput'
 import { PaymentAccountPicker, bankAccountIdOf, paymentModeOf } from '../../components/PaymentAccountPicker'
-import { PeriodFilter } from '../../components/PeriodFilter'
+import { PeriodFilterToggle } from '../../components/PeriodFilterToggle'
 import { RecordRow, useOpenRows } from '../../components/RecordRow'
 import { Modal } from '../../components/Modal'
 import { RecordDetails } from '../reports/RecordDetailModal'
@@ -242,8 +242,10 @@ export function OtherReceiptsSection() {
       )}
 
       <div className="toolbar">
-        <PeriodFilter onChange={setRange} allowCustom style={{ marginBottom: 0 }} />
-        <ReportExportButtons title="Other money received" sections={sections} range={range} style={{ marginTop: 0 }} />
+        <div className="toolbar-group toolbar-fill">
+          <PeriodFilterToggle range={range} onChange={setRange} />
+        </div>
+        <ReportExportButtons title="Other money received" sections={sections} range={range} iconOnly style={{ marginTop: 0 }} />
       </div>
       <TableScroll>
         <table className="data">

@@ -1,6 +1,6 @@
 # LIS changes since v2.0.1
 
-Version 2.0.1 was released on 3 September 2026. This list covers everything after it, up to 2.1.27. It is put together from the project history, grouped by area. Version numbers are shown where a release carried one.
+Version 2.0.1 was released on 3 September 2026. This list covers everything after it, up to 2.1.28. It is put together from the project history, grouped by area. Version numbers are shown where a release carried one.
 
 ## 2.0.2 – 2.0.3 (3 – 4 September)
 
@@ -180,6 +180,11 @@ Version 2.0.1 was released on 3 September 2026. This list covers everything afte
 ## 2.1.26 (17 October): sticky trip rows, and records grouped by month
 - **Trip Records:** while you scroll through an opened trip's entries, the table header, the trip's own row and the entries heading (with the spend split and + Add expense) stay at the top; they let go when the trip ends. The entries have a Remarks column after the sub-head.
 - **Admin and Project expense records, and Activity by user,** are grouped by month (a bold grey bar with the count and total) and, inside a month, by date. Both can be folded. Each date group is blue or green in turn, and its rows alternate a lighter and a slightly deeper tint; reimbursements stay amber. Month and day totals cover everything in them, not only the current page.
+
+## 2.1.28 (17 October): blue and white shading, folded months, one toolbar
+- **Months start folded** in the Admin and Project expense records and in Activity by user. Click a month to open it; searching opens every month.
+- **Blue and white shading.** The grouped records and Trip Records now use blue shades with white, with no cream. In Trip Records each trip, with its entries, is blue or white in turn, under a grey month bar like the expense records. Reimbursements stay amber.
+- **One toolbar for every records list:** the calendar and filters, then the search box, then the PDF and Excel icons at the right, all on one row. The search box now sits in that row instead of on its own line.
 
 ## 2.1.27 (17 October): cream instead of green
 - Row shading no longer uses green. In the grouped records (Admin and Project expenses, Activity by user), date groups alternate blue and white/cream. The shaded trip rows in Trip Records are cream. Reimbursement rows are a stronger amber so they stand out from the cream.

@@ -697,7 +697,11 @@ export function SalarySection() {
 
       <div className="card" style={{ padding: 16, marginBottom: 14 }}>
         <h3 style={{ marginTop: 0, fontSize: 13 }}>Wage accrual history</h3>
-        <TableSearch value={accrualSearch} onChange={setAccrualSearch} placeholder="Search by ID, staff name, period or amount…" />
+        <div className="toolbar" style={{ marginTop: 0 }}>
+          <div className="toolbar-group toolbar-fill">
+            <TableSearch value={accrualSearch} onChange={setAccrualSearch} inline placeholder="Search by ID, staff name, period or amount…" />
+          </div>
+        </div>
         <div className="table-scroll">
           <table className="data">
             <thead>
@@ -754,7 +758,11 @@ export function SalarySection() {
 
       <div className="card" style={{ padding: 16 }}>
         <h3 style={{ marginTop: 0, fontSize: 13 }}>Wage payment history</h3>
-        <TableSearch value={paymentSearch} onChange={setPaymentSearch} placeholder="Search by ID, staff name, date, account or amount…" />
+        <div className="toolbar" style={{ marginTop: 0 }}>
+          <div className="toolbar-group toolbar-fill">
+            <TableSearch value={paymentSearch} onChange={setPaymentSearch} inline placeholder="Search by ID, staff name, date, account or amount…" />
+          </div>
+        </div>
         <div className="table-scroll">
           <table className="data">
             <thead>
@@ -807,7 +815,11 @@ export function SalarySection() {
 
       <div className="card" style={{ padding: 16, marginTop: 14 }}>
         <h3 style={{ marginTop: 0, fontSize: 13 }}>Salary advance history</h3>
-        <TableSearch value={advanceSearch} onChange={setAdvanceSearch} placeholder="Search by ID, staff name, date, account or amount…" />
+        <div className="toolbar" style={{ marginTop: 0 }}>
+          <div className="toolbar-group toolbar-fill">
+            <TableSearch value={advanceSearch} onChange={setAdvanceSearch} inline placeholder="Search by ID, staff name, date, account or amount…" />
+          </div>
+        </div>
         <div className="table-scroll">
           <table className="data">
             <thead>

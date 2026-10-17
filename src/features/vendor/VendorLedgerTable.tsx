@@ -119,11 +119,12 @@ export function VendorLedgerTable({ vendorId }: { vendorId: string }) {
     <details className="toggle-section" open>
       <summary>Ledger</summary>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
-        <ReportExportButtons title="Vendor ledger" sections={exportSections} range={null} style={{ marginTop: 0 }} />
+      <div className="toolbar">
+        <div className="toolbar-group toolbar-fill">
+          <TableSearch value={search} onChange={setSearch} inline placeholder="Search by ID, date, details or amount…" />
+        </div>
+        <ReportExportButtons title="Vendor ledger" sections={exportSections} range={null} iconOnly style={{ marginTop: 0 }} />
       </div>
-
-      <TableSearch value={search} onChange={setSearch} placeholder="Search by ID, date, details or amount…" />
       <TableScroll>
         <table className="data">
           <thead>

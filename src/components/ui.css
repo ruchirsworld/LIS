@@ -953,19 +953,19 @@ table.data tr.expense-date-group-row.grp-head-0 > td {
   background: color-mix(in srgb, var(--blue) 24%, var(--paper));
 }
 table.data tr.expense-date-group-row.grp-head-1 > td {
-  background: color-mix(in srgb, var(--ink) 8%, var(--paper-2));
+  background: color-mix(in srgb, var(--blue) 9%, var(--paper));
 }
 table.data tr.grp-row.grp-seg-0.grp-alt-0 > td {
-  background: color-mix(in srgb, var(--blue) 5%, var(--paper));
+  background: color-mix(in srgb, var(--blue) 8%, var(--paper));
 }
 table.data tr.grp-row.grp-seg-0.grp-alt-1 > td {
-  background: color-mix(in srgb, var(--blue) 12%, var(--paper));
+  background: color-mix(in srgb, var(--blue) 15%, var(--paper));
 }
 table.data tr.grp-row.grp-seg-1.grp-alt-0 > td {
   background: var(--paper);
 }
 table.data tr.grp-row.grp-seg-1.grp-alt-1 > td {
-  background: var(--paper-2);
+  background: color-mix(in srgb, var(--blue) 3%, var(--paper));
 }
 table.data tr.grp-row.row-reimb.grp-alt-0 > td {
   background: color-mix(in srgb, var(--amber) 22%, var(--paper));
@@ -983,8 +983,13 @@ table.data tbody.trip-block > tr.trip-main > td {
   top: var(--thead-h, 28px);
   z-index: 4;
 }
-table.data tbody.trip-block > tr.trip-main:not(.row-alt) > td {
-  background: var(--paper);
+/* Trips follow the colours of the grouped expense records: each trip, with its entries, is blue or white/cream in turn. The trip row is
+   the deeper shade of its colour, and its entries alternate light and a little deeper. */
+table.data tbody.trip-block > tr.trip-main.trip-seg-0 > td {
+  background: color-mix(in srgb, var(--blue) 24%, var(--paper));
+}
+table.data tbody.trip-block > tr.trip-main.trip-seg-1 > td {
+  background: color-mix(in srgb, var(--blue) 9%, var(--paper));
 }
 table.data .trip-entries-head {
   position: sticky;
@@ -997,19 +1002,25 @@ table.data .trip-entries-head {
 table.data.entry-table th {
   position: static;
 }
-/* The entries inside an opened trip: alternate rows in a blue tint, so they do not look like the trip rows (green tint). */
-table.data.entry-table tbody tr:nth-child(odd) > td {
+/* The entries inside an opened trip take the colour of their trip. */
+table.data.entry-table.trip-seg-0 tbody tr:nth-child(odd) > td {
+  background: color-mix(in srgb, var(--blue) 8%, var(--paper));
+}
+table.data.entry-table.trip-seg-0 tbody tr:nth-child(even) > td {
+  background: color-mix(in srgb, var(--blue) 15%, var(--paper));
+}
+table.data.entry-table.trip-seg-1 tbody tr:nth-child(odd) > td {
   background: var(--paper);
 }
-table.data.entry-table tbody tr:nth-child(even) > td {
-  background-color: color-mix(in srgb, var(--blue) 14%, var(--paper));
+table.data.entry-table.trip-seg-1 tbody tr:nth-child(even) > td {
+  background: color-mix(in srgb, var(--blue) 3%, var(--paper));
 }
 /* A reimbursement entry is amber; its rows alternate between a lighter and a deeper amber, so they still read as alternating. */
 table.data.entry-table tbody tr.row-reimb:nth-child(odd) > td {
-  background: color-mix(in srgb, var(--amber) 20%, var(--paper));
+  background: color-mix(in srgb, var(--amber) 22%, var(--paper));
 }
 table.data.entry-table tbody tr.row-reimb:nth-child(even) > td {
-  background: color-mix(in srgb, var(--amber) 32%, var(--paper));
+  background: color-mix(in srgb, var(--amber) 34%, var(--paper));
 }
 /* Every other row, where a list asks for it. */
 table.data tr.row-alt > td {
@@ -2099,6 +2110,11 @@ tr.row-link:hover td {
   margin-top: 16px;
 }
 
+/* The toolbar of every records list: filters, then the search growing to fill the row, then the PDF / Excel icons at the far right. */
+.toolbar-group.toolbar-fill {
+  flex: 1 1 auto;
+  min-width: 0;
+}
 .toolbar-group {
   display: flex;
   align-items: flex-end;
@@ -2198,9 +2214,18 @@ tr[tabindex]:hover {
   max-width: 360px;
   margin: 8px 0 10px;
 }
+.table-search-inline {
+  flex: 1 1 220px;
+  margin: 0;
+}
 .table-search input {
   width: 100%;
-  padding-right: 28px;
+  font-size: 14px;
+  padding: 8px 28px 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper-2);
+  color: var(--ink);
 }
 .table-search-clear {
   position: absolute;

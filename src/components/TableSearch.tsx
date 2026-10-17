@@ -5,13 +5,16 @@ export function TableSearch({
   value,
   onChange,
   placeholder = 'Search by ID, description, name or amount…',
+  inline,
 }: {
   value: string
   onChange: (value: string) => void
   placeholder?: string
+  /** Sits in a toolbar row beside the other filters instead of on its own line. */
+  inline?: boolean
 }) {
   return (
-    <div className="table-search">
+    <div className={inline ? 'table-search table-search-inline' : 'table-search'}>
       <input type="search" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} aria-label="Search these records" />
       {value && (
         <button type="button" className="table-search-clear" onClick={() => onChange('')} aria-label="Clear search">
