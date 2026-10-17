@@ -33,6 +33,7 @@ const SupervisorRecordsPage = lazy(() =>
 const PurchasesPage = lazy(() => import('./features/purchases/PurchasesPage').then((m) => ({ default: m.PurchasesPage })))
 const VendorPage = lazy(() => import('./features/vendor/VendorPage').then((m) => ({ default: m.VendorPage })))
 const InvoicesPage = lazy(() => import('./features/invoices/InvoicesPage').then((m) => ({ default: m.InvoicesPage })))
+const ReceiptsPage = lazy(() => import('./features/invoices/ReceiptsPage').then((m) => ({ default: m.ReceiptsPage })))
 const LoansPage = lazy(() => import('./features/loans/LoansPage').then((m) => ({ default: m.LoansPage })))
 const CapitalPage = lazy(() => import('./features/capital/CapitalPage').then((m) => ({ default: m.CapitalPage })))
 const TransfersPage = lazy(() => import('./features/transfers/TransfersPage').then((m) => ({ default: m.TransfersPage })))
@@ -94,6 +95,7 @@ function PageView({
       {tab === 'purchases' && <PurchasesPage />}
       {tab === 'vendor' && <VendorPage />}
       {tab === 'invoices' && <InvoicesPage />}
+      {tab === 'receipts' && <ReceiptsPage />}
       {tab === 'loans' && <LoansPage />}
       {tab === 'capital' && <CapitalPage />}
       {tab === 'transfers' && <TransfersPage />}

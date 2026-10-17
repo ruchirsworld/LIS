@@ -97,7 +97,7 @@ export function RevenueDetail({ range, goTo }: { range: DateRange | null; goTo: 
         ])}
         foot={['Total', '', '', fmt(sumOf(rows, (p) => p.amount))]}
       />
-      <OpenLink goTo={goTo} label="Open the receipts" onClick={() => goTo?.('invoices', { filter: { range: range?.from && range?.to ? { from: range.from, to: range.to } : undefined, focus: 'inv-payments' } })} />
+      <OpenLink goTo={goTo} label="Open the receipts" onClick={() => goTo?.('receipts', { filter: { range: range?.from && range?.to ? { from: range.from, to: range.to } : undefined, focus: 'inv-payments' } })} />
     </div>
   )
 }

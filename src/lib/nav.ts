@@ -23,6 +23,8 @@ export const TABS = [
   { id: 'purchases', label: 'Procurements', roles: ['admin', 'cxo'] },
   { id: 'vendor', label: 'Vendor', roles: ['admin', 'cxo'] },
   { id: 'invoices', label: 'Invoices', roles: ['admin', 'cxo'] },
+  // The money clients pay: receipts against invoices. A tab of its own under Clients.
+  { id: 'receipts', label: 'Receipts', roles: ['admin', 'cxo'] },
   { id: 'loans', label: 'Loans', roles: ['admin', 'cxo'] },
   { id: 'capital', label: 'Capital', roles: ['admin', 'cxo'] },
   { id: 'transfers', label: 'Transfers', roles: ['admin', 'cxo'] },
@@ -44,7 +46,7 @@ export function isTabVisible(tab: { roles: readonly string[] | null }, role: Nav
   return !tab.roles || (!!role && (tab.roles as readonly string[]).includes(role))
 }
 
-// The menu. Seven places, in this order; Settings sits apart at the bottom. The logo opens the Dashboard, so it has no menu item of
+// The menu. Seven places, in this order (Expenses, Procurement, Clients, Finance, Team, Reports); Settings sits apart at the bottom. The logo opens the Dashboard, so it has no menu item of
 // its own. Each module is one page with its own sub-tabs; the sub-tabs are the pages that used to be separate menu items, so
 // nothing was removed, only grouped.
 export type ModuleId = 'expenses' | 'procurement' | 'clients' | 'team' | 'finance' | 'reports' | 'settings'
@@ -54,14 +56,17 @@ export interface NavModule {
   label: string
   /** The sub-tabs, in order. A sub-tab the person's role cannot see is left out. */
   tabs: readonly TabId[]
+  /** Pages that belong to this place (so it is highlighted in the menu) but are reached another way, not from its tab bar. */
+  also?: readonly TabId[]
 }
 
 export const MODULES: readonly NavModule[] = [
-  { id: 'expenses', label: 'Expenses', tabs: ['expenses', 'approvals', 'supervisor', 'projects', 'records'] },
+  // Admin and CXO see just the Expenses page, which has its own Admin | Trip | Project switch. Approvals is opened from the bell.
+  { id: 'expenses', label: 'Expenses', tabs: ['expenses', 'records'], also: ['approvals'] },
   { id: 'procurement', label: 'Procurement', tabs: ['purchases', 'vendor'] },
-  { id: 'clients', label: 'Clients', tabs: ['invoices'] },
-  { id: 'team', label: 'Team', tabs: ['hr', 'calendar'] },
+  { id: 'clients', label: 'Clients', tabs: ['invoices', 'receipts'] },
   { id: 'finance', label: 'Finance', tabs: ['loans', 'capital', 'transfers', 'reconciliation'] },
+  { id: 'team', label: 'Team', tabs: ['hr', 'calendar', 'supervisor', 'projects'] },
   { id: 'reports', label: 'Reports', tabs: ['reports'] },
   { id: 'settings', label: 'Settings', tabs: ['admin'] },
 ]
@@ -75,7 +80,8 @@ const SUB_TAB_LABEL: Partial<Record<TabId, string>> = {
   records: 'My records',
   purchases: 'Purchases',
   vendor: 'Vendors',
-  invoices: 'Invoices & payments',
+  invoices: 'Invoice',
+  receipts: 'Receipts',
   hr: 'HR & payroll',
   calendar: 'Attendance',
   loans: 'Loans',
@@ -96,12 +102,12 @@ function tabDef(id: TabId) {
 
 /** The modules this role can open, each with only the sub-tabs it can see. */
 export function modulesFor(role: NavRole | undefined): (NavModule & { tabs: readonly TabId[] })[] {
-  return MODULES.map((m) => ({ ...m, tabs: m.tabs.filter((id) => isTabVisible(tabDef(id), role)) })).filter((m) => m.tabs.length > 0)
+  return MODULES.map((m) => ({ ...m, tabs: m.tabs.filter((id) => isTabVisible(tabDef(id), role)), also: (m.also ?? []).filter((id) => isTabVisible(tabDef(id), role)) })).filter((m) => m.tabs.length > 0)
 }
 
 /** The module a page belongs to. The Dashboard belongs to none: the logo opens it. */
 export function moduleOfTab(tab: TabId, role: NavRole | undefined): (NavModule & { tabs: readonly TabId[] }) | null {
-  return modulesFor(role).find((m) => m.tabs.includes(tab)) ?? null
+  return modulesFor(role).find((m) => m.tabs.includes(tab) || (m.also ?? []).includes(tab)) ?? null
 }
 
 // A Supervisor's menu: Expenses (their claims and their own records) and Team (the calendar). A Supervisor's Expenses tab only ever

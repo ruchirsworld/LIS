@@ -28,8 +28,9 @@ export function baseTarget(sourceTable: string | null | undefined, date: string)
       return { tab: 'purchases', filter: day }
     case 'invoices':
     case 'invoice_notes':
-    case 'invoice_payments':
       return { tab: 'invoices', filter: { focus: 'inv-ledger' } }
+    case 'invoice_payments':
+      return { tab: 'receipts', filter: { focus: 'inv-payments' } }
     case 'staff_imprest_transactions':
       return { tab: 'hr', filter: { hrSection: 'Imprest' } }
     case 'wage_accruals':

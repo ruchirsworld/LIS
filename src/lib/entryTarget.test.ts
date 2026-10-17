@@ -21,8 +21,9 @@ describe('where a line in the books is opened', () => {
     expect(baseTarget('vendor_bill_payments', '2026-10-09')?.filter?.range).toEqual({ from: '2026-10-09', to: '2026-10-09' })
   })
 
-  it('opens the invoice ledger for anything to do with an invoice', () => {
-    for (const t of ['invoices', 'invoice_payments', 'invoice_notes']) expect(baseTarget(t, '2026-10-08')?.tab).toBe('invoices')
+  it('opens the invoice ledger for an invoice or its notes, and Receipts for a payment', () => {
+    for (const t of ['invoices', 'invoice_notes']) expect(baseTarget(t, '2026-10-08')?.tab).toBe('invoices')
+    expect(baseTarget('invoice_payments', '2026-10-08')?.tab).toBe('receipts')
   })
 
   it('returns nothing for a record it does not know', () => {

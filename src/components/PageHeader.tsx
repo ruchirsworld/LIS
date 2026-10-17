@@ -27,13 +27,16 @@ export function PageHeader({ active, onChange }: { active: TabId; onChange: (tab
   const moduleLabel = t(isSupervisor ? SUPERVISOR_MODULE_LABEL[mod.id] ?? mod.label : mod.label)
   const subLabel = (id: TabId) => (isSupervisor && id === 'expenses' ? t('Claims & Advances') : t(subTabLabel(id)))
   const hasTabs = mod.tabs.length > 1
-  const title = hasTabs ? subLabel(active) : moduleLabel
+  // A page reached another way (Approvals, from the bell) is named on its own, under its place in the menu.
+  const onSidePage = !mod.tabs.includes(active)
+  const named = hasTabs || onSidePage
+  const title = named ? subLabel(active) : moduleLabel
 
   return (
     <header className="page-head">
       <nav className="breadcrumbs" aria-label="Breadcrumb">
         <span>{moduleLabel}</span>
-        {hasTabs && (
+        {named && (
           <>
             <ChevronRight size={14} aria-hidden="true" />
             <span aria-current="page">{subLabel(active)}</span>

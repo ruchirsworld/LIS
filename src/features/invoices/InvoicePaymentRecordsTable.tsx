@@ -42,7 +42,7 @@ export function InvoicePaymentRecordsTable() {
   const [search, setSearch] = useState('')
   const [range, setRange] = useState<DateRange | null>(null)
   const detailsRef = useRef<HTMLDetailsElement>(null)
-  const nav = useNavFilter('invoices')
+  const nav = useNavFilter('receipts')
   // A "Revenue received" drill-through lands here with the dashboard's period
   // preset — open the section so it is actually seen.
   useEffect(() => {
