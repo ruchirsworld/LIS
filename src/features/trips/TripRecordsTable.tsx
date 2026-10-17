@@ -21,7 +21,7 @@ import { fmt, fmtDate } from '../../lib/calc/format'
 import { getErrorMessage } from '../../lib/errors'
 import { ExpenseForm } from '../expenses/ExpenseForm'
 import { SpendBySource } from './SpendBySource'
-import { RecordDetails } from '../reports/RecordDetailModal'
+import { RecordDetailModal } from '../reports/RecordDetailModal'
 import { spendExportSection } from '../../lib/calc/spendByAccount'
 import { PeriodFilterToggle } from '../../components/PeriodFilterToggle'
 import type { DateRange } from '../../lib/calc/period'
@@ -176,6 +176,8 @@ export function TripRecordsTable() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [range, setRange] = useState<DateRange | null>(null)
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null)
+  // The trip's own details (traveler, project, dates, who recorded it) are in the row's menu; the arrow shows its entries.
+  const [viewingTrip, setViewingTrip] = useState<Trip | null>(null)
   const [deleteError, setDeleteError] = useState<Record<string, string>>({})
   const [deleteBusyId, setDeleteBusyId] = useState<string | null>(null)
   const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null)
@@ -383,13 +385,13 @@ export function TripRecordsTable() {
                 <Fragment key={t.id}>
                   {summary && (
                     <tr className="group-header-row" onClick={() => toggleMonth(month)} style={{ cursor: 'pointer' }}>
-                      <td colSpan={COL_SPAN} style={{ fontSize: 15, padding: '12px 10px' }}>
+                      <td colSpan={COL_SPAN} style={{ fontSize: 14, padding: '10px 10px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
-                          <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--ink)' }}>
-                            <span style={{ display: 'inline-block', width: 18, fontSize: 13, opacity: 0.6 }}>{monthCollapsed ? '▸' : '▾'}</span>
+                          <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>
+                            <span style={{ display: 'inline-block', width: 16, fontSize: 12, opacity: 0.6 }}>{monthCollapsed ? '▸' : '▾'}</span>
                             {monthLabel(month)}
                           </span>
-                          <span style={{ whiteSpace: 'nowrap', fontSize: 14 }}>
+                          <span style={{ whiteSpace: 'nowrap', fontSize: 13 }}>
                             {summary.count} trip{summary.count === 1 ? '' : 's'} · {fmt(summary.total)}
                           </span>
                         </div>
@@ -424,6 +426,7 @@ export function TripRecordsTable() {
                     <td style={{ width: 40, textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
                       <RowMenu
                         items={[
+                          { label: 'Details', onClick: () => setViewingTrip(t) },
                           { label: 'Edit', onClick: () => setEditingTrip(t) },
                           ...(canDelete ? [{ label: 'Delete', disabled: deleteBusyId === t.id, onClick: () => void handleDeleteTrip(t) }] : []),
                         ]}
@@ -438,8 +441,7 @@ export function TripRecordsTable() {
                   {isExpanded && (
                     <tr className="pay-form-row">
                       <td colSpan={COL_SPAN}>
-                        <RecordDetails sourceTable="trips" sourceId={t.id} />
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, margin: '12px 0 10px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
                           <div className="note" style={{ margin: 0, fontWeight: 600 }}>
                             Entries on this trip
                           </div>
@@ -526,6 +528,19 @@ export function TripRecordsTable() {
       <Pagination page={page} totalPages={totalPages} totalCount={totalCount} onChange={setPage} />
 
       {editingTrip && <EditTripModal trip={editingTrip} onClose={() => setEditingTrip(null)} />}
+      {viewingTrip && (
+        <RecordDetailModal
+          title={`Trip ${viewingTrip.display_id ?? ''}`}
+          sourceTable="trips"
+          sourceId={viewingTrip.id}
+          onClose={() => setViewingTrip(null)}
+          onOpenScreen={() => {
+            const trip = viewingTrip
+            setViewingTrip(null)
+            setEditingTrip(trip)
+          }}
+        />
+      )}
       {editingExpenseId && (expenses ?? []).find((x) => x.id === editingExpenseId) && (
         <Modal title="Edit entry" onClose={() => setEditingExpenseId(null)}>
           <ExpenseForm editingExpense={(expenses ?? []).find((x) => x.id === editingExpenseId) ?? null} onDoneEditing={() => setEditingExpenseId(null)} />

@@ -1,6 +1,6 @@
 # LIS changes since v2.0.1
 
-Version 2.0.1 was released on 3 September 2026. This list covers everything after it, up to 2.1.21. It is put together from the project history, grouped by area. Version numbers are shown where a release carried one.
+Version 2.0.1 was released on 3 September 2026. This list covers everything after it, up to 2.1.22. It is put together from the project history, grouped by area. Version numbers are shown where a release carried one.
 
 ## 2.0.2 – 2.0.3 (3 – 4 September)
 
@@ -162,3 +162,7 @@ Version 2.0.1 was released on 3 September 2026. This list covers everything afte
 - **Trip IDs are TRP/MM/YY/#** (for example TRP/10/26/3), numbered within the month the trip starts in, and renumbered if the start date moves to another month. Existing trips were renumbered in start order (database change).
 - **Trip Records:** bigger month headings, every month folded until opened (a search opens them all), smaller text, an ID column and alternate row shading.
 - **Activity by user:** the Status column is removed, the summary by type folds away (closed by default), and Person, the calendar button and Type sit in one row.
+
+## 2.1.22 (17 October): trip ID format, trip details in the menu
+- **Trip IDs are now TRP-#/mmyy** (for example TRP-3/1026), still numbered within the month the trip starts in and renumbered when the start date moves to another month. Existing trips were renumbered (database change).
+- **Trip Records:** the arrow on a trip shows only its entries. The trip's own details (traveler, project, dates, who recorded it) are under "Details" in the trip's menu. The month headings are slightly smaller.
