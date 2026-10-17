@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { SearchableSelect } from '../../components/SearchableSelect'
 import { TableScroll } from '../../components/TableScroll'
 import { Pagination } from '../../components/Pagination'
@@ -87,6 +87,44 @@ export function ActivityByUserReport() {
     return [...by.entries()].map(([k, v]) => ({ kind: k, ...v })).sort((a, b) => b.count - a.count)
   }, [rows])
   const { pageRows, page, setPage, totalPages, totalCount } = usePagination(shown, `${search}|${kind}`)
+
+  // Grouped the same way as the Admin and Project expense records: a month heading, then the dates inside it. Each date group is
+  // blue or green in turn and its rows alternate light and a little deeper.
+  const [collapsedMonths, setCollapsedMonths] = useState<Set<string>>(new Set())
+  const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set())
+  const flip = (set: Set<string>, key: string) => {
+    const next = new Set(set)
+    if (next.has(key)) next.delete(key)
+    else next.add(key)
+    return next
+  }
+  const rowKeyOf = (r: ActivityRow) => `${r.source_table}-${r.source_id}`
+  const segmentOfDate = new Map<string, 0 | 1>()
+  const rowShade = new Map<string, 0 | 1>()
+  {
+    let segment = -1
+    let previousDate = ''
+    let alternate = 0
+    for (const r of pageRows ?? []) {
+      if (r.activity_date !== previousDate) {
+        segment += 1
+        alternate = 0
+        previousDate = r.activity_date
+        segmentOfDate.set(r.activity_date, (segment % 2) as 0 | 1)
+      }
+      if (collapsedDates.has(r.activity_date) || collapsedMonths.has(r.activity_date.slice(0, 7))) continue
+      rowShade.set(rowKeyOf(r), (alternate % 2) as 0 | 1)
+      alternate += 1
+    }
+  }
+  // A month or a day covers every entry of it, not only the ones on this page.
+  const totalsOf = (match: (r: ActivityRow) => boolean) => {
+    const list = shown.filter(match)
+    const sum = (direction: string) => list.filter((r) => r.direction === direction).reduce((s, r) => s + Number(r.amount ?? 0), 0)
+    return { count: list.length, moneyIn: sum('in'), moneyOut: sum('out') }
+  }
+  const totalsText = (t: { count: number; moneyIn: number; moneyOut: number }) =>
+    [`${t.count} entr${t.count === 1 ? 'y' : 'ies'}`, t.moneyIn ? `in ${fmt(t.moneyIn)}` : '', t.moneyOut ? `out ${fmt(t.moneyOut)}` : ''].filter(Boolean).join(' · ')
 
   /** The popup shows the record where it is; "its screen" goes to the page that holds it. */
   async function open(r: ActivityRow) {
@@ -239,11 +277,40 @@ export function ActivityByUserReport() {
                     </td>
                   </tr>
                 )}
-                {pageRows?.map((r) => {
+                {pageRows?.map((r, idx) => {
                   const [moneyIn, moneyOut, other] = amountCells(r)
+                  const month = r.activity_date.slice(0, 7)
+                  const isNewMonth = idx === 0 || pageRows[idx - 1].activity_date.slice(0, 7) !== month
+                  const monthFolded = collapsedMonths.has(month)
+                  const isNewDate = idx === 0 || pageRows[idx - 1].activity_date !== r.activity_date
+                  const dateFolded = collapsedDates.has(r.activity_date)
+                  const segment = segmentOfDate.get(r.activity_date) ?? 0
+                  const shade = rowShade.get(rowKeyOf(r)) ?? 0
                   return (
+                    <Fragment key={rowKeyOf(r)}>
+                    {isNewMonth && (
+                      <tr className="expense-month-group-row" onClick={() => setCollapsedMonths((cur) => flip(cur, month))} style={{ cursor: 'pointer' }}>
+                        <td colSpan={11}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
+                            <span>
+                              <span style={{ display: 'inline-block', width: 16, fontSize: 12, opacity: 0.6 }}>{monthFolded ? '▸' : '▾'}</span>
+                              {new Date(`${month}-01T00:00:00`).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}
+                            </span>
+                            <span style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}>{totalsText(totalsOf((x) => x.activity_date.slice(0, 7) === month))}</span>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    {isNewDate && !monthFolded && (
+                      <tr className={`expense-date-group-row grp-head-${segment}`} onClick={() => setCollapsedDates((cur) => flip(cur, r.activity_date))} style={{ cursor: 'pointer' }}>
+                        <td colSpan={11} style={{ fontWeight: 600 }}>
+                          <span style={{ display: 'inline-block', width: 14, fontSize: 11, opacity: 0.6 }}>{dateFolded ? '▸' : '▾'}</span>
+                          {fmtDate(r.activity_date)} — {totalsText(totalsOf((x) => x.activity_date === r.activity_date))}
+                        </td>
+                      </tr>
+                    )}
+                    {!monthFolded && !dateFolded && (
                     <RecordRow
-                      key={`${r.source_table}-${r.source_id}`}
                       expanded={openRows.isOpen(`${r.source_table}-${r.source_id}`)}
                       onToggle={() => openRows.toggle(`${r.source_table}-${r.source_id}`)}
                       colSpan={11}
@@ -259,7 +326,7 @@ export function ActivityByUserReport() {
                         ...(canShowRecord(r.source_table) ? [{ label: 'View in a popup', onClick: () => void open(r) }] : []),
                         { label: 'Open its screen', onClick: () => void openScreen(r) },
                       ]}
-                      className={r.reimbursable ? 'row-reimb' : undefined}
+                      className={`grp-row grp-seg-${segment} grp-alt-${shade}${r.reimbursable ? ' row-reimb' : ''}`}
                       title={r.reimbursable ? 'Recorded as reimbursement' : undefined}
                     >
                       <td style={{ whiteSpace: 'nowrap' }}>{fmtDate(r.activity_date)}</td>
@@ -299,6 +366,8 @@ export function ActivityByUserReport() {
                           ))}
                       </td>
                     </RecordRow>
+                    )}
+                    </Fragment>
                   )
                 })}
               </tbody>

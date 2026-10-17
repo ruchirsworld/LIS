@@ -939,6 +939,63 @@ table.data.table-compact td {
 }
 /* A transaction recorded as a reimbursement (paid out of someone's own pocket): a faint amber wash and edge, so it
  * stands out in a long list without shouting. */
+/* Admin and project expense records: a month heading, then the dates inside it. Each date group is blue or green in turn, and its
+   rows alternate light and a little deeper, so neighbouring groups cannot be mistaken for each other. Reimbursements stay amber. */
+table.data tr.expense-month-group-row > td {
+  background: color-mix(in srgb, var(--ink) 13%, var(--paper));
+  font-size: 15px;
+  font-weight: 700;
+  padding: 11px 12px;
+  border-top: 2px solid var(--ink-soft);
+}
+table.data tr.expense-date-group-row.grp-head-0 > td {
+  background: color-mix(in srgb, var(--blue) 24%, var(--paper));
+}
+table.data tr.expense-date-group-row.grp-head-1 > td {
+  background: color-mix(in srgb, var(--green) 20%, var(--paper));
+}
+table.data tr.grp-row.grp-seg-0.grp-alt-0 > td {
+  background: color-mix(in srgb, var(--blue) 5%, var(--paper));
+}
+table.data tr.grp-row.grp-seg-0.grp-alt-1 > td {
+  background: color-mix(in srgb, var(--blue) 12%, var(--paper));
+}
+table.data tr.grp-row.grp-seg-1.grp-alt-0 > td {
+  background: color-mix(in srgb, var(--green) 5%, var(--paper));
+}
+table.data tr.grp-row.grp-seg-1.grp-alt-1 > td {
+  background: color-mix(in srgb, var(--green) 13%, var(--paper));
+}
+table.data tr.grp-row.row-reimb.grp-alt-0 > td {
+  background: color-mix(in srgb, var(--amber) 13%, var(--paper));
+}
+table.data tr.grp-row.row-reimb.grp-alt-1 > td {
+  background: color-mix(in srgb, var(--amber) 25%, var(--paper));
+}
+/* A trip row and the heading of its entries stay in view while that trip's entries scroll: the row sticks under the table header,
+   the heading under the row. Each trip is its own table section, so they let go when the trip ends. */
+table.data > thead > tr > th {
+  z-index: 5;
+}
+table.data tbody.trip-block > tr.trip-main > td {
+  position: sticky;
+  top: var(--thead-h, 28px);
+  z-index: 4;
+}
+table.data tbody.trip-block > tr.trip-main:not(.row-alt) > td {
+  background: var(--paper);
+}
+table.data .trip-entries-head {
+  position: sticky;
+  top: calc(var(--thead-h, 28px) + var(--trip-h, 0px));
+  z-index: 3;
+  background: var(--paper-2);
+  padding: 6px 0 4px;
+}
+/* The small table of entries scrolls with the trip; its own header must not stick over the main one. */
+table.data.entry-table th {
+  position: static;
+}
 /* The entries inside an opened trip: alternate rows in a blue tint, so they do not look like the trip rows (green tint). */
 table.data.entry-table tbody tr:nth-child(odd) > td {
   background: var(--paper);

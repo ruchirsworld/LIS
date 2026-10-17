@@ -365,7 +365,12 @@ export function TripRecordsTable() {
       <TableSearch value={search} onChange={setSearch} placeholder="Search trips by ID, location, purpose, traveller, project or any entry on them…" />
 
       <TableScroll>
-        <table className="data table-compact">
+        <table
+          className="data table-compact"
+          ref={(el) => {
+            if (el) el.style.setProperty('--thead-h', `${el.tHead?.offsetHeight ?? 28}px`)
+          }}
+        >
           <thead>
             <tr>
               <th></th>
@@ -378,13 +383,14 @@ export function TripRecordsTable() {
               <th></th>
             </tr>
           </thead>
-          <tbody>
             {sortedTrips.length === 0 && (
-              <tr>
-                <td colSpan={COL_SPAN} className="empty-row">
-                  No trips in this period
-                </td>
-              </tr>
+              <tbody>
+                <tr>
+                  <td colSpan={COL_SPAN} className="empty-row">
+                    No trips in this period
+                  </td>
+                </tr>
+              </tbody>
             )}
             {pageRows?.map((t, idx) => {
               const isExpanded = expandedId === t.id
@@ -396,6 +402,7 @@ export function TripRecordsTable() {
               return (
                 <Fragment key={t.id}>
                   {summary && (
+                    <tbody>
                     <tr className="group-header-row" onClick={() => toggleMonth(month)} style={{ cursor: 'pointer' }}>
                       <td colSpan={COL_SPAN} style={{ fontSize: 14, padding: '10px 10px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
@@ -410,10 +417,17 @@ export function TripRecordsTable() {
                         {!monthCollapsed && <SpendBySource expenses={summary.spent} label="Spent via" style={{ margin: '6px 0 0', fontWeight: 400 }} />}
                       </td>
                     </tr>
+                    </tbody>
                   )}
                   {!monthCollapsed && (
-                  <>
-                  <tr className={shadedTrips.get(t.id) ? 'row-alt' : undefined} {...activateProps(() => setExpandedId(isExpanded ? null : t.id))} style={{ cursor: 'pointer' }}>
+                  <tbody
+                    className="trip-block"
+                    ref={(el) => {
+                      // The trip row and the entries heading stay in view while its entries scroll: the heading sticks below the row.
+                      if (el) el.style.setProperty('--trip-h', `${el.querySelector<HTMLElement>('tr.trip-main')?.offsetHeight ?? 0}px`)
+                    }}
+                  >
+                  <tr className={`trip-main${shadedTrips.get(t.id) ? ' row-alt' : ''}`} {...activateProps(() => setExpandedId(isExpanded ? null : t.id))} style={{ cursor: 'pointer' }}>
                     <td>
                       <button
                         type="button"
@@ -468,7 +482,7 @@ export function TripRecordsTable() {
                     <tr className="pay-form-row">
                       <td colSpan={COL_SPAN}>
                         {/* One slim heading: the title, what was spent from where, and the button to add an entry. */}
-                        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px 18px', marginBottom: 10 }}>
+                        <div className="trip-entries-head" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px 18px', marginBottom: 10 }}>
                           <strong style={{ fontSize: 12, whiteSpace: 'nowrap' }}>Entries on this trip</strong>
                           <SpendBySource compact expenses={tripExpenses} label="Spent via" style={{ flex: 1, minWidth: 220 }} />
                           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -512,6 +526,7 @@ export function TripRecordsTable() {
                                 <th>Date</th>
                                 <th>Description</th>
                                 <th>Sub-head</th>
+                                <th>Remarks</th>
                                 <th style={{ textAlign: 'right' }}>Amount</th>
                                 <th></th>
                               </tr>
@@ -523,6 +538,7 @@ export function TripRecordsTable() {
                                     <td>{fmtDate(e.date)}</td>
                                     <td>{e.description}</td>
                                     <td>{subHeadName(e.sub_head_id)}</td>
+                                    <td>{e.remarks || '—'}</td>
                                     <td className="amt">{fmt(e.amount)}</td>
                                     <td style={{ width: 40, textAlign: 'right' }}>
                                       <RowMenu
@@ -542,12 +558,11 @@ export function TripRecordsTable() {
                       </td>
                     </tr>
                   )}
-                  </>
+                  </tbody>
                   )}
                 </Fragment>
               )
             })}
-          </tbody>
         </table>
       </TableScroll>
       <Pagination page={page} totalPages={totalPages} totalCount={totalCount} onChange={setPage} />

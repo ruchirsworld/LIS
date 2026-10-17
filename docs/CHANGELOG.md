@@ -176,3 +176,7 @@ Version 2.0.1 was released on 3 September 2026. This list covers everything afte
 
 ## 2.1.25 (17 October): slimmer trip heading
 - Under an opened trip, "Entries on this trip", the spent-via split (Kotak, Cash, CBI, Reimbursement) with its total, and the add button are one slim line in a smaller type size. "+ Add expense" is a solid green button.
+
+## 2.1.26 (17 October): sticky trip rows, and records grouped by month
+- **Trip Records:** while you scroll through an opened trip's entries, the table header, the trip's own row and the entries heading (with the spend split and + Add expense) stay at the top; they let go when the trip ends. The entries have a Remarks column after the sub-head.
+- **Admin and Project expense records, and Activity by user,** are grouped by month (a bold grey bar with the count and total) and, inside a month, by date. Both can be folded. Each date group is blue or green in turn, and its rows alternate a lighter and a slightly deeper tint; reimbursements stay amber. Month and day totals cover everything in them, not only the current page.

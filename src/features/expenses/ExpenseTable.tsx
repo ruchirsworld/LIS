@@ -88,6 +88,16 @@ export function ExpenseTable({
   const [payFormId, setPayFormId] = useState<string | null>(null)
   const [editingReimbursement, setEditingReimbursement] = useState<ExpenseReimbursement | null>(null)
   const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set())
+  const [collapsedMonths, setCollapsedMonths] = useState<Set<string>>(new Set())
+
+  function toggleMonthGroup(month: string) {
+    setCollapsedMonths((prev) => {
+      const next = new Set(prev)
+      if (next.has(month)) next.delete(month)
+      else next.add(month)
+      return next
+    })
+  }
 
   function toggleDateGroup(date: string) {
     setCollapsedDates((prev) => {
@@ -220,6 +230,32 @@ export function ExpenseTable({
     groupByDate ? 'date' : 'id'
   )
   const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedExpenses, search)
+
+  // Grouped records: months, then dates inside a month. Each date group gets one of two colour families (blue, green) in turn,
+  // and the rows inside it alternate light and a little deeper, so every group stands apart from its neighbours.
+  const groupSegmentOfDate = new Map<string, 0 | 1>()
+  const rowShade = new Map<string, 0 | 1>()
+  if (groupByDate) {
+    let segment = -1
+    let previousDate = ''
+    let alternate = 0
+    for (const r of pageRows ?? []) {
+      if (r.date !== previousDate) {
+        segment += 1
+        alternate = 0
+        previousDate = r.date
+        groupSegmentOfDate.set(r.date, (segment % 2) as 0 | 1)
+      }
+      if (collapsedDates.has(r.date) || collapsedMonths.has(r.date.slice(0, 7))) continue
+      rowShade.set(r.id, (alternate % 2) as 0 | 1)
+      alternate += 1
+    }
+  }
+  // A month or a day covers every record of it, not only the ones on this page.
+  const totalOf = (match: (e: NonNullable<typeof sortedExpenses>[number]) => boolean) => {
+    const list = (sortedExpenses ?? []).filter(match)
+    return { count: list.length, total: list.reduce((s, r) => s + Number(r.amount || 0), 0) }
+  }
 
   const pageIds = (pageRows ?? []).map((e) => e.id)
   const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id))
@@ -378,31 +414,49 @@ export function ExpenseTable({
               const due = dueOf(e)
               const hasHistory = expReimbursements.length > 0
               const isExpanded = expandedIds.has(e.id)
+              const month = e.date.slice(0, 7)
+              const isNewMonthGroup = groupByDate && (idx === 0 || pageRows[idx - 1].date.slice(0, 7) !== month)
+              const isMonthCollapsed = groupByDate && collapsedMonths.has(month)
+              const monthSummary = isNewMonthGroup ? totalOf((r) => r.date.slice(0, 7) === month) : null
               const isNewDateGroup = groupByDate && (idx === 0 || pageRows[idx - 1].date !== e.date)
-              const dayTotal = isNewDateGroup
-                ? pageRows.filter((r) => r.date === e.date).reduce((s, r) => s + Number(r.amount || 0), 0)
-                : 0
+              const daySummary = isNewDateGroup ? totalOf((r) => r.date === e.date) : null
               const isDateCollapsed = groupByDate && collapsedDates.has(e.date)
+              const segment = groupSegmentOfDate.get(e.date) ?? 0
+              const shade = rowShade.get(e.id) ?? 0
 
               return (
                 <Fragment key={e.id}>
-                  {isNewDateGroup && (
-                    <tr
-                      className="expense-date-group-row"
-                      onClick={() => toggleDateGroup(e.date)}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <td colSpan={COL_SPAN} style={{ fontWeight: 600, background: 'var(--paper-2)' }}>
-                        <span style={{ display: 'inline-block', width: 14, fontSize: 11, opacity: 0.6 }}>
-                          {isDateCollapsed ? '▸' : '▾'}
-                        </span>
-                        {fmtDate(e.date)} — {fmt(dayTotal)}
+                  {monthSummary && (
+                    <tr className="expense-month-group-row" onClick={() => toggleMonthGroup(month)} style={{ cursor: 'pointer' }}>
+                      <td colSpan={COL_SPAN}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
+                          <span>
+                            <span style={{ display: 'inline-block', width: 16, fontSize: 12, opacity: 0.6 }}>{isMonthCollapsed ? '▸' : '▾'}</span>
+                            {new Date(`${month}-01T00:00:00`).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}
+                          </span>
+                          <span style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                            {monthSummary.count} entr{monthSummary.count === 1 ? 'y' : 'ies'} · {fmt(monthSummary.total)}
+                          </span>
+                        </div>
                       </td>
                     </tr>
                   )}
-                  {!isDateCollapsed && (
+                  {isNewDateGroup && daySummary && !isMonthCollapsed && (
+                    <tr className={`expense-date-group-row grp-head-${segment}`} onClick={() => toggleDateGroup(e.date)} style={{ cursor: 'pointer' }}>
+                      <td colSpan={COL_SPAN} style={{ fontWeight: 600 }}>
+                        <span style={{ display: 'inline-block', width: 14, fontSize: 11, opacity: 0.6 }}>
+                          {isDateCollapsed ? '▸' : '▾'}
+                        </span>
+                        {fmtDate(e.date)} — {fmt(daySummary.total)}
+                      </td>
+                    </tr>
+                  )}
+                  {!isDateCollapsed && !isMonthCollapsed && (
                     <>
-                  <tr className={e.reimbursable ? 'row-reimb' : undefined} title={e.reimbursable ? 'Recorded as reimbursement' : undefined}>
+                  <tr
+                    className={[groupByDate ? `grp-row grp-seg-${segment} grp-alt-${shade}` : '', e.reimbursable ? 'row-reimb' : ''].filter(Boolean).join(' ') || undefined}
+                    title={e.reimbursable ? 'Recorded as reimbursement' : undefined}
+                  >
                     <td>
                       <input type="checkbox" checked={selectedIds.has(e.id)} onChange={() => toggleSelected(e.id)} aria-label={`Select ${e.display_id ?? 'row'}`} />
                     </td>
