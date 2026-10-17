@@ -467,10 +467,10 @@ export function TripRecordsTable() {
                   {isExpanded && (
                     <tr className="pay-form-row">
                       <td colSpan={COL_SPAN}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
-                          <div className="note" style={{ margin: 0, fontWeight: 600 }}>
-                            Entries on this trip
-                          </div>
+                        {/* One slim heading: the title, what was spent from where, and the button to add an entry. */}
+                        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px 18px', marginBottom: 10 }}>
+                          <strong style={{ fontSize: 12, whiteSpace: 'nowrap' }}>Entries on this trip</strong>
+                          <SpendBySource compact expenses={tripExpenses} label="Spent via" style={{ flex: 1, minWidth: 220 }} />
                           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                             {showAddExpense && (
                               <input
@@ -482,11 +482,11 @@ export function TripRecordsTable() {
                             )}
                             <Button
                               type="button"
-                              variant="secondary"
-                              style={{ fontSize: 12, padding: '5px 12px' }}
+                              variant={showAddExpense ? 'secondary' : 'primary'}
+                              style={{ fontSize: 12, padding: '6px 14px', fontWeight: 600 }}
                               onClick={() => setShowAddExpense((v) => !v)}
                             >
-                              {showAddExpense ? 'Close' : 'Add expense'}
+                              {showAddExpense ? 'Close' : '+ Add expense'}
                             </Button>
                           </div>
                         </div>
@@ -506,7 +506,6 @@ export function TripRecordsTable() {
                           <div className="empty-state">No entries on this trip.</div>
                         ) : (
                           <>
-                          <SpendBySource expenses={tripExpenses} style={{ marginTop: 0 }} />
                           <table className="data entry-table">
                             <thead>
                               <tr>
