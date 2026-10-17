@@ -26,6 +26,8 @@ export const TABS = [
   { id: 'loans', label: 'Loans', roles: ['admin', 'cxo'] },
   { id: 'capital', label: 'Capital', roles: ['admin', 'cxo'] },
   { id: 'transfers', label: 'Transfers', roles: ['admin', 'cxo'] },
+  // Bank reconciliation lives under Finance. It is the same screen that is also listed in Reports.
+  { id: 'reconciliation', label: 'Reconciliation', roles: ['admin', 'cxo'] },
   { id: 'projects', label: 'Projects', roles: ['admin', 'cxo'] },
   { id: 'hr', label: 'HR', roles: ['admin', 'cxo'] },
   { id: 'reports', label: 'Reports', roles: ['admin', 'cxo'] },
@@ -42,18 +44,69 @@ export function isTabVisible(tab: { roles: readonly string[] | null }, role: Nav
   return !tab.roles || (!!role && (tab.roles as readonly string[]).includes(role))
 }
 
-// Admin/CXO sidebar: every page, grouped by the job it does rather than by
-// the kind of data it holds. Nothing is hidden behind a menu. A Supervisor's
-// sidebar is short already (Dashboard, Expenses, Calendar, Records) and stays
-// a single flat list.
-export const NAV_GROUPS: readonly { label: string; ids: readonly TabId[] }[] = [
-  { label: 'Overview', ids: ['dashboard', 'approvals'] },
-  { label: 'Sales', ids: ['invoices'] },
-  { label: 'Purchases', ids: ['purchases', 'vendor'] },
-  { label: 'Money', ids: ['expenses', 'transfers', 'loans', 'capital'] },
-  { label: 'People & projects', ids: ['projects', 'hr', 'calendar', 'supervisor'] },
-  { label: 'Books', ids: ['reports', 'admin'] },
+// The menu. Seven places, in this order; Settings sits apart at the bottom. The logo opens the Dashboard, so it has no menu item of
+// its own. Each module is one page with its own sub-tabs; the sub-tabs are the pages that used to be separate menu items, so
+// nothing was removed, only grouped.
+export type ModuleId = 'expenses' | 'procurement' | 'clients' | 'team' | 'finance' | 'reports' | 'settings'
+
+export interface NavModule {
+  id: ModuleId
+  label: string
+  /** The sub-tabs, in order. A sub-tab the person's role cannot see is left out. */
+  tabs: readonly TabId[]
+}
+
+export const MODULES: readonly NavModule[] = [
+  { id: 'expenses', label: 'Expenses', tabs: ['expenses', 'approvals', 'supervisor', 'projects', 'records'] },
+  { id: 'procurement', label: 'Procurement', tabs: ['purchases', 'vendor'] },
+  { id: 'clients', label: 'Clients', tabs: ['invoices'] },
+  { id: 'team', label: 'Team', tabs: ['hr', 'calendar'] },
+  { id: 'finance', label: 'Finance', tabs: ['loans', 'capital', 'transfers', 'reconciliation'] },
+  { id: 'reports', label: 'Reports', tabs: ['reports'] },
+  { id: 'settings', label: 'Settings', tabs: ['admin'] },
 ]
+
+/** What a page is called inside its module (the sub-tab and the page title). */
+const SUB_TAB_LABEL: Partial<Record<TabId, string>> = {
+  expenses: 'Expenses',
+  approvals: 'Approvals',
+  supervisor: 'Enter for a supervisor',
+  projects: 'Projects',
+  records: 'My records',
+  purchases: 'Purchases',
+  vendor: 'Vendors',
+  invoices: 'Invoices & payments',
+  hr: 'HR & payroll',
+  calendar: 'Attendance',
+  loans: 'Loans',
+  capital: 'Capital',
+  transfers: 'Transfers',
+  reconciliation: 'Reconciliation',
+  reports: 'Reports',
+  admin: 'Settings',
+}
+
+export function subTabLabel(tab: TabId): string {
+  return SUB_TAB_LABEL[tab] ?? TABS.find((t) => t.id === tab)?.label ?? tab
+}
+
+function tabDef(id: TabId) {
+  return TABS.find((t) => t.id === id)!
+}
+
+/** The modules this role can open, each with only the sub-tabs it can see. */
+export function modulesFor(role: NavRole | undefined): (NavModule & { tabs: readonly TabId[] })[] {
+  return MODULES.map((m) => ({ ...m, tabs: m.tabs.filter((id) => isTabVisible(tabDef(id), role)) })).filter((m) => m.tabs.length > 0)
+}
+
+/** The module a page belongs to. The Dashboard belongs to none: the logo opens it. */
+export function moduleOfTab(tab: TabId, role: NavRole | undefined): (NavModule & { tabs: readonly TabId[] }) | null {
+  return modulesFor(role).find((m) => m.tabs.includes(tab)) ?? null
+}
+
+// A Supervisor's menu: Expenses (their claims and their own records) and Team (the calendar). A Supervisor's Expenses tab only ever
+// shows Project claims and advance requests, so it is called "Claims & Advances".
+export const SUPERVISOR_MODULE_LABEL: Partial<Record<ModuleId, string>> = { expenses: 'Claims & Advances' }
 
 // The Expenses tab's three flows, merged behind one cost-center switcher in
 // its header — was three separate tabs (Admin / Trips / Project) before

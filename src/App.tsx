@@ -4,6 +4,7 @@ import { LanguageProvider } from './lib/i18n'
 import { LoginPage } from './features/auth/LoginPage'
 import { Shell } from './components/Shell'
 import { SplitPaneHead } from './components/SplitPaneHead'
+import { ShellTitleContext } from './components/PageHeader'
 import { useMediaQuery } from './lib/useMediaQuery'
 import { LocationGate } from './components/LocationGate'
 import { ErrorBoundary, PageLoading } from './components/ErrorBoundary'
@@ -38,6 +39,9 @@ const TransfersPage = lazy(() => import('./features/transfers/TransfersPage').th
 const ProjectsPage = lazy(() => import('./features/projects/ProjectsPage').then((m) => ({ default: m.ProjectsPage })))
 const HRPage = lazy(() => import('./features/hr/HRPage').then((m) => ({ default: m.HRPage })))
 const AdminPage = lazy(() => import('./features/admin/AdminPage').then((m) => ({ default: m.AdminPage })))
+const ReconciliationPage = lazy(() =>
+  import('./features/reports/ReconciliationPage').then((m) => ({ default: m.ReconciliationPage }))
+)
 const ReportsPage = lazy(() => import('./features/reports/ReportsPage').then((m) => ({ default: m.ReportsPage })))
 
 // Side by side needs room for two readable panes next to the sidebar.
@@ -95,6 +99,7 @@ function PageView({
       {tab === 'transfers' && <TransfersPage />}
       {tab === 'projects' && <ProjectsPage />}
       {tab === 'hr' && <HRPage />}
+      {tab === 'reconciliation' && <ReconciliationPage />}
       {tab === 'reports' && <ReportsPage />}
       {tab === 'admin' && <AdminPage />}
     </>
@@ -187,12 +192,14 @@ function AppShellRouter() {
                 </div>
                 <div className="split-pane">
                   <SplitPaneHead tab={splitTab} tabs={splitTabs} onChange={changeSplitTab} onClose={() => changeSplitTab(null)} />
-                  <PageView
-                    tab={splitTab}
-                    expensesCostCenter={splitExpensesCostCenter}
-                    onExpensesCostCenterChange={setSplitExpensesCostCenter}
-                    expenseCostCenters={allowedExpenseCostCenters}
-                  />
+                  <ShellTitleContext.Provider value={false}>
+                    <PageView
+                      tab={splitTab}
+                      expensesCostCenter={splitExpensesCostCenter}
+                      onExpensesCostCenterChange={setSplitExpensesCostCenter}
+                      expenseCostCenters={allowedExpenseCostCenters}
+                    />
+                  </ShellTitleContext.Provider>
                 </div>
               </div>
             ) : (

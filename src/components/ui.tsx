@@ -1,5 +1,6 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import { useContext, type ButtonHTMLAttributes, type ReactNode } from 'react'
 import { Check, CircleAlert, CircleCheck, Clock, Info, type LucideIcon } from 'lucide-react'
+import { ShellTitleContext } from './PageHeader'
 import './ui.css'
 
 export function Button({
@@ -14,6 +15,9 @@ export function Button({
 /** The green page title band. `actions` puts controls (a section switcher,
  * a mode toggle) on its right — the same layout on every page that has one. */
 export function ModuleHeader({ children, actions }: { children: ReactNode; actions?: ReactNode }) {
+  // The app shell already shows the page title (and breadcrumbs and sub-tabs) above the page, so here only the page's own controls remain.
+  const shellDrawsTitle = useContext(ShellTitleContext)
+  if (shellDrawsTitle) return actions ? <div className="module-actions">{actions}</div> : null
   if (!actions) return <div className="module-header">{children}</div>
   return (
     <div className="module-header">

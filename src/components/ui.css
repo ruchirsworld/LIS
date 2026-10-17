@@ -2576,3 +2576,103 @@ summary:focus-visible {
     min-height: var(--tap);
   }
 }
+
+/* ===== A phone: tables become a stack of cards (no sideways scrolling) =====
+   Each cell carries its column heading in data-label (see useStackedTables). Date and amount come first. The trip table keeps its
+   sticky layout, so it is left as a table. */
+@media (max-width: 640px) {
+  table.data:not(:has(tbody.trip-block)),
+  table.data:not(:has(tbody.trip-block)) > tbody {
+    display: block;
+    background: none;
+  }
+  table.data:not(:has(tbody.trip-block)) > thead {
+    display: none;
+  }
+  table.data:not(:has(tbody.trip-block)) tr {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: var(--space-2);
+    padding: 10px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+  }
+  table.data:not(:has(tbody.trip-block)) tr.row-reimb {
+    background: color-mix(in srgb, var(--pending) 10%, var(--surface));
+    border-left: 3px solid var(--pending);
+  }
+  table.data:not(:has(tbody.trip-block)) td {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: 3px 0;
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    text-align: right;
+  }
+  table.data:not(:has(tbody.trip-block)) td:empty {
+    display: none;
+  }
+  table.data:not(:has(tbody.trip-block)) td[data-label]:not([data-label=''])::before {
+    content: attr(data-label);
+    flex: none;
+    max-width: 45%;
+    text-align: left;
+    font-size: var(--text-label);
+    color: var(--muted);
+  }
+  table.data:not(:has(tbody.trip-block)) td[data-role='date'] {
+    order: -2;
+    font-weight: 600;
+  }
+  table.data:not(:has(tbody.trip-block)) td[data-role='amount'],
+  table.data:not(:has(tbody.trip-block)) td.amt {
+    order: -1;
+    font-weight: 600;
+  }
+  /* Month and date heading rows: a plain full-width bar, not a card. */
+  table.data:not(:has(tbody.trip-block)) tr.expense-month-group-row,
+  table.data:not(:has(tbody.trip-block)) tr.expense-date-group-row,
+  table.data:not(:has(tbody.trip-block)) tr.group-header-row {
+    padding: 0;
+    background: var(--hover);
+    box-shadow: none;
+  }
+  table.data:not(:has(tbody.trip-block)) tr.expense-month-group-row > td,
+  table.data:not(:has(tbody.trip-block)) tr.expense-date-group-row > td,
+  table.data:not(:has(tbody.trip-block)) tr.group-header-row > td {
+    display: block;
+    padding: 10px 12px;
+    text-align: left;
+  }
+  .table-scroll-top {
+    display: none;
+  }
+}
+
+/* Card rows on a phone: the arrow and the menu button sit at the top right of the card instead of taking a line each. */
+@media (max-width: 640px) {
+  table.data:not(:has(tbody.trip-block)) tr {
+    position: relative;
+  }
+  table.data:not(:has(tbody.trip-block)) td[data-label='']:first-child:not(:only-child) {
+    position: absolute;
+    top: 4px;
+    right: 52px;
+    padding: 0;
+  }
+  table.data:not(:has(tbody.trip-block)) td[data-label='']:last-child:not(:only-child) {
+    position: absolute;
+    top: 4px;
+    right: 8px;
+    padding: 0;
+  }
+  table.data:not(:has(tbody.trip-block)) td[data-role='date']:not(:only-child) {
+    padding-right: 104px;
+  }
+}

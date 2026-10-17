@@ -203,3 +203,138 @@
 .split-close:hover {
   text-decoration: underline;
 }
+
+/* ── Page header: breadcrumbs, title, sub-tabs. The same on every page. ───── */
+.page-head {
+  margin-bottom: var(--space-3);
+}
+.breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-label);
+  color: var(--muted);
+}
+.breadcrumbs [aria-current='page'] {
+  color: var(--text);
+}
+.page-title {
+  margin: 2px 0 var(--space-3);
+  font-size: var(--text-title);
+  line-height: 1.25;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+.subtabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.subtab {
+  font-family: inherit;
+  font-size: var(--text-body);
+  font-weight: 500;
+  color: var(--muted);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+.subtab:hover {
+  color: var(--text);
+}
+.subtab.active {
+  color: var(--primary);
+  font-weight: 600;
+  border-bottom-color: var(--primary);
+}
+/* A page's own controls (for example its Admin / Trips / Project switch), under the sub-tabs. */
+.module-actions {
+  margin-bottom: var(--space-2);
+}
+
+/* ── "+ New entry" ─────────────────────────────────────────────────────── */
+.new-entry {
+  position: relative;
+}
+.new-entry-btn {
+  padding: 7px 12px;
+}
+.new-entry-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 70;
+  min-width: 240px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+}
+.new-entry-item {
+  font-family: inherit;
+  font-size: var(--text-body);
+  text-align: left;
+  color: var(--text);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  cursor: pointer;
+}
+.new-entry-item:hover {
+  background: var(--hover);
+}
+@media (max-width: 640px) {
+  .page-title {
+    font-size: 22px;
+  }
+  .new-entry-item {
+    min-height: var(--tap);
+  }
+  .subtab {
+    min-height: var(--tap);
+    padding: 10px 12px;
+  }
+}
+
+/* On a phone "+ New entry" is a round button above the bottom bar (the top bar hides while scrolling); on a desktop it is in the top bar. */
+.new-entry-floating {
+  display: none;
+}
+@media (max-width: 640px) {
+  .new-entry-inline {
+    display: none;
+  }
+  .new-entry-floating {
+    display: block;
+    position: fixed;
+    right: 16px;
+    bottom: calc(100px + env(safe-area-inset-bottom));
+    z-index: 46;
+  }
+  .new-entry-floating .new-entry-menu {
+    top: auto;
+    bottom: calc(100% + 8px);
+  }
+  .new-entry-fab {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    border: none;
+    background: var(--cta-strong);
+    color: #fff;
+    cursor: pointer;
+    box-shadow: var(--shadow-md);
+  }
+}

@@ -1,14 +1,13 @@
-import { TABS, isTabVisible, type TabId } from '../lib/nav'
+import { SUPERVISOR_MODULE_LABEL, moduleOfTab, modulesFor, type TabId } from '../lib/nav'
+import { landingTab } from '../lib/moduleMemory'
 import { useAuth } from '../lib/auth'
 import { useT } from '../lib/i18n'
 import { usePendingApprovalsCount } from '../lib/queries/approvals'
-import { NavIcon } from './NavIcons'
+import { MODULE_ICON } from './moduleIcons'
 import './MobileFooter.css'
 
-// 'records' only ever shows for a Supervisor (role-gated in nav.ts) — it
-// doesn't take a slot away from Admin/CXO's own items below.
-const QUICK_ACCESS_IDS: TabId[] = ['expenses', 'records', 'purchases', 'calendar', 'hr', 'approvals']
-const FOOTER_ITEMS = QUICK_ACCESS_IDS.map((id) => TABS.find((t) => t.id === id)!)
+// The bottom bar holds the first five menu modules (Reports and Settings are in the drawer, opened from the logo in the top bar).
+const MAX_ITEMS = 5
 
 export function MobileFooter({ active, onChange }: { active: TabId; onChange: (tab: TabId) => void }) {
   const { profile } = useAuth()
@@ -16,28 +15,34 @@ export function MobileFooter({ active, onChange }: { active: TabId; onChange: (t
   const isSupervisor = profile?.role === 'supervisor'
   const pendingApprovalsCount = usePendingApprovalsCount(canApprove)
   const t = useT()
-  const visibleItems = FOOTER_ITEMS.filter((item) => isTabVisible(item, profile?.role))
-  const navLabel = (item: { id: TabId; label: string }) =>
-    item.id === 'expenses' && isSupervisor ? t('Claims & Advances') : t(item.label)
+  const items = modulesFor(profile?.role)
+    .filter((m) => m.id !== 'settings' && m.id !== 'reports')
+    .slice(0, MAX_ITEMS)
+  const current = moduleOfTab(active, profile?.role)
 
   return (
     <nav className="mobile-footer" aria-label="Quick access">
-      {visibleItems.map((item) => (
-        <button
-          key={item.id}
-          type="button"
-          className={item.id === active ? 'mobile-footer-item active' : 'mobile-footer-item'}
-          onClick={() => onChange(item.id)}
-        >
-          <span className="mobile-footer-icon" aria-hidden="true">
-            <NavIcon id={item.id} size={26} />
-            {item.id === 'approvals' && canApprove && pendingApprovalsCount > 0 && (
-              <span className="mobile-footer-badge">{pendingApprovalsCount}</span>
-            )}
-          </span>
-          <span className="mobile-footer-label">{navLabel(item)}</span>
-        </button>
-      ))}
+      {items.map((m) => {
+        const Icon = MODULE_ICON[m.id]
+        const isActive = current?.id === m.id
+        const label = t(isSupervisor ? SUPERVISOR_MODULE_LABEL[m.id] ?? m.label : m.label)
+        const badge = m.id === 'expenses' && canApprove ? pendingApprovalsCount : 0
+        return (
+          <button
+            key={m.id}
+            type="button"
+            className={isActive ? 'mobile-footer-item active' : 'mobile-footer-item'}
+            aria-current={isActive ? 'page' : undefined}
+            onClick={() => onChange(landingTab(profile?.id, m.id, profile?.role))}
+          >
+            <span className="mobile-footer-icon" aria-hidden="true">
+              <Icon size={24} strokeWidth={1.75} />
+              {badge > 0 && <span className="mobile-footer-badge">{badge}</span>}
+            </span>
+            <span className="mobile-footer-label">{label}</span>
+          </button>
+        )
+      })}
     </nav>
   )
 }

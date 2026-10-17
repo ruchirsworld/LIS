@@ -3,7 +3,11 @@ import { useAuth } from '../lib/auth'
 import { Sidebar } from './Sidebar'
 import { SearchLauncher } from './CommandPalette'
 import { MobileFooter } from './MobileFooter'
-import { MobileFab } from './MobileFab'
+import { PageHeader, ShellTitleContext } from './PageHeader'
+import { NewEntryMenu } from './NewEntryMenu'
+import { useStackedTables } from './useStackedTables'
+import { moduleOfTab } from '../lib/nav'
+import { rememberSubTab } from '../lib/moduleMemory'
 import { usePendingApprovalsCount } from '../lib/queries/approvals'
 import { useLanguage } from '../lib/i18n'
 import type { TabId } from '../lib/nav'
@@ -58,6 +62,14 @@ export function Shell({
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [headerHidden, setHeaderHidden] = useState(false)
   const lastScrollY = useRef(0)
+  const mainRef = useRef<HTMLElement>(null)
+  useStackedTables(mainRef)
+
+  // Opening a module again lands on the sub-tab this person last used there.
+  useEffect(() => {
+    const mod = moduleOfTab(active, profile?.role)
+    if (mod) rememberSubTab(profile?.id, mod.id, active)
+  }, [active, profile?.id, profile?.role])
 
   // Mobile-only: hide the header while scrolling down (more room for content),
   // reveal it again on scroll up or near the top — menu/logout stay reachable,
@@ -126,6 +138,7 @@ export function Shell({
                   {lang === 'en' ? 'हिं' : 'EN'}
                 </button>
               )}
+              <NewEntryMenu />
               {isAdminSide && <SearchLauncher onNavigate={onChange} />}
               {isAdminSide && (
                 <button
@@ -145,13 +158,14 @@ export function Shell({
             </div>
           </div>
 
-          <main className="shell-content" id="main-content" tabIndex={-1}>
-            {children}
+          <main className="shell-content" id="main-content" tabIndex={-1} ref={mainRef}>
+            {!split?.isOpen && <PageHeader active={active} onChange={onChange} />}
+            <ShellTitleContext.Provider value={!split?.isOpen}>{children}</ShellTitleContext.Provider>
           </main>
         </div>
       </div>
 
-      <MobileFab onChange={onChange} />
+      <NewEntryMenu floating />
       <MobileFooter active={active} onChange={onChange} />
     </div>
   )
