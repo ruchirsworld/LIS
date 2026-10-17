@@ -1,6 +1,6 @@
 # LIS changes since v2.0.1
 
-Version 2.0.1 was released on 3 September 2026. This list covers everything after it, up to 2.1.28. It is put together from the project history, grouped by area. Version numbers are shown where a release carried one.
+Version 2.0.1 was released on 3 September 2026. This list covers everything after it, up to 3.0.1. It is put together from the project history, grouped by area. Version numbers are shown where a release carried one.
 
 ## 2.0.2 – 2.0.3 (3 – 4 September)
 
@@ -180,6 +180,18 @@ Version 2.0.1 was released on 3 September 2026. This list covers everything afte
 ## 2.1.26 (17 October): sticky trip rows, and records grouped by month
 - **Trip Records:** while you scroll through an opened trip's entries, the table header, the trip's own row and the entries heading (with the spend split and + Add expense) stay at the top; they let go when the trip ends. The entries have a Remarks column after the sub-head.
 - **Admin and Project expense records, and Activity by user,** are grouped by month (a bold grey bar with the count and total) and, inside a month, by date. Both can be folded. Each date group is blue or green in turn, and its rows alternate a lighter and a slightly deeper tint; reimbursements stay amber. Month and day totals cover everything in them, not only the current page.
+
+## 3.0.1 (18 October): the redesign
+A new look and a new way round, with new safety checks. Nothing recorded was changed or removed: every row count and total was checked before and after each database change.
+- **Design:** a new colour set (deep blue, teal, terracotta, with status colours only for status), Inter type, and one set of buttons, inputs, tags, panels, toasts with Undo, empty states and loading placeholders. Text colours meet WCAG AA.
+- **Menu:** Expenses, Procurement, Clients, Team, Finance, Reports, and Settings apart at the bottom. Each is one page with tabs along the top (Finance: Loans, Capital, Transfers, Reconciliation), breadcrumbs, and a title. The logo opens the Dashboard. The menu can shrink to icons. The last tab used in each place is remembered. "+ New entry" is always at the top (a round button on a phone). On a phone, tables become cards and there is a bottom bar.
+- **Entering expenses:** the date comes first, large. A trip is chosen from a searchable list of active and closed trips grouped by month, and its date is limited to the trip's dates (the database checks this for new and edited entries only; ten older entries outside their trips were left alone). A trip entry can be linked to a project. "Entered on behalf of" (optional) and remarks are under More details. Before saving you see the entry as one sentence, with warnings for a future date, a date over 30 days old, an unusually large amount, and a possible duplicate (same amount, within 2 days, same person, in any module). Saving anyway after a duplicate warning needs a reason. After saving: a toast with the ID and Undo; Ctrl+Enter saves; "My entries today" lists what you entered.
+- **Records:** click a row to open a side panel (a bottom sheet on a phone) with ID, status, amount, date, every detail, and Edit / Looks right / Delete. Rows are plain zebra; reimbursable rows have an amber edge, tint and an initials badge.
+- **Trash:** deleting an expense, reimbursement, capital entry, transfer, other receipt, loan or loan payment moves it to the Trash (Settings, Additional Settings) instead of removing it. An Admin restores it, with its entry in the books. An entry matched in bank reconciliation must be unmatched first. Invoices, bills and their payments still delete for good.
+- **Activity by user:** every entry in every module, newest entered first, with who entered it and on whose behalf, cost centre / project / trip, and a Checked tick; filters for person, module, dates and Unchecked only; a daily summary (entries today, total, unchecked, possible duplicates, missing receipts).
+- **Possible duplicates:** a new report with Not a duplicate (undoable), Open and Delete.
+- **Bank reconciliation:** statement lines, matches and groups are saved (a statement is loaded once). Any dates, default the last 7 days. Books and statement side by side with the same columns, matched pairs on one row, unmatched in two panels, suggestions to confirm, group matches with GRP-0001 references, reviewed ticks, filters (All, Unreviewed, Reviewed, Matched, Unmatched) and a summary bar. Editing a matched entry breaks its match. A reconciled period can be locked; only an admin can unlock it, with a reason, for 30 minutes. Everything is in a history.
+- **Database (all additive):** new nullable columns (on behalf of, duplicate reason, deleted-at marks) and new tables (reviews, duplicate marks, statement lines, matches, history, locks). Nothing existing was updated, deleted or backfilled.
 
 ## 2.1.28 (17 October): blue and white shading, folded months, one toolbar
 - **Months start folded** in the Admin and Project expense records and in Activity by user. Click a month to open it; searching opens every month.
