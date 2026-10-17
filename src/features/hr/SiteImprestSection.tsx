@@ -692,7 +692,7 @@ export function SiteImprestSection() {
                         </tr>
                       </Fragment>
                     ) : (
-                      <tr key={t.id}>
+                      <tr key={t.id} className={t.reimbursable ? 'row-reimb' : undefined} title={t.reimbursable ? 'Recorded as reimbursement' : undefined}>
                         <td>{fmtDate(t.date)}</td>
                         <td>{t.kind === 'advance' ? 'Advance' : 'Return'}</td>
                         <td className="amt">{fmt(t.amount)}</td>

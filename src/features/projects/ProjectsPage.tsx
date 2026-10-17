@@ -490,7 +490,12 @@ export function ProjectsPage() {
                                 const isExpanded = expandedExpenseId === e.id
                                 return (
                                   <Fragment key={e.id}>
-                                    <tr {...activateProps(() => setExpandedExpenseId(isExpanded ? null : e.id))} style={{ cursor: 'pointer' }}>
+                                    <tr
+                                      className={e.reimbursable ? 'row-reimb' : undefined}
+                                      title={e.reimbursable ? 'Recorded as reimbursement' : undefined}
+                                      {...activateProps(() => setExpandedExpenseId(isExpanded ? null : e.id))}
+                                      style={{ cursor: 'pointer' }}
+                                    >
                                       <td>
                                         <button
                                           type="button"
@@ -609,7 +614,7 @@ export function ProjectsPage() {
                             {tripExpenseRows
                               .filter((e) => (e.sub_head_id ?? 'none') === tripExpenseSubHeadId)
                               .map((e) => (
-                                <tr key={e.id}>
+                                <tr key={e.id} className={e.reimbursable ? 'row-reimb' : undefined} title={e.reimbursable ? 'Recorded as reimbursement' : undefined}>
                                   <td>{e.date ? fmtDate(e.date) : '—'}</td>
                                   <td>{tripName(e.trip_id)}</td>
                                   <td>{e.description ?? '—'}</td>

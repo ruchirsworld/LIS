@@ -116,7 +116,7 @@ export function PaymentRecordsTable() {
               const vendor = vendorOf(p)
               return (
                 <Fragment key={p.id}>
-                  <tr>
+                  <tr className={p.payment_mode === 'Reimbursement' ? 'row-reimb' : undefined} title={p.payment_mode === 'Reimbursement' ? 'Recorded as reimbursement' : undefined}>
                     <td>{p.display_id ?? '—'}</td>
                     <td>{fmtDate(p.date)}</td>
                     <td>{vendor?.name ?? '—'}</td>

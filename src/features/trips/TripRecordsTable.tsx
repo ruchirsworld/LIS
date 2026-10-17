@@ -349,11 +349,15 @@ export function TripRecordsTable() {
                   {summary && (
                     <tr className="group-header-row" onClick={() => toggleMonth(month)} style={{ cursor: 'pointer' }}>
                       <td colSpan={COL_SPAN}>
-                        <span style={{ display: 'inline-block', width: 14, fontSize: 11, opacity: 0.6 }}>{monthCollapsed ? '▸' : '▾'}</span>
-                        {monthLabel(month)}{' '}
-                        <span className="note" style={{ margin: 0 }}>
-                          {summary.count} trip{summary.count === 1 ? '' : 's'} · {fmt(summary.total)}
-                        </span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
+                          <span>
+                            <span style={{ display: 'inline-block', width: 14, fontSize: 11, opacity: 0.6 }}>{monthCollapsed ? '▸' : '▾'}</span>
+                            {monthLabel(month)}
+                          </span>
+                          <span style={{ whiteSpace: 'nowrap' }}>
+                            {summary.count} trip{summary.count === 1 ? '' : 's'} · {fmt(summary.total)}
+                          </span>
+                        </div>
                         {!monthCollapsed && <SpendBySource expenses={summary.spent} label="Spent via" style={{ margin: '6px 0 0', fontWeight: 400 }} />}
                       </td>
                     </tr>
@@ -476,7 +480,7 @@ export function TripRecordsTable() {
                             <tbody>
                               {tripExpenses.map((e) => (
                                 <Fragment key={e.id}>
-                                  <tr>
+                                  <tr className={e.reimbursable ? 'row-reimb' : undefined} title={e.reimbursable ? 'Recorded as reimbursement' : undefined}>
                                     <td>{fmtDate(e.date)}</td>
                                     <td>{e.description}</td>
                                     <td>{subHeadName(e.sub_head_id)}</td>

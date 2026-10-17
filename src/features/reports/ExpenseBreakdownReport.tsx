@@ -118,7 +118,7 @@ export function ExpenseBreakdownReport({ range }: { range: DateRange | null }) {
               </tr>
             )}
             {expenses?.map((e) => (
-              <tr key={e.id}>
+              <tr key={e.id} className={e.reimbursable ? 'row-reimb' : undefined} title={e.reimbursable ? 'Recorded as reimbursement' : undefined}>
                 <td>{e.display_id ?? '—'}</td>
                 <td>{fmtDate(e.date)}</td>
                 <td>{e.description}</td>

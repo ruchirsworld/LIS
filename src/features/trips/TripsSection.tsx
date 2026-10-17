@@ -264,7 +264,7 @@ export function TripsSection() {
                   </thead>
                   <tbody>
                     {expandedTripExpenses.map((e) => (
-                      <tr key={e.id}>
+                      <tr key={e.id} className={e.reimbursable ? 'row-reimb' : undefined} title={e.reimbursable ? 'Recorded as reimbursement' : undefined}>
                         <td>{fmtDate(e.date)}</td>
                         <td>{e.description}</td>
                         <td>{subHeadName(e.sub_head_id)}</td>

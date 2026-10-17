@@ -381,7 +381,7 @@ export function ExpenseTable({
                   )}
                   {!isDateCollapsed && (
                     <>
-                  <tr>
+                  <tr className={e.reimbursable ? 'row-reimb' : undefined} title={e.reimbursable ? 'Recorded as reimbursement' : undefined}>
                     <td>
                       <input type="checkbox" checked={selectedIds.has(e.id)} onChange={() => toggleSelected(e.id)} aria-label={`Select ${e.display_id ?? 'row'}`} />
                     </td>
