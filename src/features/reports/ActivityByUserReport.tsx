@@ -13,6 +13,7 @@ import { useActivityByUser, type ActivityRow } from '../../lib/queries/reports'
 import type { DateRange } from '../../lib/calc/reportPeriod'
 import type { ExportSection } from '../../lib/export/report'
 import { ReportExportButtons } from './ReportExportButtons'
+import { TableSearch, matchesSearch } from '../../components/TableSearch'
 import { RecordDetailModal, canShowRecord } from './RecordDetailModal'
 
 const dateOf = (iso: string) => iso.slice(0, 10)
@@ -24,12 +25,15 @@ export function ActivityByUserReport({ range }: { range: DateRange | null }) {
   const [userId, setUserId] = useState('')
   const [byRecorded, setByRecorded] = useState(false)
   const [kind, setKind] = useState('')
+  const [search, setSearch] = useState('')
   const [viewing, setViewing] = useState<ActivityRow | null>(null)
   const { data, isLoading, error } = useActivityByUser(userId || null, range, byRecorded)
 
   const person = profiles?.find((p) => p.id === userId)
   const rows = data ?? []
-  const shown = kind ? rows.filter((r) => r.kind === kind) : rows
+  const shown = rows.filter(
+    (r) => (!kind || r.kind === kind) && matchesSearch(search, [r.display_id, r.description, r.kind, r.status, r.activity_date, r.recorded_at.slice(0, 10), r.amount])
+  )
 
   const kinds = useMemo(() => [...new Set(rows.map((r) => r.kind))].sort(), [rows])
   const summary = useMemo(() => {
@@ -45,7 +49,7 @@ export function ActivityByUserReport({ range }: { range: DateRange | null }) {
     }
     return [...by.entries()].map(([k, v]) => ({ kind: k, ...v })).sort((a, b) => b.count - a.count)
   }, [rows])
-  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(shown)
+  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(shown, `${search}|${kind}`)
 
   /** The popup shows the record where it is; "its screen" goes to the page that holds it. */
   async function open(r: ActivityRow) {
@@ -168,6 +172,7 @@ export function ActivityByUserReport({ range }: { range: DateRange | null }) {
             </TableScroll>
           )}
 
+          <TableSearch value={search} onChange={setSearch} />
           <TableScroll>
             <table className="data">
               <thead>
@@ -196,8 +201,8 @@ export function ActivityByUserReport({ range }: { range: DateRange | null }) {
                   const [moneyIn, moneyOut, other] = amountCells(r)
                   return (
                     <tr key={`${r.source_table}-${r.source_id}`} className={r.reimbursable ? 'row-reimb' : undefined} title={r.reimbursable ? 'Recorded as reimbursement' : undefined}>
-                      <td>{fmtDate(r.activity_date)}</td>
-                      <td>{fmtDate(dateOf(r.recorded_at))}</td>
+                      <td style={{ whiteSpace: 'nowrap' }}>{fmtDate(r.activity_date)}</td>
+                      <td style={{ whiteSpace: 'nowrap' }}>{fmtDate(dateOf(r.recorded_at))}</td>
                       <td>{r.kind}</td>
                       <td>{r.display_id ?? '—'}</td>
                       <td>{r.description || '—'}</td>

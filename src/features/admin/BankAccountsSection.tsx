@@ -6,6 +6,7 @@ import { Pagination } from '../../components/Pagination'
 import { TableScroll } from '../../components/TableScroll'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
+import { TableSearch, matchesSearch } from '../../components/TableSearch'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
 import { useBankAccounts } from '../../lib/queries/masters'
@@ -19,12 +20,14 @@ export function BankAccountsSection() {
   const updateAccount = useUpdateBankAccount()
   const deleteAccount = useDeleteBankAccount()
 
-  const { sorted: sortedAccounts, sortKey, direction, toggleSort } = useSort(accounts, {
+  const [search, setSearch] = useState('')
+  const searched = search ? accounts?.filter((r) => matchesSearch(search, Object.values(r))) : accounts
+  const { sorted: sortedAccounts, sortKey, direction, toggleSort } = useSort(searched, {
     name: (a) => a.name,
     accountNumber: (a) => a.account_number,
     openingBalance: (a) => a.opening_balance,
   })
-  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedAccounts)
+  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedAccounts, search)
 
   const exportSections: ExportSection[] = [
     {
@@ -127,6 +130,7 @@ export function BankAccountsSection() {
 
       <ReportExportButtons title="Bank accounts" sections={exportSections} range={null} />
 
+      <TableSearch value={search} onChange={setSearch} />
       <TableScroll>
         <table className="data">
           <thead>

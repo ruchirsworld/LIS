@@ -8,6 +8,7 @@ import { TableScroll } from '../../components/TableScroll'
 import { RowMenu } from '../../components/RowMenu'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
+import { TableSearch, matchesSearch } from '../../components/TableSearch'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
 import { useVendorBills, useVendorBillPayments, useDeleteVendorBill, useVendorBillItems } from '../../lib/queries/purchases'
@@ -40,6 +41,7 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
   const [editListId, setEditListId] = useState<string | null>(null)
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
   const [vendorFilter, setVendorFilter] = useState('')
+  const [search, setSearch] = useState('')
   const [unpaidOnly, setUnpaidOnly] = useState(false)
   const nav = useNavFilter('purchases')
   useEffect(() => {
@@ -92,8 +94,14 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
   // overpaid, is left out).
   const visibleBills = unpaidOnly ? vendorFiltered?.filter((b) => dueOf(b) > 0.01) : vendorFiltered
 
+  const searchedBills = search
+    ? visibleBills?.filter((b) =>
+        matchesSearch(search, [b.display_id, b.description, b.remarks, b.vendor_invoice_no, b.date, b.amount, billTotal(b), vendorNameOf(b), clientNameOf(b), projectNameOf(b), ...itemsOf(b).map((i) => i.name)])
+      )
+    : visibleBills
+
   const { sorted: sortedBills, sortKey, direction, toggleSort } = useSort(
-    visibleBills,
+    searchedBills,
     {
       id: (b) => b.display_id,
       vendor: (b) => vendorNameOf(b),
@@ -110,7 +118,7 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
     },
     'date'
   )
-  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedBills)
+  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedBills, search)
 
   const exportSections: ExportSection[] = [
     {
@@ -189,6 +197,7 @@ export function VendorBillTable({ onEdit }: { onEdit: (bill: VendorBill) => void
         </div>
       )}
 
+      <TableSearch value={search} onChange={setSearch} />
       <TableScroll>
         <table className="data">
           <thead>

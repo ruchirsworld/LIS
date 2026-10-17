@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import { SortableTh } from '../../components/SortableTh'
+import { TableSearch, matchesSearch } from '../../components/TableSearch'
 import { Pagination } from '../../components/Pagination'
 import { TableScroll } from '../../components/TableScroll'
 import { useSort } from '../../lib/useSort'
@@ -23,8 +25,13 @@ export function TripLinkedProjectExpenses() {
   const projectName = (id: string | null) => (id ? projects?.find((p) => p.id === id)?.name ?? '—' : '—')
   const tripName = (id: string | null) => (id ? trips?.find((t) => t.id === id)?.name ?? '—' : '—')
 
+  const [search, setSearch] = useState('')
+  const searchedRows = search
+    ? rows.filter((e) => matchesSearch(search, [e.display_id, e.description, e.remarks, e.date, e.amount, projectName(e.project_id), tripName(e.trip_id)]))
+    : rows
+
   const { sorted, sortKey, direction, toggleSort } = useSort(
-    rows,
+    searchedRows,
     {
       date: (e) => e.date,
       project: (e) => projectName(e.project_id),
@@ -35,7 +42,7 @@ export function TripLinkedProjectExpenses() {
     'date',
     'desc'
   )
-  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sorted)
+  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sorted, search)
 
   if (rows.length === 0) return null
 
@@ -46,6 +53,7 @@ export function TripLinkedProjectExpenses() {
         Logged under a trip, not here — shown for reference since they still count toward these projects' totals on
         Project Overview. Edit or delete them from Trips.
       </div>
+      <TableSearch value={search} onChange={setSearch} />
       <TableScroll>
         <table className="data">
           <thead>

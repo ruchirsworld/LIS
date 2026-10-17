@@ -7,6 +7,7 @@ import { Pagination } from '../../components/Pagination'
 import { TableScroll } from '../../components/TableScroll'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
+import { TableSearch, matchesSearch } from '../../components/TableSearch'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
 import { useClients, useProjects } from '../../lib/queries/masters'
@@ -44,7 +45,9 @@ export function ProjectsSection() {
   const clientNameOf = (p: NonNullable<typeof projects>[number]) => clientLabel(clients?.find((c) => c.id === p.client_id))
   const clientFullNameOf = (p: NonNullable<typeof projects>[number]) => clientFullName(clients?.find((c) => c.id === p.client_id))
 
-  const { sorted: sortedProjects, sortKey, direction, toggleSort } = useSort(projects, {
+  const [search, setSearch] = useState('')
+  const searched = search ? projects?.filter((r) => matchesSearch(search, Object.values(r))) : projects
+  const { sorted: sortedProjects, sortKey, direction, toggleSort } = useSort(searched, {
     code: (p) => p.code,
     name: (p) => p.name,
     client: (p) => clientNameOf(p),
@@ -55,7 +58,7 @@ export function ProjectsSection() {
     endDate: (p) => p.end_date,
     status: (p) => p.status,
   })
-  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedProjects)
+  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedProjects, search)
 
   const exportSections: ExportSection[] = [
     {
@@ -276,6 +279,7 @@ export function ProjectsSection() {
 
       <ReportExportButtons title="Projects" sections={exportSections} range={null} />
 
+      <TableSearch value={search} onChange={setSearch} />
       <TableScroll>
         <table className="data">
           <thead>

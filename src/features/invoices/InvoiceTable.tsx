@@ -7,6 +7,7 @@ import { Pagination } from '../../components/Pagination'
 import { TableScroll } from '../../components/TableScroll'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
+import { TableSearch, matchesSearch } from '../../components/TableSearch'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import { useInvoices, useInvoicePayments, useDeleteInvoice, useCycleInvoiceStatus, useMovePaymentExcess } from '../../lib/queries/invoices'
 import { useClients, useProjects } from '../../lib/queries/masters'
@@ -29,6 +30,7 @@ type Invoice = Database['public']['Tables']['invoices']['Row']
 export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void }) {
   const [range, setRange] = useState<DateRange | null>(null)
   const [clientFilter, setClientFilter] = useState('')
+  const [search, setSearch] = useState('')
   const [view, setView] = useState<InvoiceView>('all')
   // Arriving from a dashboard card or table row: narrow to what it counted.
   const nav = useNavFilter('invoices')
@@ -124,8 +126,14 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
           return retentionHeld(inv, invPayments) > 0
         })
 
+  const searchedInvoices = search
+    ? filteredInvoices?.filter((inv) =>
+        matchesSearch(search, [inv.display_id, inv.invoice_number, inv.description, inv.hsn_sac, inv.status, inv.invoice_date, inv.amount, netPayable(inv), clientNameOf(inv), projectNameOf(inv)])
+      )
+    : filteredInvoices
+
   const { sorted: sortedInvoices, sortKey, direction, toggleSort } = useSort(
-    filteredInvoices,
+    searchedInvoices,
     {
       id: (inv) => inv.display_id,
       invoiceNo: (inv) => inv.invoice_number,
@@ -144,7 +152,7 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
     },
     'invoiceDate'
   )
-  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedInvoices)
+  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedInvoices, search)
 
   const exportSections = buildLedgerSections({ clients, invoices: allInvoices, payments, notes, projects, range, clientFilter })
   // When narrowed to one client, the export should say so up front — full
@@ -207,6 +215,7 @@ export function InvoiceTable({ onEdit }: { onEdit: (invoice: Invoice) => void })
         </div>
       )}
 
+      <TableSearch value={search} onChange={setSearch} />
       <TableScroll>
         <table className="data">
           <thead>

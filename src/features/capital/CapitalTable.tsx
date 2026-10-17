@@ -5,6 +5,7 @@ import { Pagination } from '../../components/Pagination'
 import { TableScroll } from '../../components/TableScroll'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
+import { TableSearch, matchesSearch } from '../../components/TableSearch'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
 import { useCapitalTx, useDeleteCapitalTx } from '../../lib/queries/capital'
@@ -14,14 +15,19 @@ import type { DateRange } from '../../lib/calc/period'
 
 export function CapitalTable() {
   const [range, setRange] = useState<DateRange | null>(null)
+  const [search, setSearch] = useState('')
   const { data: tx, isLoading } = useCapitalTx(range)
   const { data: profiles } = useProfiles()
   const deleteTx = useDeleteCapitalTx()
 
   const partnerNameOf = (t: NonNullable<typeof tx>[number]) => profiles?.find((p) => p.id === t.partner_id)?.name ?? ''
 
+  const searchedTx = search
+    ? tx?.filter((t) => matchesSearch(search, [t.display_id, t.notes, t.date, t.amount, t.type === 'injection' ? 'capital put in injection' : 'capital withdrawn withdrawal', t.payment_mode, partnerNameOf(t)]))
+    : tx
+
   const { sorted: sortedTx, sortKey, direction, toggleSort } = useSort(
-    tx,
+    searchedTx,
     {
       id: (t) => t.display_id,
       partner: (t) => partnerNameOf(t),
@@ -32,7 +38,7 @@ export function CapitalTable() {
     },
     'date'
   )
-  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedTx)
+  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedTx, search)
 
   const exportSections: ExportSection[] = [
     {
@@ -58,6 +64,7 @@ export function CapitalTable() {
         <ReportExportButtons title="Capital records" sections={exportSections} range={range} style={{ marginTop: 0 }} />
       </div>
 
+      <TableSearch value={search} onChange={setSearch} />
       <TableScroll>
         <table className="data">
           <thead>

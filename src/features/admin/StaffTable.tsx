@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useStaff } from '../../lib/queries/masters'
 import { useDeleteStaff, useProfiles } from '../../lib/queries/admin'
 import { useProjects } from '../../lib/queries/masters'
@@ -7,6 +8,7 @@ import { Pagination } from '../../components/Pagination'
 import { TableScroll } from '../../components/TableScroll'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
+import { TableSearch, matchesSearch } from '../../components/TableSearch'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
 import { fmt, fmtDate } from '../../lib/calc/format'
@@ -25,14 +27,16 @@ export function StaffTable({ onEdit }: { onEdit: (staff: Staff) => void }) {
   const supervisorName = (id: string | null) => (id ? profiles?.find((p) => p.id === id)?.name ?? '—' : '—')
   const projectName = (id: string | null) => (id ? projects?.find((p) => p.id === id)?.name ?? '—' : '—')
 
-  const { sorted: sortedStaff, sortKey, direction, toggleSort } = useSort(staff, {
+  const [search, setSearch] = useState('')
+  const searched = search ? staff?.filter((r) => matchesSearch(search, Object.values(r))) : staff
+  const { sorted: sortedStaff, sortKey, direction, toggleSort } = useSort(searched, {
     id: (s) => s.display_id,
     name: (s) => s.name,
     phone: (s) => s.phone,
     rate: (s) => s.daily_rate,
     start: (s) => s.start_date,
   })
-  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedStaff)
+  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedStaff, search)
 
   const exportSections: ExportSection[] = [
     {
@@ -54,6 +58,7 @@ export function StaffTable({ onEdit }: { onEdit: (staff: Staff) => void }) {
   return (
     <>
       <ReportExportButtons title="Staff" sections={exportSections} range={null} />
+      <TableSearch value={search} onChange={setSearch} />
       <TableScroll>
         <table className="data">
           <thead>

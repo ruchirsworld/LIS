@@ -6,6 +6,7 @@ import { TableScroll } from '../../components/TableScroll'
 import { RowMenu } from '../../components/RowMenu'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
+import { TableSearch, matchesSearch } from '../../components/TableSearch'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
 import { useVendorBills, useVendorBillPayments, useDeleteVendorBillPayment } from '../../lib/queries/purchases'
@@ -23,6 +24,7 @@ export function PaymentRecordsTable() {
   const deletePayment = useDeleteVendorBillPayment()
 
   const [vendorId, setVendorId] = useState('')
+  const [search, setSearch] = useState('')
   const [editingPayment, setEditingPayment] = useState<VendorBillPayment | null>(null)
 
   const billOf = (p: VendorBillPayment) => bills?.find((b) => b.id === p.bill_id)
@@ -33,8 +35,12 @@ export function PaymentRecordsTable() {
 
   const vendorFiltered = vendorId ? (payments ?? []).filter((p) => vendorOf(p)?.id === vendorId) : payments
 
+  const searchedPayments = search
+    ? vendorFiltered?.filter((p) => matchesSearch(search, [p.display_id, p.reference, p.date, p.amount, p.payment_mode, vendorOf(p)?.name, billOf(p)?.display_id, billOf(p)?.description]))
+    : vendorFiltered
+
   const { sorted: sortedPayments, sortKey, direction, toggleSort } = useSort(
-    vendorFiltered,
+    searchedPayments,
     {
       id: (p) => p.display_id,
       date: (p) => p.date,
@@ -44,7 +50,7 @@ export function PaymentRecordsTable() {
     },
     'date'
   )
-  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedPayments)
+  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedPayments, search)
 
   const exportSections: ExportSection[] = [
     {
@@ -82,6 +88,7 @@ export function PaymentRecordsTable() {
         <ReportExportButtons title="Payment records" sections={exportSections} range={null} style={{ marginTop: 0 }} />
       </div>
 
+      <TableSearch value={search} onChange={setSearch} />
       <TableScroll>
         <table className="data">
           <thead>

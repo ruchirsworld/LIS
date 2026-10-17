@@ -5,6 +5,7 @@ import { TableScroll } from '../../components/TableScroll'
 import { RowMenu } from '../../components/RowMenu'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
+import { TableSearch, matchesSearch } from '../../components/TableSearch'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
 import {
@@ -35,6 +36,7 @@ export function ReimbursementRecordsTable({ costCenter }: { costCenter?: string 
   const approveReimbursement = useApproveExpenseReimbursement()
 
   const [userId, setUserId] = useState('')
+  const [search, setSearch] = useState('')
   const [editingReimbursement, setEditingReimbursement] = useState<ExpenseReimbursement | null>(null)
 
   const expenseOf = (r: ExpenseReimbursement) => expenses?.find((e) => e.id === r.expense_id)
@@ -57,8 +59,14 @@ export function ReimbursementRecordsTable({ costCenter }: { costCenter?: string 
   }
   const userFiltered = (reimbursements ?? []).filter((r) => inScope(r) && (!userId || userOf(r)?.id === userId))
 
+  const searchedReimbursements = search
+    ? userFiltered.filter((r) =>
+        matchesSearch(search, [r.display_id, r.reference, r.date, r.amount, r.payment_mode, userOf(r)?.name, againstOf(r), expenseOf(r)?.description, approverOf(r)?.name])
+      )
+    : userFiltered
+
   const { sorted: sortedReimbursements, sortKey, direction, toggleSort } = useSort(
-    userFiltered,
+    searchedReimbursements,
     {
       id: (r) => r.display_id,
       date: (r) => r.date,
@@ -68,7 +76,7 @@ export function ReimbursementRecordsTable({ costCenter }: { costCenter?: string 
     },
     'date'
   )
-  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedReimbursements)
+  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedReimbursements, search)
 
   const exportSections: ExportSection[] = [
     {
@@ -110,6 +118,7 @@ export function ReimbursementRecordsTable({ costCenter }: { costCenter?: string 
         <ReportExportButtons title="Reimbursement records" sections={exportSections} range={null} iconOnly style={{ marginTop: 0 }} />
       </div>
 
+      <TableSearch value={search} onChange={setSearch} />
       <TableScroll>
         <table className="data">
           <thead>

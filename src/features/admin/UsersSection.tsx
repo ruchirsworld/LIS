@@ -5,6 +5,7 @@ import { Pagination } from '../../components/Pagination'
 import { TableScroll } from '../../components/TableScroll'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
+import { TableSearch, matchesSearch } from '../../components/TableSearch'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
 import {
@@ -42,12 +43,14 @@ export function UsersSection() {
   const { data: activeProjects } = useProjects()
   const setSupervisorProjects = useSetSupervisorProjects()
 
-  const { sorted: sortedProfiles, sortKey, direction, toggleSort } = useSort(profiles, {
+  const [search, setSearch] = useState('')
+  const searched = search ? profiles?.filter((r) => matchesSearch(search, Object.values(r))) : profiles
+  const { sorted: sortedProfiles, sortKey, direction, toggleSort } = useSort(searched, {
     name: (p) => p.name,
     phone: (p) => p.phone,
     role: (p) => p.role,
   })
-  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedProfiles)
+  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedProfiles, search)
 
   const exportSections: ExportSection[] = [
     {
@@ -235,6 +238,7 @@ export function UsersSection() {
 
       <ReportExportButtons title="Users" sections={exportSections} range={null} />
 
+      <TableSearch value={search} onChange={setSearch} />
       <TableScroll>
         <table className="data">
           <thead>

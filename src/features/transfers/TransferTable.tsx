@@ -5,6 +5,7 @@ import { Pagination } from '../../components/Pagination'
 import { TableScroll } from '../../components/TableScroll'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
+import { TableSearch, matchesSearch } from '../../components/TableSearch'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
 import { useTransfers, useDeleteTransfer } from '../../lib/queries/transfers'
@@ -14,6 +15,7 @@ import type { DateRange } from '../../lib/calc/period'
 
 export function TransferTable() {
   const [range, setRange] = useState<DateRange | null>(null)
+  const [search, setSearch] = useState('')
   const { data: transfers, isLoading } = useTransfers(range)
   const { data: accounts } = useBankAccounts()
   const deleteTransfer = useDeleteTransfer()
@@ -23,8 +25,12 @@ export function TransferTable() {
     return accounts?.find((a) => a.id === id)?.name ?? '—'
   }
 
+  const searchedTransfers = search
+    ? transfers?.filter((t) => matchesSearch(search, [t.display_id, t.notes, t.date, t.amount, accountName(t.from_account_id), accountName(t.to_account_id)]))
+    : transfers
+
   const { sorted: sortedTransfers, sortKey, direction, toggleSort } = useSort(
-    transfers,
+    searchedTransfers,
     {
       id: (t) => t.display_id,
       from: (t) => accountName(t.from_account_id),
@@ -35,7 +41,7 @@ export function TransferTable() {
     },
     'date'
   )
-  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedTransfers)
+  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedTransfers, search)
 
   const exportSections: ExportSection[] = [
     {
@@ -61,6 +67,7 @@ export function TransferTable() {
         <ReportExportButtons title="Transfer records" sections={exportSections} range={range} style={{ marginTop: 0 }} />
       </div>
 
+      <TableSearch value={search} onChange={setSearch} />
       <TableScroll>
         <table className="data">
           <thead>

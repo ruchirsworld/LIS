@@ -5,6 +5,7 @@ import { Pagination } from '../../components/Pagination'
 import { TableScroll } from '../../components/TableScroll'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
+import { TableSearch, matchesSearch } from '../../components/TableSearch'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
 import { useClients } from '../../lib/queries/masters'
@@ -14,7 +15,9 @@ import { getErrorMessage } from '../../lib/errors'
 
 export function ClientsSection() {
   const { data: clients, isLoading } = useClients()
-  const { sorted: sortedClients, sortKey, direction, toggleSort } = useSort(clients, {
+  const [search, setSearch] = useState('')
+  const searched = search ? clients?.filter((r) => matchesSearch(search, Object.values(r))) : clients
+  const { sorted: sortedClients, sortKey, direction, toggleSort } = useSort(searched, {
     id: (c) => c.display_id,
     name: (c) => c.name,
     code: (c) => c.client_code,
@@ -25,7 +28,7 @@ export function ClientsSection() {
     gst: (c) => c.gst,
     email: (c) => c.email,
   })
-  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedClients)
+  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedClients, search)
   const exportSections: ExportSection[] = [
     {
       title: 'Clients',
@@ -222,6 +225,7 @@ export function ClientsSection() {
 
       <ReportExportButtons title="Clients" sections={exportSections} range={null} />
 
+      <TableSearch value={search} onChange={setSearch} />
       <TableScroll>
         <table className="data">
           <thead>

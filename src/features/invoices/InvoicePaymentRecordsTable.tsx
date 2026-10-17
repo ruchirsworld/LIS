@@ -10,6 +10,7 @@ import { TableScroll } from '../../components/TableScroll'
 import { RowMenu } from '../../components/RowMenu'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
+import { TableSearch, matchesSearch } from '../../components/TableSearch'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
 import { useInvoices, useInvoicePayments, useDeleteInvoicePayment } from '../../lib/queries/invoices'
@@ -34,6 +35,7 @@ export function InvoicePaymentRecordsTable() {
   const deletePayment = useDeleteInvoicePayment()
 
   const [clientId, setClientId] = useState('')
+  const [search, setSearch] = useState('')
   const [range, setRange] = useState<DateRange | null>(null)
   const detailsRef = useRef<HTMLDetailsElement>(null)
   const nav = useNavFilter('invoices')
@@ -58,8 +60,14 @@ export function InvoicePaymentRecordsTable() {
     (p) => (!range?.from || p.date >= range.from) && (!range?.to || p.date <= range.to)
   )
 
+  const searchedPayments = search
+    ? clientFiltered?.filter((p) =>
+        matchesSearch(search, [p.display_id, p.reference, p.date, p.amount, p.payment_mode, invoiceLabelOf(p), invoiceOf(p)?.invoice_number, clientLabel(clientOf(p)), p.is_retention_release ? 'retention release' : ''])
+      )
+    : clientFiltered
+
   const { sorted: sortedPayments, sortKey, direction, toggleSort } = useSort(
-    clientFiltered,
+    searchedPayments,
     {
       id: (p) => p.display_id,
       date: (p) => p.date,
@@ -93,7 +101,7 @@ export function InvoicePaymentRecordsTable() {
       return next
     })
   }
-  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(entries)
+  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(entries, search)
 
   const exportSections: ExportSection[] = [
     {
@@ -138,6 +146,7 @@ export function InvoicePaymentRecordsTable() {
         <ReportExportButtons title="Payment records" sections={exportSections} range={range} style={{ marginTop: 0 }} />
       </div>
 
+      <TableSearch value={search} onChange={setSearch} />
       <TableScroll>
         <table className="data">
           <thead>

@@ -11,6 +11,7 @@ import { useSort } from '../../lib/useSort'
 import { PeriodFilterToggle } from '../../components/PeriodFilterToggle'
 import type { DateRange } from '../../lib/calc/period'
 import { usePagination } from '../../lib/usePagination'
+import { TableSearch, matchesSearch } from '../../components/TableSearch'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
 import {
@@ -62,6 +63,7 @@ export function ExpenseTable({
   const [range, setRange] = useState<DateRange | null>(null)
   const nav = useNavFilter('expenses')
   const [userFilter, setUserFilter] = useState('')
+  const [search, setSearch] = useState('')
   const { data: rawExpenses, isLoading } = useExpenses(range)
   const expenses = costCenterFilter ? rawExpenses?.filter((e) => e.cost_center === costCenterFilter) : rawExpenses
   const { data: projects } = useProjects()
@@ -188,7 +190,12 @@ export function ExpenseTable({
   const reimbursedOf = (e: NonNullable<typeof expenses>[number]) => expenseReimbursed(reimbursementsOf(e))
   const dueOf = (e: NonNullable<typeof expenses>[number]) => (e.reimbursable ? expenseDue(e.amount, reimbursementsOf(e)) : 0)
 
-  const userFiltered = userFilter ? expenses?.filter((e) => e.created_by === userFilter) : expenses
+  const byUser = userFilter ? expenses?.filter((e) => e.created_by === userFilter) : expenses
+  const userFiltered = search
+    ? byUser?.filter((e) =>
+        matchesSearch(search, [e.display_id, e.description, e.remarks, e.purpose, e.date, e.amount, e.cost_center, e.payment_mode, e.status, projLabelOf(e), vendorNameOf(e), subHeadNameOf(e), userNameOf(e), e.reimbursable ? 'reimbursable reimbursement' : ''])
+      )
+    : byUser
   const { sorted: sortedExpenses, sortKey, direction, toggleSort } = useSort(
     userFiltered,
     {
@@ -200,7 +207,7 @@ export function ExpenseTable({
     },
     groupByDate ? 'date' : 'id'
   )
-  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedExpenses)
+  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedExpenses, search)
 
   const pageIds = (pageRows ?? []).map((e) => e.id)
   const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id))
@@ -303,6 +310,7 @@ export function ExpenseTable({
         </div>
       )}
 
+      <TableSearch value={search} onChange={setSearch} />
       <TableScroll>
         <table className="data table-compact">
           <thead>

@@ -10,6 +10,7 @@ import { SortableTh } from '../../components/SortableTh'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
+import { TableSearch, matchesSearch } from '../../components/TableSearch'
 import { useTrips, useUpdateTrip, useDeleteTrip } from '../../lib/queries/trips'
 import { useExpenses, useDeleteExpense } from '../../lib/queries/expenses'
 import { useProfiles } from '../../lib/queries/admin'
@@ -180,6 +181,7 @@ export function TripRecordsTable() {
   const [entryDate, setEntryDate] = useState(todayStr())
   // Trips are clustered under a heading for the month they started in; a heading folds its trips away.
   const [groupByMonth, setGroupByMonth] = useState(true)
+  const [search, setSearch] = useState('')
   const [collapsedMonths, setCollapsedMonths] = useState<Set<string>>(new Set())
   function toggleMonth(month: string) {
     setCollapsedMonths((cur) => {
@@ -244,8 +246,23 @@ export function TripRecordsTable() {
   const expensesByTrip = (tripId: string) => (expenses ?? []).filter((e) => e.trip_id === tripId)
   const tripTotal = (tripId: string) => expensesByTrip(tripId).reduce((s, e) => s + Number(e.amount || 0), 0)
 
+  // The search also looks inside a trip, so a trip can be found by any entry logged on it.
   const rangeFilteredTrips = (trips ?? []).filter(
-    (t) => (!range?.from || t.start_date >= range.from) && (!range?.to || t.start_date <= range.to)
+    (t) =>
+      (!range?.from || t.start_date >= range.from) &&
+      (!range?.to || t.start_date <= range.to) &&
+      (!search ||
+        matchesSearch(search, [
+          t.display_id,
+          t.name,
+          t.notes,
+          t.status,
+          t.start_date,
+          t.end_date,
+          travelerName(t.traveler_id),
+          projectName(t.project_id),
+          ...expensesByTrip(t.id).flatMap((e) => [e.display_id, e.description, e.remarks, e.amount]),
+        ]))
   )
   // Everything spent on the trips shown, for the summary by account.
   const shownTripIds = new Set(rangeFilteredTrips.map((t) => t.id))
@@ -271,7 +288,7 @@ export function TripRecordsTable() {
     sortKey === 'start' && direction === 'asc' ? a.localeCompare(b) : b.localeCompare(a)
   )
   const sortedTrips = groupByMonth ? monthsInOrder.flatMap((m) => sortedByColumn.filter((t) => monthOf(t.start_date) === m)) : sortedByColumn
-  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedTrips)
+  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedTrips, search)
   // A month's figures cover all of its trips, not only the ones on this page.
   const monthSummary = (month: string) => {
     const tripsInMonth = sortedTrips.filter((t) => monthOf(t.start_date) === month)
@@ -313,6 +330,7 @@ export function TripRecordsTable() {
       </div>
 
       <SpendBySource expenses={shownExpenses} label="All trips shown, spent via" />
+      <TableSearch value={search} onChange={setSearch} placeholder="Search trips by ID, name, traveler, project or any entry on them…" />
 
       <TableScroll>
         <table className="data">

@@ -865,24 +865,34 @@ table.data {
   border-collapse: collapse;
   background: var(--paper);
 }
+/* Page content is capped at 1060px. A table fits inside it by wrapping long text onto a second line, rather than running
+   wider and hiding its last columns behind a sideways scrollbar. Amounts and buttons stay on one line. */
 table.data th {
   text-align: left;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--ink-soft);
-  padding: 10px 14px;
+  padding: 10px 10px;
   background: var(--paper-2);
   border-bottom: 1px solid var(--line);
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: break-word;
   position: sticky;
   top: 0;
   z-index: 1;
 }
 table.data td {
-  padding: 11px 14px;
+  padding: 11px 10px;
   font-size: 13.5px;
   border-bottom: 1px solid var(--line);
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+table.data td.amt,
+table.data th.amt,
+table.data td .btn,
+table.data td button {
   white-space: nowrap;
 }
 table.data tr:last-child td {
@@ -2102,4 +2112,27 @@ tr[tabindex]:focus-visible {
 }
 tr[tabindex]:hover {
   background: var(--paper-2);
+}
+
+/* Search box above a list of records */
+.table-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  max-width: 360px;
+  margin: 8px 0 10px;
+}
+.table-search input {
+  width: 100%;
+  padding-right: 28px;
+}
+.table-search-clear {
+  position: absolute;
+  right: 6px;
+  background: none;
+  border: none;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--ink-soft);
+  cursor: pointer;
 }

@@ -1,6 +1,6 @@
 # LIS changes since v2.0.1
 
-Version 2.0.1 was released on 3 September 2026. This list covers everything after it, up to 2.1.17. It is put together from the project history, grouped by area. Version numbers are shown where a release carried one.
+Version 2.0.1 was released on 3 September 2026. This list covers everything after it, up to 2.1.18. It is put together from the project history, grouped by area. Version numbers are shown where a release carried one.
 
 ## 2.0.2 – 2.0.3 (3 – 4 September)
 
@@ -143,3 +143,7 @@ Version 2.0.1 was released on 3 September 2026. This list covers everything afte
 
 ## 2.1.17 (17 October): View in Bank reconciliation
 - Every entry on the books side of Bank reconciliation has a View button that opens the same read-only popup, so an entry can be checked without leaving the matching screen. It also covers entries that have no edit form here (transfers, capital, advances, loan repayments, opening balances).
+
+## 2.1.18 (17 October): search in every record list, and tables fit the page
+- A search box above every list of records: expense records, reimbursements, trip-linked project expenses, vendor bills, vendor payments, invoices, receipts, loans, capital, transfers, Trip Records, Activity by user, and the Clients, Projects, Staff, Vendors, Users and Bank accounts lists. Type any part of an ID, description, name, status, date or amount, in any order; every word must match. Amounts match with or without commas or the rupee sign. Vendor bills also match the items on the bill, and trips match the entries logged on them. The list returns to page 1 as you type.
+- Tables now fit inside the 1060px page: long text wraps onto a second line instead of pushing the last columns out of sight behind a sideways scrollbar. Amounts and buttons stay on one line.

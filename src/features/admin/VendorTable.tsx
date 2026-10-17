@@ -7,6 +7,7 @@ import { Pagination } from '../../components/Pagination'
 import { TableScroll } from '../../components/TableScroll'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
+import { TableSearch, matchesSearch } from '../../components/TableSearch'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
 import type { Database } from '../../types/database'
@@ -21,7 +22,9 @@ export function VendorTable({ onEdit }: { onEdit: (vendor: Vendor) => void }) {
   const [showOneTime, setShowOneTime] = useState(false)
   const vendors = allVendors?.filter((v) => showOneTime || !v.is_one_time)
 
-  const { sorted: sortedVendors, sortKey, direction, toggleSort } = useSort(vendors, {
+  const [search, setSearch] = useState('')
+  const searched = search ? vendors?.filter((r) => matchesSearch(search, Object.values(r))) : vendors
+  const { sorted: sortedVendors, sortKey, direction, toggleSort } = useSort(searched, {
     id: (v) => v.display_id,
     name: (v) => v.name,
     category: (v) => v.category,
@@ -30,7 +33,7 @@ export function VendorTable({ onEdit }: { onEdit: (vendor: Vendor) => void }) {
     gstin: (v) => v.gstin ?? v.gstpan,
     address: (v) => v.address,
   })
-  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedVendors)
+  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedVendors, search)
 
   const exportSections: ExportSection[] = [
     {
@@ -58,6 +61,7 @@ export function VendorTable({ onEdit }: { onEdit: (vendor: Vendor) => void }) {
           Show one-time vendors
         </label>
       )}
+      <TableSearch value={search} onChange={setSearch} />
       <TableScroll>
       <table className="data">
         <thead>

@@ -5,6 +5,7 @@ import { Pagination } from '../../components/Pagination'
 import { TableScroll } from '../../components/TableScroll'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
+import { TableSearch, matchesSearch } from '../../components/TableSearch'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
 import { useLoans, useLoanPayments, useDeleteLoan } from '../../lib/queries/loans'
@@ -27,6 +28,7 @@ const LOAN_TYPE_LABEL: Record<string, string> = { private: 'Private Party', bank
 
 export function LoanTable({ onEdit }: { onEdit: (loan: Loan) => void }) {
   const [range, setRange] = useState<DateRange | null>(null)
+  const [search, setSearch] = useState('')
   const { data: loans, isLoading } = useLoans(range)
   const { data: payments } = useLoanPayments()
   const deleteLoan = useDeleteLoan()
@@ -34,8 +36,12 @@ export function LoanTable({ onEdit }: { onEdit: (loan: Loan) => void }) {
 
   const paymentsOf = (l: NonNullable<typeof loans>[number]) => payments?.filter((p) => p.loan_id === l.id) ?? []
 
+  const searchedLoans = search
+    ? loans?.filter((l) => matchesSearch(search, [l.display_id, l.lender, l.notes, LOAN_TYPE_LABEL[l.loan_type] ?? l.loan_type, l.date_taken, l.principal, l.roi_pct, l.payment_mode]))
+    : loans
+
   const { sorted: sortedLoans, sortKey, direction, toggleSort } = useSort(
-    loans,
+    searchedLoans,
     {
       id: (l) => l.display_id,
       type: (l) => LOAN_TYPE_LABEL[l.loan_type] ?? l.loan_type,
@@ -52,7 +58,7 @@ export function LoanTable({ onEdit }: { onEdit: (loan: Loan) => void }) {
     },
     'dateTaken'
   )
-  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedLoans)
+  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedLoans, search)
 
   const exportSections: ExportSection[] = [
     {
@@ -87,6 +93,7 @@ export function LoanTable({ onEdit }: { onEdit: (loan: Loan) => void }) {
         <ReportExportButtons title="Loan records" sections={exportSections} range={range} style={{ marginTop: 0 }} />
       </div>
 
+      <TableSearch value={search} onChange={setSearch} />
       <TableScroll>
         <table className="data">
           <thead>
