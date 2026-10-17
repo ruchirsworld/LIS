@@ -1,6 +1,6 @@
 # LIS changes since v2.0.1
 
-Version 2.0.1 was released on 3 September 2026. This list covers everything after it, up to 2.1.12. It is put together from the project history, grouped by area. Version numbers are shown where a release carried one.
+Version 2.0.1 was released on 3 September 2026. This list covers everything after it, up to 2.1.13. It is put together from the project history, grouped by area. Version numbers are shown where a release carried one.
 
 ## 2.0.2 – 2.0.3 (3 – 4 September)
 
@@ -126,3 +126,6 @@ Version 2.0.1 was released on 3 September 2026. This list covers everything afte
 
 ## 2.1.12 (16 October): journal vouchers name the bank
 - A Bank line in a journal voucher (for example paying GST from Kotak) now asks which bank it is for, and the voucher cannot be posted without it. Before, the line had no bank, so it never reached Kotak's or CBI's balance or reconciliation.
+
+## 2.1.13 (17 October): Trip records grouped by month
+- Trip Records now groups trips under a heading for the month they started in, with the number of trips, the month's total and its "Spent via" split (Kotak, Cash, CBI, Reimbursement). A heading can be folded. The "Group trips within months" box turns it off.

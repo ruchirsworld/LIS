@@ -34,6 +34,10 @@ function todayStr() {
 
 const COL_SPAN = 9
 
+/** The month a trip belongs to: the one it started in. */
+const monthOf = (date: string) => date.slice(0, 7)
+const monthLabel = (month: string) => new Date(`${month}-01T00:00:00`).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
+
 /** Popup to edit a trip's own details, including its dates — status itself
  * (open/closed) still stays controlled by the "End Trip" toggle in
  * TripsSection above, not duplicated here; this only edits the end date's
@@ -174,6 +178,17 @@ export function TripRecordsTable() {
   const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null)
   const [showAddExpense, setShowAddExpense] = useState(false)
   const [entryDate, setEntryDate] = useState(todayStr())
+  // Trips are clustered under a heading for the month they started in; a heading folds its trips away.
+  const [groupByMonth, setGroupByMonth] = useState(true)
+  const [collapsedMonths, setCollapsedMonths] = useState<Set<string>>(new Set())
+  function toggleMonth(month: string) {
+    setCollapsedMonths((cur) => {
+      const next = new Set(cur)
+      if (next.has(month)) next.delete(month)
+      else next.add(month)
+      return next
+    })
+  }
 
   // Reset the add-expense panel and its date whenever a different trip
   // expands — otherwise a date picked for one trip would carry over to
@@ -249,8 +264,21 @@ export function TripRecordsTable() {
     'start',
     'desc'
   )
-  const sortedTrips = sorted ?? []
+  const sortedByColumn = sorted ?? []
+  // Grouped: months run newest first (oldest first when sorting by an ascending start date), and the chosen
+  // sort applies to the trips inside each month.
+  const monthsInOrder = [...new Set(sortedByColumn.map((t) => monthOf(t.start_date)))].sort((a, b) =>
+    sortKey === 'start' && direction === 'asc' ? a.localeCompare(b) : b.localeCompare(a)
+  )
+  const sortedTrips = groupByMonth ? monthsInOrder.flatMap((m) => sortedByColumn.filter((t) => monthOf(t.start_date) === m)) : sortedByColumn
   const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedTrips)
+  // A month's figures cover all of its trips, not only the ones on this page.
+  const monthSummary = (month: string) => {
+    const tripsInMonth = sortedTrips.filter((t) => monthOf(t.start_date) === month)
+    const ids = new Set(tripsInMonth.map((t) => t.id))
+    const spent = (expenses ?? []).filter((e) => e.trip_id && ids.has(e.trip_id))
+    return { count: tripsInMonth.length, spent, total: spent.reduce((s, e) => s + Number(e.amount || 0), 0) }
+  }
 
   const exportSections: ExportSection[] = [
     {
@@ -276,6 +304,10 @@ export function TripRecordsTable() {
       <div className="toolbar">
         <div className="toolbar-group">
           <PeriodFilterToggle range={range} onChange={setRange} />
+          <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
+            <input type="checkbox" checked={groupByMonth} onChange={(e) => setGroupByMonth(e.target.checked)} />
+            Group trips within months
+          </label>
         </div>
         <ReportExportButtons title="Trip records" sections={exportSections} range={range} iconOnly style={{ marginTop: 0 }} />
       </div>
@@ -305,11 +337,29 @@ export function TripRecordsTable() {
                 </td>
               </tr>
             )}
-            {pageRows?.map((t) => {
+            {pageRows?.map((t, idx) => {
               const isExpanded = expandedId === t.id
               const tripExpenses = expensesByTrip(t.id)
+              const month = monthOf(t.start_date)
+              const isNewMonth = groupByMonth && (idx === 0 || monthOf(pageRows[idx - 1].start_date) !== month)
+              const monthCollapsed = groupByMonth && collapsedMonths.has(month)
+              const summary = isNewMonth ? monthSummary(month) : null
               return (
                 <Fragment key={t.id}>
+                  {summary && (
+                    <tr className="group-header-row" onClick={() => toggleMonth(month)} style={{ cursor: 'pointer' }}>
+                      <td colSpan={COL_SPAN}>
+                        <span style={{ display: 'inline-block', width: 14, fontSize: 11, opacity: 0.6 }}>{monthCollapsed ? '▸' : '▾'}</span>
+                        {monthLabel(month)}{' '}
+                        <span className="note" style={{ margin: 0 }}>
+                          {summary.count} trip{summary.count === 1 ? '' : 's'} · {fmt(summary.total)}
+                        </span>
+                        {!monthCollapsed && <SpendBySource expenses={summary.spent} label="Spent via" style={{ margin: '6px 0 0', fontWeight: 400 }} />}
+                      </td>
+                    </tr>
+                  )}
+                  {!monthCollapsed && (
+                  <>
                   <tr {...activateProps(() => setExpandedId(isExpanded ? null : t.id))} style={{ cursor: 'pointer' }}>
                     <td>
                       <button
@@ -473,6 +523,8 @@ export function TripRecordsTable() {
                         )}
                       </td>
                     </tr>
+                  )}
+                  </>
                   )}
                 </Fragment>
               )
