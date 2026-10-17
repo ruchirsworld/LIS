@@ -3565,6 +3565,8 @@ export type Database = {
       trash_record: { Args: { p_table: string; p_id: string; p_reason?: string | null }; Returns: undefined }
       restore_record: { Args: { p_table: string; p_id: string }; Returns: undefined }
       list_trash: { Args: never; Returns: Record<string, unknown>[] }
+      activity_feed: { Args: { p_user?: string; p_from?: string; p_to?: string; p_by_recorded?: boolean }; Returns: Record<string, unknown>[] }
+      possible_duplicates: { Args: { p_from?: string; p_to?: string }; Returns: Record<string, unknown>[] }
       cash_or_bank: { Args: { p_bank_account_id: string }; Returns: string }
       client_state_code: { Args: { p_client: string }; Returns: string }
       company_state_code: { Args: never; Returns: string }

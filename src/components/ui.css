@@ -2936,3 +2936,46 @@ details.more-details > summary {
 table.data tr.row-clickable {
   cursor: pointer;
 }
+
+/* Activity by user: the "checked" tick, and the daily summary. */
+.check-tick {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: #fff;
+  cursor: pointer;
+}
+.check-tick:hover {
+  border-color: var(--success);
+}
+.check-tick.checked {
+  background: var(--success);
+  border-color: var(--success);
+}
+@media (max-width: 640px), (pointer: coarse) {
+  .check-tick {
+    width: 32px;
+    height: 32px;
+  }
+}
+.daily-summary {
+  margin-bottom: var(--space-3);
+}
+
+/* Possible duplicates: one card per cluster. */
+.dup-cluster {
+  padding: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.dup-cluster-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}

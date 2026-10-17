@@ -25,6 +25,7 @@ import {
 } from './PartyLedgerReport'
 import { AuditLogReport } from './AuditLogReport'
 import { ActivityByUserReport } from './ActivityByUserReport'
+import { PossibleDuplicatesReport } from './PossibleDuplicatesReport'
 import { BooksHealthReport } from './BooksHealthReport'
 import { JournalVouchersReport } from './JournalVouchersReport'
 import { GstTdsRegisterReport } from './GstTdsRegisterReport'
@@ -274,8 +275,15 @@ const CATEGORIES: ReportCategory[] = [
       {
         id: 'activity-by-user',
         title: 'Activity by user',
-        description: 'Everything one person recorded, in one list: expenses, bills, payments, receipts, transfers and more.',
+        description: 'Everything entered, in every module, newest first. For one person: what they entered and what was entered for them. Tick entries as checked.',
         Component: ActivityByUserReport,
+        periodless: true,
+      },
+      {
+        id: 'possible-duplicates',
+        title: 'Possible duplicates',
+        description: 'Entries with the same amount, within 2 days, for the same person. Open one, mark it not a duplicate, or delete it.',
+        Component: PossibleDuplicatesReport,
         periodless: true,
       },
       {
