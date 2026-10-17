@@ -3565,6 +3565,11 @@ export type Database = {
       trash_record: { Args: { p_table: string; p_id: string; p_reason?: string | null }; Returns: undefined }
       restore_record: { Args: { p_table: string; p_id: string }; Returns: undefined }
       list_trash: { Args: never; Returns: Record<string, unknown>[] }
+      save_bank_match: { Args: { p_bank: string; p_bank_lines: string[]; p_journal_lines: string[]; p_kind?: string }; Returns: string }
+      unmatch_bank_match: { Args: { p_match: string; p_reason?: string }; Returns: undefined }
+      lock_bank_period: { Args: { p_bank: string; p_until: string }; Returns: undefined }
+      unlock_bank_period: { Args: { p_bank: string; p_reason: string; p_minutes?: number }; Returns: undefined }
+      release_bank_lock: { Args: { p_bank: string; p_reason: string }; Returns: undefined }
       activity_feed: { Args: { p_user?: string; p_from?: string; p_to?: string; p_by_recorded?: boolean }; Returns: Record<string, unknown>[] }
       possible_duplicates: { Args: { p_from?: string; p_to?: string }; Returns: Record<string, unknown>[] }
       cash_or_bank: { Args: { p_bank_account_id: string }; Returns: string }

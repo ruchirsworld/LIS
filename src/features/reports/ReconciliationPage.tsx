@@ -1,7 +1,7 @@
-import { BankReconciliationReport } from './BankReconciliationReport'
+import { ReconWorkspace } from './ReconWorkspace'
 import './Reports.css'
 
-/** Finance → Reconciliation: the bank reconciliation screen as a page of its own (it is also listed in Reports). */
+/** Finance, then Reconciliation: the bank reconciliation screen (it is also listed in Reports). */
 export function ReconciliationPage() {
-  return <BankReconciliationReport />
+  return <ReconWorkspace />
 }

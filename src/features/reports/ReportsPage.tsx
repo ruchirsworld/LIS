@@ -30,7 +30,7 @@ import { BooksHealthReport } from './BooksHealthReport'
 import { JournalVouchersReport } from './JournalVouchersReport'
 import { GstTdsRegisterReport } from './GstTdsRegisterReport'
 import { GstReturnsReport } from './GstReturnsReport'
-import { BankReconciliationReport } from './BankReconciliationReport'
+import { ReconWorkspace } from './ReconWorkspace'
 import { PurchaseGstTdsRegisterReport } from './PurchaseGstTdsRegisterReport'
 import { GstReleaseStatementReport } from './GstReleaseStatementReport'
 import { BalanceSheetReport, ProfitAndLossReport } from './FinancialStatementsReports'
@@ -190,7 +190,7 @@ const CATEGORIES: ReportCategory[] = [
         id: 'bank-reconciliation',
         title: 'Bank reconciliation',
         description: 'Tick the lines that appear on the bank statement and see whether the books and the bank agree.',
-        Component: BankReconciliationReport,
+        Component: ReconWorkspace,
         periodless: true,
       },
       {

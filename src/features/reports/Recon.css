@@ -1,0 +1,353 @@
+/* Bank reconciliation: your books and the bank statement side by side, with the same six columns on each. */
+.recon {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.recon-warn {
+  border-left: 3px solid var(--pending);
+  padding-left: var(--space-2);
+}
+.recon-import {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: flex-end;
+}
+.recon-import-card {
+  padding: var(--space-3);
+  text-align: left;
+  max-width: 560px;
+}
+
+.recon-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.recon-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: var(--text-label);
+}
+.recon-chip-matched {
+  background: var(--success-tint);
+  border-color: var(--success);
+  color: var(--success-text);
+  font-weight: 600;
+}
+.recon-chip-suggested {
+  background: var(--pending-tint);
+  border-color: var(--pending);
+  color: var(--pending-text);
+}
+.recon-chip-open {
+  background: var(--error-tint);
+  border-color: var(--error);
+  color: var(--error-text);
+}
+.recon-days {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-label);
+  color: var(--muted);
+}
+.recon-days select {
+  font-family: inherit;
+  font-size: var(--text-label);
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+/* The six columns every line uses. */
+.recon-grid {
+  display: grid;
+  grid-template-columns: 62px minmax(0, 1fr) 72px 72px 80px;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 13px;
+  min-width: 0;
+}
+.recon-grid > span {
+  min-width: 0;
+}
+.rc-desc {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.rc-desc > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rc-date {
+  white-space: nowrap;
+}
+.rc-num {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.rc-bal {
+  color: var(--muted);
+}
+.rc-ref {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+/* Matched pairs: one row, books on the left, the statement on the right. */
+.recon-pairs {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.recon-pair {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) minmax(0, 1fr);
+  gap: 4px var(--space-3);
+  align-items: start;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.recon-pair:last-child {
+  border-bottom: none;
+}
+.recon-pair-head {
+  background: var(--zebra);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.recon-pair-head .recon-title {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 13px;
+}
+.recon-matched {
+  background: color-mix(in srgb, var(--success) 9%, var(--surface));
+}
+.recon-suggested {
+  background: color-mix(in srgb, var(--pending) 10%, var(--surface));
+}
+.recon-half {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.rc-lead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.rc-matched-icon {
+  color: var(--success);
+}
+.rc-tail {
+  grid-column: 2 / span 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  font-size: 12px;
+}
+.rc-expand {
+  display: inline-flex;
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 2px;
+}
+.recon-suggest-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 8px 12px;
+  background: var(--pending-tint);
+  color: var(--pending-text);
+  font-size: var(--text-label);
+  border-bottom: 1px solid var(--border);
+}
+
+/* The reviewed tick: light green when ticked. A matched pair has the solid green mark and a pale green row. */
+.rc-review {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--success-text);
+  cursor: pointer;
+}
+.rc-review.reviewed {
+  background: var(--success-tint);
+  border-color: var(--success);
+}
+
+/* What has no match, side by side. */
+.recon-open {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-3);
+}
+.recon-half-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  min-width: 0;
+  overflow: hidden;
+}
+.recon-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.recon-half-panel .recon-grid {
+  grid-template-columns: 20px 62px minmax(0, 1fr) 70px 70px 78px;
+  padding: 6px 12px;
+}
+.recon-grid-head {
+  background: var(--zebra);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.recon-row {
+  border-bottom: 1px solid var(--border);
+}
+.recon-row:nth-child(even) {
+  background: var(--zebra);
+}
+.recon-row-selected {
+  background: var(--primary-tint) !important;
+}
+.recon-row-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 12px 6px 12px;
+  font-size: 12px;
+}
+.rc-actions {
+  display: inline-flex;
+  gap: var(--space-2);
+}
+.recon-matchbar {
+  position: sticky;
+  bottom: 12px;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 10px 14px;
+  background: var(--surface);
+  border: 1px solid var(--primary);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  font-size: var(--text-label);
+}
+.recon-bad {
+  color: var(--error-text);
+}
+
+/* Lock and history. */
+.recon-lock-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-bottom: var(--space-3);
+}
+.recon-lock-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+.recon-history-row {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr) 130px;
+  gap: var(--space-2);
+  padding: 4px 0;
+  font-size: var(--text-label);
+  border-bottom: 1px solid var(--border);
+}
+.recon-history-when {
+  color: var(--muted);
+}
+
+/* Narrower screens: the two sides stack, the lines get compact. */
+@media (max-width: 900px) {
+  .recon-pair {
+    grid-template-columns: 36px minmax(0, 1fr);
+  }
+  .recon-pair > .recon-half {
+    grid-column: 2;
+  }
+  .recon-pair > .rc-tail {
+    grid-column: 2;
+  }
+  .recon-pair-head {
+    display: none;
+  }
+  .recon-open {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 640px) {
+  .recon-grid {
+    grid-template-columns: 58px minmax(0, 1fr) 70px 70px;
+    gap: 2px 6px;
+  }
+  .recon-grid .rc-bal {
+    display: none;
+  }
+  .recon-grid-head {
+    display: none;
+  }
+  .recon-half-panel .recon-grid {
+    grid-template-columns: 22px 58px minmax(0, 1fr) 70px 70px;
+  }
+  .recon-grid .rc-check {
+    display: none;
+  }
+  .recon-half-panel .recon-grid .rc-check {
+    display: inline;
+  }
+  .recon-history-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .recon-days {
+    margin-left: 0;
+  }
+}
