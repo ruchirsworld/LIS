@@ -1,0 +1,23 @@
+Production (erp2.0) row counts and totals, read on 2026-10-17 before any redesign migration. Nothing has been changed since.
+table                        rows    total
+audit_log                     943
+bank_reconciliations           10
+capital_transactions           17    107668
+expenses                      470    467749.1979733967128
+invoice_payments               24    6520696.00
+invoices                       21    9174028.96
+journal_entries               633
+journal_lines (debit)        1318    22994627.8799999999989532
+journal_lines (credit)       1318    22994627.87999999999895320000
+loan_payments                   7    490000
+loans                           5    1020000
+other_receipts                  3    6761.00
+staff_imprest_transactions     34    53000
+staff_salary_advances           0    0
+transfers                      25    692500
+trips                          11
+vendor_advances                 3    25600.00
+vendor_bill_payments           13    181900.00
+vendor_bills                    5    265250.00
+wage_accruals                  12
+wage_payments                  23    104535

@@ -13,12 +13,17 @@ import {
 import { ReceiptUploadButton } from '../../components/ReceiptUploadButton'
 import { Modal } from '../../components/Modal'
 import { useClients, useProjects, useCostCenters, useExpenseSubHeads, useExpenseUnits } from '../../lib/queries/masters'
-import { useCreateExpense, useUpdateExpense } from '../../lib/queries/expenses'
+import { useCreateExpense, useDeleteExpense, useUpdateExpense } from '../../lib/queries/expenses'
+import { useAuth } from '../../lib/auth'
+import { toast } from '../../lib/feedback'
+import { useSaveConfirm } from '../../components/SaveConfirm'
+import { entrySentence } from '../../lib/saveChecks'
+import { MyEntriesToday } from './MyEntriesToday'
 import { useCreateExpenseUnit } from '../../lib/queries/admin'
 import { useGeolocation } from '../../lib/useGeolocation'
 import { compressImage } from '../../lib/compressImage'
 import { uploadReceipt } from '../../lib/storage'
-import { fmt, parseINR } from '../../lib/calc/format'
+import { fmt, fmtDate, parseINR } from '../../lib/calc/format'
 import { isProjectSubHeadCode } from '../../lib/projectSubHeads'
 import { getErrorMessage } from '../../lib/errors'
 import { clientLabel } from '../../lib/labels'
@@ -131,6 +136,9 @@ export function ExpenseForm({
 
   const createExpense = useCreateExpense()
   const updateExpense = useUpdateExpense()
+  const deleteExpense = useDeleteExpense()
+  const { profile } = useAuth()
+  const saveConfirm = useSaveConfirm()
   const createUnit = useCreateExpenseUnit()
 
   const [costCenterOverride, setCostCenterOverride] = useState<string | null>(null)
@@ -445,6 +453,26 @@ export function ExpenseForm({
       return
     }
 
+    // A new entry is read back in one sentence before it is saved, with any warnings and possible duplicates.
+    let duplicateNote: string | null = null
+    if (!editingExpense) {
+      const decision = await saveConfirm.ask({
+        sentence: entrySentence([
+          `Expense ${fmt(baseAmount)}`,
+          fmtDate(effectiveDate),
+          costCenter || null,
+          hasProject && selectedProject ? `Project: ${selectedProject.name}` : null,
+          description.trim() || null,
+        ]),
+        amount: baseAmount,
+        date: effectiveDate,
+        personIds: [profile?.id ?? ''],
+        subHeadId,
+      })
+      if (!decision.ok) return
+      if (decision.duplicateReason) duplicateNote = `[Possible duplicate, saved anyway: ${decision.duplicateReason}]`
+    }
+
     setSubmitting(true)
     try {
       let receiptPath: string | null = editingExpense?.receipt_path ?? null
@@ -468,7 +496,7 @@ export function ExpenseForm({
         date: effectiveDate,
         reimbursable: effectiveAccountId === REIMBURSE,
         paid_from_imprest: effectiveAccountId === IMPREST,
-        remarks: remarks.trim() || null,
+        remarks: [remarks.trim(), duplicateNote].filter(Boolean).join(' ') || null,
         receipt_path: receiptPath,
         payment_mode:
           effectiveAccountId === REIMBURSE || effectiveAccountId === IMPREST
@@ -491,6 +519,17 @@ export function ExpenseForm({
       } else {
         const created = await createExpense.mutateAsync({ ...patch, geo_lat: geo?.lat ?? null, geo_lng: geo?.lng ?? null })
         setLastCreatedId(created.display_id)
+        toast('success', `Saved ${created.display_id} · ${fmt(created.amount)}`, {
+          action: {
+            label: 'Undo',
+            onClick: () => {
+              deleteExpense.mutateAsync(created.id).then(
+                () => toast('info', `${created.display_id} was removed.`),
+                () => toast('error', 'Could not undo. Delete it from the list instead.')
+              )
+            },
+          },
+        })
       }
       resetForm()
     } catch (err) {
@@ -525,7 +564,18 @@ export function ExpenseForm({
         </button>
       </summary>
 
-      <form className="form-grid exp-compact" onSubmit={handleSubmit} style={{ marginTop: 8 }}>
+      <form
+        className="form-grid exp-compact"
+        onSubmit={handleSubmit}
+        onKeyDown={(e) => {
+          // Ctrl+Enter saves from anywhere in the form.
+          if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault()
+            e.currentTarget.requestSubmit()
+          }
+        }}
+        style={{ marginTop: 8 }}
+      >
         {/* Row 1: Cost center — fixed by the trip when entering trip expenses,
             so there's nothing to pick here (the page header already says
             Trips). Date comes from the Trips header's date picker instead of
@@ -1013,6 +1063,8 @@ export function ExpenseForm({
           {formError}
         </div>
       )}
+      {!editingExpense && !tripId && <MyEntriesToday />}
+      {saveConfirm.dialog}
     </details>
   )
 }
