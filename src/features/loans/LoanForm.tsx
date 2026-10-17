@@ -4,7 +4,8 @@ import { CurrencyInput } from '../../components/CurrencyInput'
 import { SearchableSelect } from '../../components/SearchableSelect'
 import { useBankAccounts } from '../../lib/queries/masters'
 import { useCreateLoan, useUpdateLoan } from '../../lib/queries/loans'
-import { parseINR } from '../../lib/calc/format'
+import { fmt2, parseINR } from '../../lib/calc/format'
+import { DEFAULT_PRIVATE_LOAN_ROI, monthlyInterestOn } from '../../lib/calc/loans'
 import { getErrorMessage } from '../../lib/errors'
 import type { Database } from '../../types/database'
 
@@ -27,7 +28,9 @@ export function LoanForm({
   const [loanType, setLoanType] = useState<'private' | 'bank'>('private')
   const [lender, setLender] = useState('')
   const [principal, setPrincipal] = useState('0')
-  const [roiPct, setRoiPct] = useState('')
+  // A new private party loan starts at 24% a year; the rate can be changed. A bank loan has no preset rate.
+  const [roiPct, setRoiPct] = useState(String(DEFAULT_PRIVATE_LOAN_ROI))
+  const [roiTouched, setRoiTouched] = useState(false)
   const [dateTaken, setDateTaken] = useState('')
   const [notes, setNotes] = useState('')
   const [accountId, setAccountId] = useState(CASH)
@@ -40,6 +43,7 @@ export function LoanForm({
     setLender(editingLoan.lender)
     setPrincipal(String(editingLoan.principal))
     setRoiPct(String(editingLoan.roi_pct))
+    setRoiTouched(true)
     setDateTaken(editingLoan.date_taken ?? '')
     setNotes(editingLoan.notes ?? '')
     setAccountId(editingLoan.bank_account_id ?? CASH)
@@ -50,11 +54,20 @@ export function LoanForm({
     setLoanType('private')
     setLender('')
     setPrincipal('0')
-    setRoiPct('')
+    setRoiPct(String(DEFAULT_PRIVATE_LOAN_ROI))
+    setRoiTouched(false)
     setDateTaken('')
     setNotes('')
     setAccountId(CASH)
   }
+
+  /** Switching the type moves the rate between the private default and blank, unless a rate was typed. */
+  function chooseType(type: 'private' | 'bank') {
+    setLoanType(type)
+    if (!roiTouched && !editingLoan) setRoiPct(type === 'private' ? String(DEFAULT_PRIVATE_LOAN_ROI) : '')
+  }
+
+  const monthlyInterest = monthlyInterestOn(parseINR(principal), Number(roiPct))
 
   function handleCancel() {
     resetForm()
@@ -106,11 +119,11 @@ export function LoanForm({
             <button
               type="button"
               className={loanType === 'private' ? 'pill active' : 'pill'}
-              onClick={() => setLoanType('private')}
+              onClick={() => chooseType('private')}
             >
               Private Party
             </button>
-            <button type="button" className={loanType === 'bank' ? 'pill active' : 'pill'} onClick={() => setLoanType('bank')}>
+            <button type="button" className={loanType === 'bank' ? 'pill active' : 'pill'} onClick={() => chooseType('bank')}>
               Bank
             </button>
           </div>
@@ -142,8 +155,15 @@ export function LoanForm({
               step="0.01"
               required
               value={roiPct}
-              onChange={(e) => setRoiPct(e.target.value)}
+              onChange={(e) => {
+                setRoiTouched(true)
+                setRoiPct(e.target.value)
+              }}
             />
+            <div className="retention-note">
+              {loanType === 'private' && !roiTouched && !editingLoan ? 'Preset to 24% a year (2% a month); change it if the agreed rate differs. ' : ''}
+              {Number(roiPct) > 0 && parseINR(principal) > 0 ? `Monthly interest: ${fmt2(monthlyInterest)} (principal x rate / 12).` : ''}
+            </div>
           </div>
         </div>
 

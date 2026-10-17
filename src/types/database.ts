@@ -916,6 +916,7 @@ export type Database = {
           rate: number | null
           receipt_path: string | null
           reimbursable: boolean
+          reimburse_to: string | null
           remarks: string | null
           status: string
           sub_head_id: string | null
@@ -945,6 +946,7 @@ export type Database = {
           rate?: number | null
           receipt_path?: string | null
           reimbursable?: boolean
+          reimburse_to?: string | null
           remarks?: string | null
           status?: string
           sub_head_id?: string | null
@@ -974,6 +976,7 @@ export type Database = {
           rate?: number | null
           receipt_path?: string | null
           reimbursable?: boolean
+          reimburse_to?: string | null
           remarks?: string | null
           status?: string
           sub_head_id?: string | null

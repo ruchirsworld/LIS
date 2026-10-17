@@ -10,6 +10,10 @@ import { toast } from '../../lib/feedback'
 import { useGoTo } from '../../lib/navContext'
 import { useProfiles } from '../../lib/queries/admin'
 import { useActivityByUser, type ActivityRow } from '../../lib/queries/reports'
+import { useAuth } from '../../lib/auth'
+import { useExpenses, useUpdateExpense } from '../../lib/queries/expenses'
+import { useUpdateVendorBillPayment, useVendorBillPayments } from '../../lib/queries/purchases'
+import { getErrorMessage } from '../../lib/errors'
 import type { DateRange } from '../../lib/calc/reportPeriod'
 import type { ExportSection } from '../../lib/export/report'
 import { ReportExportButtons } from './ReportExportButtons'
@@ -21,7 +25,13 @@ const dateOf = (iso: string) => iso.slice(0, 10)
 /** Everything one person recorded, in one list: expenses, bills, payments, receipts, transfers, loans, capital and so on. */
 export function ActivityByUserReport({ range }: { range: DateRange | null }) {
   const goTo = useGoTo()
+  const { profile: me } = useAuth()
+  const isAdmin = me?.role === 'admin'
   const { data: profiles } = useProfiles()
+  const { data: allExpenses } = useExpenses(null)
+  const { data: allPayments } = useVendorBillPayments()
+  const updateExpense = useUpdateExpense()
+  const updatePayment = useUpdateVendorBillPayment()
   const [userId, setUserId] = useState('')
   const [byRecorded, setByRecorded] = useState(false)
   const [kind, setKind] = useState('')
@@ -30,6 +40,29 @@ export function ActivityByUserReport({ range }: { range: DateRange | null }) {
   const { data, isLoading, error } = useActivityByUser(userId || null, range, byRecorded)
 
   const person = profiles?.find((p) => p.id === userId)
+  const nameOf = (id: string | null | undefined) => (id ? profiles?.find((p) => p.id === id)?.name ?? '—' : '')
+
+  /** Who a reimbursable entry is to be paid back to: the person the Admin named, else whoever recorded it (an expense),
+   * or whoever paid out of pocket (a vendor payment). */
+  function owedTo(r: ActivityRow): string | null {
+    if (!r.reimbursable) return null
+    if (r.source_table === 'expenses') {
+      const e = allExpenses?.find((x) => x.id === r.source_id)
+      return e ? e.reimburse_to ?? e.created_by : null
+    }
+    if (r.source_table === 'vendor_bill_payments') return allPayments?.find((x) => x.id === r.source_id)?.paid_by ?? null
+    return null
+  }
+  const canChangeOwed = (r: ActivityRow) => isAdmin && r.reimbursable && (r.source_table === 'expenses' || r.source_table === 'vendor_bill_payments')
+
+  async function changeOwed(r: ActivityRow, personId: string) {
+    try {
+      if (r.source_table === 'expenses') await updateExpense.mutateAsync({ id: r.source_id, patch: { reimburse_to: personId || null } })
+      else await updatePayment.mutateAsync({ id: r.source_id, patch: { paid_by: personId || null } })
+    } catch (err) {
+      toast('error', getErrorMessage(err, 'Could not change who this is reimbursed to.'))
+    }
+  }
   const rows = data ?? []
   const shown = rows.filter(
     (r) => (!kind || r.kind === kind) && matchesSearch(search, [r.display_id, r.description, r.kind, r.status, r.activity_date, r.recorded_at.slice(0, 10), r.amount])
@@ -85,8 +118,8 @@ export function ActivityByUserReport({ range }: { range: DateRange | null }) {
         },
         {
           title: `What ${person.name} recorded`,
-          columns: ['Date', 'Recorded on', 'Type', 'ID', 'Details', 'Money in', 'Money out', 'Other amount', 'Status'],
-          rows: shown.map((r) => [fmtDate(r.activity_date), fmtDate(dateOf(r.recorded_at)), r.kind, r.display_id ?? '', r.description ?? '', ...amountCells(r), r.status ?? '']),
+          columns: ['Date', 'Recorded on', 'Type', 'ID', 'Details', 'Money in', 'Money out', 'Other amount', 'Status', 'Reimburse to'],
+          rows: shown.map((r) => [fmtDate(r.activity_date), fmtDate(dateOf(r.recorded_at)), r.kind, r.display_id ?? '', r.description ?? '', ...amountCells(r), r.status ?? '', r.reimbursable ? nameOf(owedTo(r)) : '']),
           numericColumns: [5, 6, 7],
         },
       ]
@@ -186,13 +219,14 @@ export function ActivityByUserReport({ range }: { range: DateRange | null }) {
                   <th style={{ textAlign: 'right' }}>Money out</th>
                   <th style={{ textAlign: 'right' }}>Other amount</th>
                   <th>Status</th>
+                  <th>Reimburse to</th>
                   <th></th>
                 </tr>
               </thead>
               <tbody>
                 {shown.length === 0 && (
                   <tr>
-                    <td colSpan={10} className="empty-row">
+                    <td colSpan={11} className="empty-row">
                       Nothing recorded by {person?.name} in this period.
                     </td>
                   </tr>
@@ -203,13 +237,41 @@ export function ActivityByUserReport({ range }: { range: DateRange | null }) {
                     <tr key={`${r.source_table}-${r.source_id}`} className={r.reimbursable ? 'row-reimb' : undefined} title={r.reimbursable ? 'Recorded as reimbursement' : undefined}>
                       <td style={{ whiteSpace: 'nowrap' }}>{fmtDate(r.activity_date)}</td>
                       <td style={{ whiteSpace: 'nowrap' }}>{fmtDate(dateOf(r.recorded_at))}</td>
-                      <td>{r.kind}</td>
+                      <td>
+                        {r.kind}
+                        {r.reimbursable && (
+                          <div className="retention-note" style={{ fontWeight: 600 }}>
+                            Reimbursement
+                          </div>
+                        )}
+                      </td>
                       <td>{r.display_id ?? '—'}</td>
                       <td>{r.description || '—'}</td>
                       <td className="amt">{moneyIn === '' ? '' : fmt2(Number(moneyIn))}</td>
                       <td className="amt">{moneyOut === '' ? '' : fmt2(Number(moneyOut))}</td>
                       <td className="amt">{other === '' ? '' : fmt2(Number(other))}</td>
                       <td>{r.status ?? ''}</td>
+                      <td>
+                        {r.reimbursable &&
+                          (canChangeOwed(r) ? (
+                            <select
+                              aria-label="Reimburse to"
+                              value={owedTo(r) ?? ''}
+                              onChange={(e) => void changeOwed(r, e.target.value)}
+                              disabled={updateExpense.isPending || updatePayment.isPending}
+                              style={{ maxWidth: 150 }}
+                            >
+                              <option value="">— Not set —</option>
+                              {(profiles ?? []).map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  {p.name}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            nameOf(owedTo(r)) || '—'
+                          ))}
+                      </td>
                       <td>
                         <Button type="button" variant="secondary" onClick={() => void open(r)}>
                           Open

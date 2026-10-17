@@ -44,7 +44,8 @@ export function ReimbursementRecordsTable({ costCenter }: { costCenter?: string 
     r.vendor_bill_payment_id ? vendorPayments?.find((p) => p.id === r.vendor_bill_payment_id) : undefined
   // Whoever is owed: the expense's creator, or who paid the vendor.
   const userOf = (r: ExpenseReimbursement) => {
-    const ownerId = expenseOf(r)?.created_by ?? vendorPaymentOf(r)?.paid_by
+    const expense = expenseOf(r)
+    const ownerId = expense ? expense.reimburse_to ?? expense.created_by : vendorPaymentOf(r)?.paid_by
     return ownerId ? profiles?.find((p) => p.id === ownerId) : undefined
   }
   const againstOf = (r: ExpenseReimbursement) => {

@@ -40,6 +40,7 @@ const LABELS: Record<string, string> = {
   from_account_id: 'From account',
   to_account_id: 'To account',
   paid_by: 'Paid by',
+  reimburse_to: 'To be reimbursed to',
   approved_by: 'Approved by',
   partner_id: 'Partner',
   profile_id: 'Supervisor',
@@ -166,6 +167,7 @@ export function RecordDetailModal({
         case 'to_account_id':
           return nameIn(banks, value) ?? null
         case 'paid_by':
+        case 'reimburse_to':
         case 'approved_by':
         case 'partner_id':
         case 'profile_id':

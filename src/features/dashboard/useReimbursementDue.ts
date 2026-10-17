@@ -57,7 +57,8 @@ export function useReimbursementDue(): DueUserRow[] {
       const expenseReimbursements = (reimbursements ?? []).filter((r) => r.expense_id === e.id)
       const due = expenseDue(e.amount, expenseReimbursements)
       if (due <= 0) return
-      addDue(e.created_by, 'expense', {
+      // Whoever the Admin named, else whoever recorded the expense.
+      addDue(e.reimburse_to ?? e.created_by, 'expense', {
         id: e.id,
         displayId: e.display_id ?? '',
         date: e.date,

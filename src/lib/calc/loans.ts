@@ -13,6 +13,14 @@ export interface LoanPaymentRow {
   interest_paid: number | null
 }
 
+/** A private party loan is entered at 24% a year (2% a month) unless the rate is changed. */
+export const DEFAULT_PRIVATE_LOAN_ROI = 24
+
+/** Interest for one month on an amount at an annual rate: amount x rate / 100 / 12, to the paisa. */
+export function monthlyInterestOn(amount: number, roiPct: number): number {
+  return Math.round(((Number(amount) || 0) * (Number(roiPct) || 0)) / 12) / 100
+}
+
 export function loanPrincipalPaid(payments: LoanPaymentRow[]): number {
   return payments.reduce((s, p) => s + Number(p.principal_paid || 0), 0)
 }
