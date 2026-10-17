@@ -21,3 +21,5 @@ vendor_bill_payments           13    181900.00
 vendor_bills                    5    265250.00
 wage_accruals                  12
 wage_payments                  23    104535
+
+Applied on 2026-10-17 (migration phase3_on_behalf_trip_dates). After: every table above identical (rows and totals); new on_behalf_of / duplicate_reason columns empty on all existing rows; trigger trg_check_trip_entry_date present.
