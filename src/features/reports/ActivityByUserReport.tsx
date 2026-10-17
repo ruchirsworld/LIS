@@ -13,6 +13,7 @@ import { useActivityByUser, type ActivityRow } from '../../lib/queries/reports'
 import type { DateRange } from '../../lib/calc/reportPeriod'
 import type { ExportSection } from '../../lib/export/report'
 import { ReportExportButtons } from './ReportExportButtons'
+import { RecordDetailModal, canShowRecord } from './RecordDetailModal'
 
 const dateOf = (iso: string) => iso.slice(0, 10)
 
@@ -23,6 +24,7 @@ export function ActivityByUserReport({ range }: { range: DateRange | null }) {
   const [userId, setUserId] = useState('')
   const [byRecorded, setByRecorded] = useState(false)
   const [kind, setKind] = useState('')
+  const [viewing, setViewing] = useState<ActivityRow | null>(null)
   const { data, isLoading, error } = useActivityByUser(userId || null, range, byRecorded)
 
   const person = profiles?.find((p) => p.id === userId)
@@ -45,7 +47,17 @@ export function ActivityByUserReport({ range }: { range: DateRange | null }) {
   }, [rows])
   const { pageRows, page, setPage, totalPages, totalCount } = usePagination(shown)
 
+  /** The popup shows the record where it is; "its screen" goes to the page that holds it. */
   async function open(r: ActivityRow) {
+    if (canShowRecord(r.source_table)) {
+      setViewing(r)
+      return
+    }
+    await openScreen(r)
+  }
+
+  async function openScreen(r: ActivityRow) {
+    setViewing(null)
     const target = await resolveEntryTarget(r.source_table, r.source_id, r.activity_date)
     if (!target || !goTo) {
       toast('info', `I cannot open this one directly. Look for it dated ${fmtDate(r.activity_date)} in its own screen.`)
@@ -206,6 +218,17 @@ export function ActivityByUserReport({ range }: { range: DateRange | null }) {
           </TableScroll>
           <Pagination page={page} totalPages={totalPages} totalCount={totalCount} onChange={setPage} />
         </>
+      )}
+
+      {viewing && (
+        <RecordDetailModal
+          title={`${viewing.kind}${viewing.display_id ? ` ${viewing.display_id}` : ''}`}
+          sourceTable={viewing.source_table}
+          sourceId={viewing.source_id}
+          recordedBy={person?.name}
+          onClose={() => setViewing(null)}
+          onOpenScreen={() => void openScreen(viewing)}
+        />
       )}
     </div>
   )

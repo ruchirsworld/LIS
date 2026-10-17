@@ -1,6 +1,6 @@
 # LIS changes since v2.0.1
 
-Version 2.0.1 was released on 3 September 2026. This list covers everything after it, up to 2.1.15. It is put together from the project history, grouped by area. Version numbers are shown where a release carried one.
+Version 2.0.1 was released on 3 September 2026. This list covers everything after it, up to 2.1.16. It is put together from the project history, grouped by area. Version numbers are shown where a release carried one.
 
 ## 2.0.2 – 2.0.3 (3 – 4 September)
 
@@ -137,3 +137,6 @@ Version 2.0.1 was released on 3 September 2026. This list covers everything afte
 ## 2.1.15 (17 October): Activity by user
 - New report, Reports > Activity by user: choose a person and a period to see everything they recorded in one list. It covers expenses, reimbursements, vendor bills, payments and advances, invoices, client receipts, credit and debit notes, transfers, loans, capital, other receipts, wages, site imprest, salary advances, trips and opening balances.
 - A summary by type (entries, money in, money out) sits above the list. Dates can filter by the date of each entry or by the day it was recorded. Each row has an Open button, reimbursements are tinted, and the list exports to PDF and Excel. Admin and CXO only.
+
+## 2.1.16 (17 October): records open in a popup
+- In Activity by user, Open shows every detail of the record in a popup on the same page instead of leaving it: the names of the vendor, client, project, bank, expense head and trip, who recorded it and when, and the items on a vendor bill. It is read only, with a button to open the record in its own screen to change it.
