@@ -24,6 +24,7 @@ import { PaymentAccountPicker, bankAccountIdOf, CASH_ACCOUNT } from '../../compo
 import { computeAccrualBreakdown, nextAccrualStart, todayStr, type AttendanceDayType } from '../../lib/calc/payroll'
 import { fmt, fmtDate, parseINR } from '../../lib/calc/format'
 import { getErrorMessage } from '../../lib/errors'
+import { TableSearch, matchesSearch } from '../../components/TableSearch'
 
 // The pay-slip is meant for the worker to keep, not just the Admin running
 // payroll — every label on it shows English and Hindi together rather than
@@ -79,6 +80,9 @@ export function SalarySection() {
   const { data: allLeave } = useAllStaffAttendance()
   const { data: holidays } = useHolidays()
   const { data: allAssignments } = useAllStaffProjectAssignments()
+  const [accrualSearch, setAccrualSearch] = useState('')
+  const [paymentSearch, setPaymentSearch] = useState('')
+  const [advanceSearch, setAdvanceSearch] = useState('')
   const { data: accruals } = useWageAccruals()
   const { data: payments } = useWagePayments()
   const { data: bankAccounts } = useBankAccounts()
@@ -478,6 +482,12 @@ export function SalarySection() {
     : 0
   const viewingNetPay = viewingAccrual ? viewingAccrual.amount - viewingAdvanceAdjustment - viewingPriorPaymentsAdjustment : 0
 
+  const accrualRows = (accruals ?? []).filter((a) => matchesSearch(accrualSearch, [a.display_id, staffName(a.staff_id), a.period_start, a.period_end, a.amount, a.notes]))
+  const paymentRows = (payments ?? []).filter((p) =>
+    matchesSearch(paymentSearch, [p.display_id, staffName(p.staff_id), p.date, bankAccountName(p.bank_account_id), p.amount, p.advance_recovered, p.notes])
+  )
+  const advanceRows = (salaryAdvances ?? []).filter((a) => matchesSearch(advanceSearch, [a.display_id, staffName(a.staff_id), a.date, bankAccountName(a.bank_account_id), a.amount, a.remarks]))
+
   return (
     <div>
       <div className="card" style={{ padding: 16, marginBottom: 14 }}>
@@ -689,6 +699,7 @@ export function SalarySection() {
 
       <div className="card" style={{ padding: 16, marginBottom: 14 }}>
         <h3 style={{ marginTop: 0, fontSize: 13 }}>Wage accrual history</h3>
+        <TableSearch value={accrualSearch} onChange={setAccrualSearch} placeholder="Search by ID, staff name, period or amount…" />
         <div className="table-scroll">
           <table className="data">
             <thead>
@@ -707,7 +718,14 @@ export function SalarySection() {
                   </td>
                 </tr>
               )}
-              {accruals?.map((a) => (
+              {accruals && accruals.length > 0 && accrualRows.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="empty-row">
+                    Nothing matches your search
+                  </td>
+                </tr>
+              )}
+              {accrualRows.map((a) => (
                 <tr key={a.id}>
                   <td>{a.display_id ?? '—'}</td>
                   <td>
@@ -728,6 +746,7 @@ export function SalarySection() {
 
       <div className="card" style={{ padding: 16 }}>
         <h3 style={{ marginTop: 0, fontSize: 13 }}>Wage payment history</h3>
+        <TableSearch value={paymentSearch} onChange={setPaymentSearch} placeholder="Search by ID, staff name, date, account or amount…" />
         <div className="table-scroll">
           <table className="data">
             <thead>
@@ -748,7 +767,14 @@ export function SalarySection() {
                   </td>
                 </tr>
               )}
-              {payments?.map((p) => (
+              {payments && payments.length > 0 && paymentRows.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="empty-row">
+                    Nothing matches your search
+                  </td>
+                </tr>
+              )}
+              {paymentRows.map((p) => (
                 <tr key={p.id}>
                   <td>{p.display_id ?? '—'}</td>
                   <td>{staffName(p.staff_id)}</td>
@@ -765,6 +791,7 @@ export function SalarySection() {
 
       <div className="card" style={{ padding: 16, marginTop: 14 }}>
         <h3 style={{ marginTop: 0, fontSize: 13 }}>Salary advance history</h3>
+        <TableSearch value={advanceSearch} onChange={setAdvanceSearch} placeholder="Search by ID, staff name, date, account or amount…" />
         <div className="table-scroll">
           <table className="data">
             <thead>
@@ -785,7 +812,14 @@ export function SalarySection() {
                   </td>
                 </tr>
               )}
-              {salaryAdvances?.map((a) =>
+              {salaryAdvances && salaryAdvances.length > 0 && advanceRows.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="empty-row">
+                    Nothing matches your search
+                  </td>
+                </tr>
+              )}
+              {advanceRows.map((a) =>
                 editingAdvanceId === a.id ? (
                   <Fragment key={a.id}>
                     <tr>

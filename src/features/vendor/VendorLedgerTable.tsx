@@ -6,6 +6,7 @@ import { RowMenu } from '../../components/RowMenu'
 import { ReceiptLink } from '../../components/ReceiptLink'
 import { useSort } from '../../lib/useSort'
 import { usePagination } from '../../lib/usePagination'
+import { TableSearch, matchesSearch } from '../../components/TableSearch'
 import { ReportExportButtons } from '../reports/ReportExportButtons'
 import type { ExportSection } from '../../lib/export/report'
 import { useVendorBills, useVendorBillPayments, useDeleteVendorBillPayment } from '../../lib/queries/purchases'
@@ -87,8 +88,11 @@ export function VendorLedgerTable({ vendorId }: { vendorId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vendorBills, vendorPayments])
 
+  // The running balance is worked out on the whole ledger first, so a search never changes a balance.
+  const [search, setSearch] = useState('')
+  const searchedRows = search ? ledgerRows.filter((r) => matchesSearch(search, [r.id, r.date, r.type, r.details, r.debit, r.credit, r.balance])) : ledgerRows
   const { sorted: sortedRows, sortKey, direction, toggleSort } = useSort(
-    ledgerRows,
+    searchedRows,
     {
       id: (r) => r.id,
       date: (r) => r.date,
@@ -100,7 +104,7 @@ export function VendorLedgerTable({ vendorId }: { vendorId: string }) {
     },
     'date'
   )
-  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedRows)
+  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sortedRows, search)
   const isLoading = billsLoading || paymentsLoading
 
   const exportSections: ExportSection[] = [
@@ -119,6 +123,7 @@ export function VendorLedgerTable({ vendorId }: { vendorId: string }) {
         <ReportExportButtons title="Vendor ledger" sections={exportSections} range={null} style={{ marginTop: 0 }} />
       </div>
 
+      <TableSearch value={search} onChange={setSearch} placeholder="Search by ID, date, details or amount…" />
       <TableScroll>
         <table className="data">
           <thead>

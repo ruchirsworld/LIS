@@ -1,6 +1,6 @@
 # LIS changes since v2.0.1
 
-Version 2.0.1 was released on 3 September 2026. This list covers everything after it, up to 2.1.19. It is put together from the project history, grouped by area. Version numbers are shown where a release carried one.
+Version 2.0.1 was released on 3 September 2026. This list covers everything after it, up to 2.1.20. It is put together from the project history, grouped by area. Version numbers are shown where a release carried one.
 
 ## 2.0.2 – 2.0.3 (3 – 4 September)
 
@@ -151,3 +151,6 @@ Version 2.0.1 was released on 3 September 2026. This list covers everything afte
 ## 2.1.19 (17 October): reimbursement person, and 24% private loans
 - Activity by user: reimbursement entries carry a "Reimbursement" label as well as the tint, and a new "Reimburse to" column names the person owed. For an expense it is the person the Admin named, else whoever recorded it; for a vendor payment in Reimbursement mode it is who paid out of pocket. An Admin can change the person from a drop-down. The Dashboard "Reimbursement due" per person and the Reimbursement records follow it. New "reimburse to" field on expenses (database change).
 - Loans: a new Private Party loan starts at 24% a year (2% a month), and the form shows the monthly interest for the principal and rate entered. Bank loans have no preset rate. Existing loans are unchanged.
+
+## 2.1.20 (17 October): search in HR, the vendor ledger and the audit log
+- A search box above the HR wage accrual, wage payment and salary advance histories, the site imprest transactions, the Vendor ledger and the Audit log. The vendor ledger's running balance is not affected by a search. The Audit log search covers who changed it, the date, and everything the record held before and after the change (among the 500 most recent changes the report loads).

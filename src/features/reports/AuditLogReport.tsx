@@ -2,6 +2,7 @@ import { Fragment, useState } from 'react'
 import { useAuditLog, type AuditLogRow } from '../../lib/queries/audit'
 import { useProfiles } from '../../lib/queries/admin'
 import { fmtDate } from '../../lib/calc/format'
+import { TableSearch, matchesSearch } from '../../components/TableSearch'
 
 const TABLE_LABELS: Record<string, string> = {
   expenses: 'Expense',
@@ -50,9 +51,15 @@ export function AuditLogReport() {
   const { data: profiles } = useProfiles()
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [tableFilter, setTableFilter] = useState('')
+  const [search, setSearch] = useState('')
 
   const nameOf = (id: string | null) => (id ? profiles?.find((p) => p.id === id)?.name ?? '—' : '—')
-  const rows = tableFilter ? (log ?? []).filter((r) => r.table_name === tableFilter) : log ?? []
+  // The search looks at who and when, and at everything the record held before and after the change (ID, description, amount, names).
+  const rows = (log ?? []).filter(
+    (r) =>
+      (!tableFilter || r.table_name === tableFilter) &&
+      matchesSearch(search, [TABLE_LABELS[r.table_name] ?? r.table_name, r.operation, nameOf(r.changed_by), r.changed_at, ...Object.values(r.old_data ?? {}), ...Object.values(r.new_data ?? {})])
+  )
 
   return (
     <div className="report-panel">
@@ -72,6 +79,7 @@ export function AuditLogReport() {
         </select>
       </div>
 
+      <TableSearch value={search} onChange={setSearch} placeholder="Search by who, ID, description, amount or date…" />
       <div className="table-scroll" style={{ marginTop: 16 }}>
         <table className="data">
           <thead>

@@ -29,6 +29,7 @@ import type { ExportSection } from '../../lib/export/report'
 import type { DateRange } from '../../lib/calc/reportPeriod'
 import { fmt, fmtDate, parseINR } from '../../lib/calc/format'
 import { getErrorMessage } from '../../lib/errors'
+import { TableSearch, matchesSearch } from '../../components/TableSearch'
 import type { Database } from '../../types/database'
 
 type StaffImprestTransaction = Database['public']['Tables']['staff_imprest_transactions']['Row']
@@ -84,6 +85,7 @@ export function SiteImprestSection() {
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [paymentsRange, setPaymentsRange] = useState<DateRange | null>(null)
+  const [recordSearch, setRecordSearch] = useState('')
   const [requestBusyId, setRequestBusyId] = useState<string | null>(null)
   const [requestError, setRequestError] = useState<Record<string, string>>({})
   const [editingRequestId, setEditingRequestId] = useState<string | null>(null)
@@ -131,12 +133,15 @@ export function SiteImprestSection() {
   const supervisorName = (id: string) => supervisors.find((p) => p.id === id)?.name ?? '—'
   const bankAccountName = (id: string | null) => (id ? bankAccounts?.find((a) => a.id === id)?.name ?? '—' : 'Cash')
   const accountLabel = (t: StaffImprestTransaction) => (t.reimbursable ? 'Reimbursement' : bankAccountName(t.bank_account_id))
+  const searchedRecords = recordsShown.filter((t) =>
+    matchesSearch(recordSearch, [t.display_id, t.date, t.kind === 'advance' ? 'advance given' : 'return', t.amount, accountLabel(t), t.remarks, staffName(t.staff_id), t.status, t.reimbursable ? 'reimbursement' : ''])
+  )
 
   const recordsExportSections: ExportSection[] = [
     {
       title: `${supervisorName(supervisorId)} — Imprest transactions`,
       columns: ['Date', 'Type', 'Amount', 'Account'],
-      rows: recordsShown.map((t) => [fmtDate(t.date), t.kind === 'advance' ? 'Advance' : 'Return', t.amount, accountLabel(t)]),
+      rows: searchedRecords.map((t) => [fmtDate(t.date), t.kind === 'advance' ? 'Advance' : 'Return', t.amount, accountLabel(t)]),
     },
   ]
 
@@ -604,6 +609,7 @@ export function SiteImprestSection() {
               />
             </div>
 
+            <TableSearch value={recordSearch} onChange={setRecordSearch} placeholder="Search by ID, date, amount, account or remarks…" />
             <div className="table-scroll">
               <table className="data">
                 <thead>
@@ -623,7 +629,14 @@ export function SiteImprestSection() {
                       </td>
                     </tr>
                   )}
-                  {recordsShown.map((t) =>
+                  {recordsShown.length > 0 && searchedRecords.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="empty-row">
+                        Nothing matches your search
+                      </td>
+                    </tr>
+                  )}
+                  {searchedRecords.map((t) =>
                     editingTxnId === t.id ? (
                       <Fragment key={t.id}>
                         <tr>
