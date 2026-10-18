@@ -18,7 +18,7 @@ export function MyEntriesToday() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('expenses')
-        .select('id, display_id, description, amount, date, created_at')
+        .select('id, display_id, description, remarks, amount, date, created_at')
         .eq('created_by', profile!.id)
         .gte('created_at', startOfTodayIso())
         .order('created_at', { ascending: false })
@@ -35,6 +35,7 @@ export function MyEntriesToday() {
         <div key={e.id} className="my-entries-row">
           <span className="mono my-entries-id">{e.display_id}</span>
           <span className="my-entries-desc">{e.description}</span>
+          <span className="my-entries-remarks" title={e.remarks ?? undefined}>{e.remarks}</span>
           <span className="my-entries-amt">{fmt(e.amount)}</span>
         </div>
       ))}

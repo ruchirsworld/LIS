@@ -2732,6 +2732,14 @@ summary:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.my-entries-remarks {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
 .my-entries-amt {
   flex: none;
   font-weight: 600;
