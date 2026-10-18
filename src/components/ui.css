@@ -2725,6 +2725,15 @@ summary:focus-visible {
   flex: none;
   color: var(--muted);
 }
+.my-entries-cc {
+  flex: none;
+  min-width: 52px;
+}
+.my-entries-date {
+  flex: none;
+  white-space: nowrap;
+  color: var(--muted);
+}
 .my-entries-desc {
   flex: 1;
   min-width: 0;
