@@ -102,12 +102,12 @@ export function ActivityByUserReport() {
   )
   const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sorted ?? shown, `${search}|${kind}|${onlyUnchecked}|${onlyReimbursable}|${userId}|${sortKey}|${direction}`)
 
-  // Grouped by month while the list is in date order (by when entered, or by date): a heading per month with its count and money in and out.
-  // Every month starts folded; a search opens them all. Sorting by module or amount shows one plain list.
+  // Grouped by the month of the transaction's own date (not when it was entered): a heading per month with its count and money in and out.
+  // Within a month the rows keep the chosen order. Every month starts folded; a search opens them all. Sorting by module or amount shows one plain list.
   const [groupByMonth, setGroupByMonth] = useState(true)
   const [openMonths, setOpenMonths] = useState<Set<string>>(new Set())
   const grouped = groupByMonth && (sortKey === 'entered' || sortKey === 'date')
-  const monthOf = (r: FeedRow) => (sortKey === 'date' ? r.activity_date : r.recorded_at.slice(0, 10)).slice(0, 7)
+  const monthOf = (r: FeedRow) => r.activity_date.slice(0, 7)
   const monthFolded = (month: string) => !search && !openMonths.has(month)
   const monthTotals = (month: string) => {
     const list = shown.filter((r) => monthOf(r) === month)
@@ -115,7 +115,10 @@ export function ActivityByUserReport() {
     return { count: list.length, moneyIn: sum('in'), moneyOut: sum('out') }
   }
   const monthLabel = (month: string) => new Date(`${month}-01T00:00:00`).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
-  const listRows = grouped ? sorted ?? shown : pageRows
+  // Months run newest first (or oldest first when the order is reversed); the sort is stable, so each month keeps the order chosen.
+  const listRows = grouped
+    ? [...(sorted ?? shown)].sort((a, b) => (direction === 'desc' ? monthOf(b).localeCompare(monthOf(a)) : monthOf(a).localeCompare(monthOf(b))))
+    : pageRows
   const uncheckedCount = rows.filter((r) => !r.checked_at).length
 
   async function openScreen(r: FeedRow) {

@@ -1,6 +1,6 @@
 # LIS changes since v2.0.1
 
-Version 2.0.1 was released on 3 September 2026. This list covers everything after it, up to 3.0.9. It is put together from the project history, grouped by area. Version numbers are shown where a release carried one.
+Version 2.0.1 was released on 3 September 2026. This list covers everything after it, up to 3.0.10. It is put together from the project history, grouped by area. Version numbers are shown where a release carried one.
 
 ## 2.0.2 – 2.0.3 (3 – 4 September)
 
@@ -180,6 +180,10 @@ Version 2.0.1 was released on 3 September 2026. This list covers everything afte
 ## 2.1.26 (17 October): sticky trip rows, and records grouped by month
 - **Trip Records:** while you scroll through an opened trip's entries, the table header, the trip's own row and the entries heading (with the spend split and + Add expense) stay at the top; they let go when the trip ends. The entries have a Remarks column after the sub-head.
 - **Admin and Project expense records, and Activity by user,** are grouped by month (a bold grey bar with the count and total) and, inside a month, by date. Both can be folded. Each date group is blue or green in turn, and its rows alternate a lighter and a slightly deeper tint; reimbursements stay amber. Month and day totals cover everything in them, not only the current page.
+
+## 3.0.10 (21 October): ticks, and months by transaction date
+- **Activity by user, months:** entries are grouped under the month of the transaction's own date, not the day it was entered. Inside a month they keep the order chosen.
+- **The tick** no longer shows "That already exists" when an entry is ticked twice (a double click, or a list that had not refreshed): it just stays ticked. The list and today's summary now update the moment you tick.
 
 ## 3.0.9 (21 October): more in Activity by user
 - **Group by month:** while the list is in date order, entries sit under a heading for each month, with its count and money in and out. Months start folded; a search opens them all. A "Group by month" tick turns it off.
