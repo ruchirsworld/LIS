@@ -99,11 +99,11 @@ export function ActivityByUserReport() {
       (!onlyReimbursable || r.reimbursable) &&
       matchesSearch(search, [r.display_id, r.description, r.kind, r.activity_date, r.recorded_at.slice(0, 10), r.amount, r.cost_center, r.project_name, r.trip_name, nameOf(r.entered_by), nameOf(r.on_behalf_of)])
   )
-  // Newest entered first to begin with; the Entered on, Date and Amount headings sort the list either way.
+  // Latest transaction date first to begin with; the Entered on, Date, Module and Amount headings sort the list either way.
   const { sorted, sortKey, direction, toggleSort } = useSort(
     shown,
     { entered: (r) => r.recorded_at, date: (r) => r.activity_date, module: (r) => r.kind, amount: (r) => (r.amount === null ? null : Number(r.amount)) },
-    'entered',
+    'date',
     'desc'
   )
   const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sorted ?? shown, `${search}|${kind}|${onlyUnchecked}|${onlyReimbursable}|${userId}|${sortKey}|${direction}`)

@@ -1,6 +1,6 @@
 # LIS changes since v2.0.1
 
-Version 2.0.1 was released on 3 September 2026. This list covers everything after it, up to 3.0.12. It is put together from the project history, grouped by area. Version numbers are shown where a release carried one.
+Version 2.0.1 was released on 3 September 2026. This list covers everything after it, up to 3.0.13. It is put together from the project history, grouped by area. Version numbers are shown where a release carried one.
 
 ## 2.0.2 – 2.0.3 (3 – 4 September)
 
@@ -180,6 +180,9 @@ Version 2.0.1 was released on 3 September 2026. This list covers everything afte
 ## 2.1.26 (17 October): sticky trip rows, and records grouped by month
 - **Trip Records:** while you scroll through an opened trip's entries, the table header, the trip's own row and the entries heading (with the spend split and + Add expense) stay at the top; they let go when the trip ends. The entries have a Remarks column after the sub-head.
 - **Admin and Project expense records, and Activity by user,** are grouped by month (a bold grey bar with the count and total) and, inside a month, by date. Both can be folded. Each date group is blue or green in turn, and its rows alternate a lighter and a slightly deeper tint; reimbursements stay amber. Month and day totals cover everything in them, not only the current page.
+
+## 3.0.13 (21 October): Activity by user opens by transaction date
+- The list now starts sorted by the date of the transaction, latest first (it was newest entered first). The months follow the same order. Click Entered on to sort by when entries were made.
 
 ## 3.0.12 (21 October): Activity by user cards
 - In a narrow window, each entry is a purpose-built card instead of a squeezed table row. Row 1: the Checked box, the amount, the date of the transaction and the cost centre (with the project or trip). Row 2: module, description and remarks (tap to open the entry). Row 3, small: when it was entered, by whom and for whom. Reimbursable entries have an amber edge and the initials badge. The remarks are read for the entries on screen (expenses and vendor bills).
