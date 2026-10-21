@@ -14,6 +14,7 @@ export function RecordRow({
   onToggle,
   colSpan,
   details,
+  leading,
   onEdit,
   onDelete,
   extraItems,
@@ -27,6 +28,8 @@ export function RecordRow({
   colSpan: number
   /** What shows under the row when it is open. */
   details: ReactNode
+  /** A cell at the very start of the row, before the arrow (for example a tick box). */
+  leading?: ReactNode
   onEdit?: () => void
   /** Only Admin sees Delete. */
   onDelete?: () => void
@@ -55,6 +58,7 @@ export function RecordRow({
   return (
     <Fragment>
       <tr className={panelRecord ? [className, 'row-clickable'].filter(Boolean).join(' ') : className} title={title} onClick={handleRowClick}>
+        {leading !== undefined && <td style={{ width: 36 }}>{leading}</td>}
         <td style={{ width: 36 }}>
           <button type="button" className="row-expand-btn" onClick={onToggle} aria-label={expanded ? 'Hide details' : 'Show complete details'} aria-expanded={expanded}>
             {expanded && !panelRecord ? '▾' : '▸'}

@@ -192,6 +192,7 @@ export function ActivityByUserReport() {
             <table className="data">
               <thead>
                 <tr>
+                  <th title="Tick when you have checked the entry">Checked</th>
                   <th></th>
                   <th>Entered on</th>
                   <th>Date</th>
@@ -201,7 +202,6 @@ export function ActivityByUserReport() {
                   <th className="amt">Amount</th>
                   <th>Entered by</th>
                   <th>On behalf of</th>
-                  <th>Checked</th>
                   <th></th>
                 </tr>
               </thead>
@@ -216,6 +216,7 @@ export function ActivityByUserReport() {
                       expanded={openRows.isOpen(key)}
                       onToggle={() => openRows.toggle(key)}
                       colSpan={COLS}
+                      leading={<CheckTick row={r} />}
                       details={
                         canShowRecord(r.source_table) ? (
                           <RecordDetails sourceTable={r.source_table} sourceId={r.source_id} recordedBy={nameOf(r.entered_by)} />
@@ -240,9 +241,9 @@ export function ActivityByUserReport() {
                       className={r.reimbursable ? 'row-reimb' : undefined}
                       title={r.reimbursable ? 'Recorded as reimbursement' : undefined}
                     >
-                      <td style={{ whiteSpace: 'nowrap' }}>
+                      <td className="act-entered">
                         {fmtDate(r.recorded_at.slice(0, 10))}
-                        <div className="note" style={{ margin: 0 }}>{timeOf(r.recorded_at)}</div>
+                        <div>{timeOf(r.recorded_at)}</div>
                       </td>
                       <td style={{ whiteSpace: 'nowrap' }}>{fmtDate(r.activity_date)}</td>
                       <td>
@@ -263,9 +264,6 @@ export function ActivityByUserReport() {
                       <td className="amt">{r.amount === null ? '' : fmt(r.amount)}</td>
                       <td>{nameOf(r.entered_by)}</td>
                       <td>{nameOf(r.on_behalf_of)}</td>
-                      <td>
-                        <CheckTick row={r} />
-                      </td>
                     </RecordRow>
                   )
                 })}

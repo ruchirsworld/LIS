@@ -2981,6 +2981,13 @@ table.data tr.row-clickable {
     height: 32px;
   }
 }
+/* When an entry was made is for reference only, so it is small and quiet. */
+table.data td.act-entered {
+  white-space: nowrap;
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--muted);
+}
 .daily-summary {
   margin-bottom: var(--space-3);
 }
