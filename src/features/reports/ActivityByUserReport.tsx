@@ -6,6 +6,8 @@ import { Pagination } from '../../components/Pagination'
 import { Modal } from '../../components/Modal'
 import { Button, CostCentreTag, EmptyState, InitialsBadge, TableSkeleton, costCentreKind } from '../../components/ui'
 import { usePagination } from '../../lib/usePagination'
+import { useSort } from '../../lib/useSort'
+import { SortableTh } from '../../components/SortableTh'
 import { fmt, fmtDate } from '../../lib/calc/format'
 import { resolveEntryTarget } from '../../lib/entryTarget'
 import { toast } from '../../lib/feedback'
@@ -89,7 +91,14 @@ export function ActivityByUserReport() {
       (!onlyUnchecked || !r.checked_at) &&
       matchesSearch(search, [r.display_id, r.description, r.kind, r.activity_date, r.recorded_at.slice(0, 10), r.amount, r.cost_center, r.project_name, r.trip_name, nameOf(r.entered_by), nameOf(r.on_behalf_of)])
   )
-  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(shown, `${search}|${kind}|${onlyUnchecked}|${userId}`)
+  // Newest entered first to begin with; the Entered on, Date and Amount headings sort the list either way.
+  const { sorted, sortKey, direction, toggleSort } = useSort(
+    shown,
+    { entered: (r) => r.recorded_at, date: (r) => r.activity_date, amount: (r) => (r.amount === null ? null : Number(r.amount)) },
+    'entered',
+    'desc'
+  )
+  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sorted ?? shown, `${search}|${kind}|${onlyUnchecked}|${userId}|${sortKey}|${direction}`)
   const uncheckedCount = rows.filter((r) => !r.checked_at).length
 
   async function openScreen(r: FeedRow) {
@@ -186,7 +195,7 @@ export function ActivityByUserReport() {
       {data && shown.length > 0 && (
         <>
           <div className="note" style={{ fontWeight: 600 }}>
-            {totalCount} entr{totalCount === 1 ? 'y' : 'ies'}, newest first.
+            {totalCount} entr{totalCount === 1 ? 'y' : 'ies'}, sorted by {sortKey === 'date' ? 'date' : sortKey === 'amount' ? 'amount' : 'when entered'} ({direction === 'desc' ? sortKey === 'amount' ? 'largest' : 'newest' : sortKey === 'amount' ? 'smallest' : 'oldest'} first).
           </div>
           <TableScroll>
             <table className="data">
@@ -194,12 +203,12 @@ export function ActivityByUserReport() {
                 <tr>
                   <th title="Tick when you have checked the entry">Checked</th>
                   <th></th>
-                  <th>Entered on</th>
-                  <th>Date</th>
+                  <SortableTh label="Entered on" sortKey="entered" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+                  <SortableTh label="Date" sortKey="date" activeKey={sortKey} direction={direction} onSort={toggleSort} />
                   <th>Module</th>
                   <th>Description</th>
                   <th>Cost centre / project / trip</th>
-                  <th className="amt">Amount</th>
+                  <SortableTh label="Amount" sortKey="amount" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
                   <th>Entered by</th>
                   <th>On behalf of</th>
                   <th></th>

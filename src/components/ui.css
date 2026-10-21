@@ -3030,3 +3030,163 @@ table.data td.act-entered {
 .trip-popup-facts {
   margin-bottom: var(--space-3);
 }
+
+/* ===== Phase 7: the Dashboard on the design system =====
+   Look only: the cards, figures and sections are the same. Brand hues are fills, bars and chart colours; text on white or on a tint uses the
+   deeper status shades so it stays readable (WCAG AA). Status colours mean status only; charts use the chart palette. */
+
+/* Cards and panels: 8px corners, a light shadow, white on the warm page. */
+.dash-card,
+.dash-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+.dash-card-clickable:hover {
+  border-color: var(--primary);
+  box-shadow: var(--shadow-md);
+}
+
+/* Type: section 18, labels 13, figures in Inter with tabular numerals (no monospace). */
+.dash-section-head {
+  font-size: var(--text-section);
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+.dash-section-note {
+  font-size: var(--text-label);
+}
+.dash-subhead {
+  font-size: var(--text-label);
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted);
+}
+.dash-label {
+  font-size: var(--text-label);
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted);
+}
+.dash-value {
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text);
+}
+.dash-sub,
+.dash-updated,
+.dash-panel-sub {
+  font-size: var(--text-label);
+}
+.dash-panel-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+.dash-hbar-value {
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Status: a coloured edge and a deeper text shade, always with the words beside it. */
+.dash-card.dash-card-danger,
+.dash-card.dash-card-warn,
+.dash-card.dash-card-good {
+  border-left-width: 4px;
+}
+.dash-card-danger {
+  border-left-color: var(--error);
+}
+.dash-card-danger .dash-value,
+.dash-card-danger .dash-sub,
+.dash-delta-bad,
+.dash-row-error,
+.retention-due {
+  color: var(--error-text);
+}
+.dash-card-warn {
+  border-left-color: var(--pending);
+}
+.dash-card-warn .dash-value,
+.gst-held-note {
+  color: var(--pending-text);
+}
+.dash-card-good {
+  border-left-color: var(--success);
+}
+.dash-card-good .dash-sub,
+.dash-delta-good {
+  color: var(--success-text);
+}
+.dash-card-retention {
+  background: var(--info-tint);
+}
+.dash-card-retention .dash-value,
+td.amt-retention {
+  color: var(--info-text);
+}
+td.amt-retention {
+  background: var(--info-tint);
+}
+.kpi-grid-divider.terracotta {
+  background: var(--cta);
+}
+
+/* Charts: the chart palette, in order. Bars and lines are blue first; money in is teal and money out terracotta. */
+.dash-hbar-fill,
+.dash-progress > span {
+  background: var(--chart-1);
+}
+.dash-hbar.tone-warn .dash-hbar-fill {
+  background: var(--pending);
+}
+.dash-hbar.tone-danger .dash-hbar-fill {
+  background: var(--error);
+}
+.dash-month-bar.in,
+.dash-legend i.in {
+  background: var(--chart-2);
+}
+.dash-month-bar.out,
+.dash-legend i.out {
+  background: var(--chart-3);
+}
+.dash-spark-line {
+  stroke: var(--chart-1);
+}
+.dash-spark-area,
+.dash-spark-dot,
+.dash-spark-dot-el {
+  fill: var(--chart-1);
+}
+.dash-spark-dot-el {
+  background: var(--chart-1);
+}
+.dash-hbar:hover,
+.dash-month:hover {
+  background: var(--hover);
+}
+
+/* The bar that holds the period and refresh: the page colour, a light rule. */
+.dash-bar {
+  border-bottom-color: var(--border);
+}
+.dash-jump-chip {
+  border-radius: var(--radius);
+  font-size: var(--text-label);
+}
+tr.row-link:hover td {
+  background: var(--hover);
+}
+
+/* Touch screens: the jump button and chips are comfortable to tap. */
+@media (max-width: 640px), (pointer: coarse) {
+  .dash-jump-chip,
+  .dash-section-head {
+    min-height: var(--tap);
+  }
+}

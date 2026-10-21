@@ -1,6 +1,6 @@
 # LIS changes since v2.0.1
 
-Version 2.0.1 was released on 3 September 2026. This list covers everything after it, up to 3.0.7. It is put together from the project history, grouped by area. Version numbers are shown where a release carried one.
+Version 2.0.1 was released on 3 September 2026. This list covers everything after it, up to 3.0.8. It is put together from the project history, grouped by area. Version numbers are shown where a release carried one.
 
 ## 2.0.2 – 2.0.3 (3 – 4 September)
 
@@ -180,6 +180,10 @@ Version 2.0.1 was released on 3 September 2026. This list covers everything afte
 ## 2.1.26 (17 October): sticky trip rows, and records grouped by month
 - **Trip Records:** while you scroll through an opened trip's entries, the table header, the trip's own row and the entries heading (with the spend split and + Add expense) stay at the top; they let go when the trip ends. The entries have a Remarks column after the sub-head.
 - **Admin and Project expense records, and Activity by user,** are grouped by month (a bold grey bar with the count and total) and, inside a month, by date. Both can be folded. Each date group is blue or green in turn, and its rows alternate a lighter and a slightly deeper tint; reimbursements stay amber. Month and day totals cover everything in them, not only the current page.
+
+## 3.0.8 (21 October): the Dashboard look, and sorting in Activity by user
+- **Dashboard** on the new design system (look only; the cards and figures are unchanged): white cards with 8px corners and a light shadow, 18px section titles, figures in Inter, status edges with deeper text shades, charts in the chart palette (money in teal, money out terracotta), 44px tap targets on a phone.
+- **Activity by user:** click Entered on, Date or Amount to sort the list, and click again to reverse it. It still starts newest-entered-first.
 
 ## 3.0.7 (21 October): Activity by user
 - The Checked tick is now the first column of the row.
