@@ -7,7 +7,7 @@ export function useStackedTables(rootRef: RefObject<HTMLElement | null>) {
   useEffect(() => {
     const root = rootRef.current
     if (!root) return
-    const mq = window.matchMedia('(max-width: 640px)')
+    const mq = window.matchMedia('(max-width: 900px)')
     let frame = 0
 
     function label(table: HTMLTableElement) {

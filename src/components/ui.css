@@ -2577,10 +2577,10 @@ summary:focus-visible {
   }
 }
 
-/* ===== A phone: tables become a stack of cards (no sideways scrolling) =====
+/* ===== A phone or half a laptop screen (up to 900px): tables become a stack of cards (no sideways scrolling) =====
    Each cell carries its column heading in data-label (see useStackedTables). Date and amount come first. The trip table keeps its
    sticky layout, so it is left as a table. */
-@media (max-width: 640px) {
+@media (max-width: 900px) {
   table.data:not(:has(tbody.trip-block)),
   table.data:not(:has(tbody.trip-block)) > tbody {
     display: block;
@@ -2655,8 +2655,33 @@ summary:focus-visible {
   }
 }
 
-/* Card rows on a phone: the arrow and the menu button sit at the top right of the card instead of taking a line each. */
-@media (max-width: 640px) {
+/* Card rows: the tick sits at the top left and the arrow and the menu button at the top right, instead of taking a line each. */
+@media (max-width: 900px) {
+  table.data:not(:has(tbody.trip-block)) td:has(> .check-tick) {
+    position: absolute;
+    top: 8px;
+    left: 12px;
+    padding: 0;
+  }
+  table.data:not(:has(tbody.trip-block)) td:has(> .check-tick)::before {
+    content: none !important;
+  }
+  table.data:not(:has(tbody.trip-block)) tr:has(> td > .check-tick) td[data-role='date'] {
+    padding-left: 40px;
+  }
+  table.data:not(:has(tbody.trip-block)) td:has(> .row-expand-btn) {
+    position: absolute;
+    top: 4px;
+    right: 52px;
+    padding: 0;
+  }
+  table.data:not(:has(tbody.trip-block)) td:has(> .row-menu) {
+    position: absolute;
+    top: 4px;
+    right: 8px;
+    padding: 0;
+  }
+
   table.data:not(:has(tbody.trip-block)) tr {
     position: relative;
   }
