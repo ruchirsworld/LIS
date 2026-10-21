@@ -17,6 +17,10 @@ import { useActivityFeed, useEntryRemarks, type FeedRow } from '../../lib/querie
 import { useMediaQuery } from '../../lib/useMediaQuery'
 import { RowMenu } from '../../components/RowMenu'
 import { RecordPanel } from './RecordPanel'
+import { EditEntryModal } from './EditEntryModal'
+import { confirmAction } from '../../lib/feedback'
+import { refreshAfterTrash, trashRecord, type TrashTable } from '../../lib/queries/trash'
+import { useQueryClient } from '@tanstack/react-query'
 import { useSetReviewed } from '../../lib/queries/reviews'
 import { useAuth } from '../../lib/auth'
 import { useUpdateExpense } from '../../lib/queries/expenses'
@@ -82,6 +86,35 @@ export function ActivityByUserReport() {
   // In a narrow window (a phone, or half a laptop screen) each entry is a card instead of a table row.
   const compact = useMediaQuery('(max-width: 900px)')
   const [panelRow, setPanelRow] = useState<FeedRow | null>(null)
+  // An Admin can change or delete an entry here, in a popup, without leaving the page.
+  const [editingRow, setEditingRow] = useState<FeedRow | null>(null)
+  const queryClient = useQueryClient()
+  const TRASHABLE = ['expenses', 'expense_reimbursements', 'capital_transactions', 'transfers', 'other_receipts', 'loans', 'loan_payments']
+  const canDelete = (r: FeedRow) => isAdmin && TRASHABLE.includes(r.source_table)
+
+  async function deleteRow(r: FeedRow) {
+    const ok = await confirmAction({
+      title: 'Delete this entry?',
+      message: `${r.display_id ?? 'This entry'}${r.amount === null ? '' : ` of ${fmt(r.amount)}`} dated ${fmtDate(r.activity_date)}. It moves to the Trash and can be restored.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (!ok) return
+    try {
+      await trashRecord(r.source_table as TrashTable, r.source_id, { qc: queryClient })
+      refreshAfterTrash(queryClient)
+    } catch (err) {
+      toast('error', getErrorMessage(err, 'Could not delete.'))
+    }
+  }
+  const asLine = (r: FeedRow) => ({
+    description: r.description ?? r.kind,
+    date: r.activity_date,
+    deposit: r.direction === 'in' ? Number(r.amount ?? 0) : 0,
+    withdrawal: r.direction === 'out' ? Number(r.amount ?? 0) : 0,
+    sourceTable: r.source_table,
+    sourceId: r.source_id,
+  })
   const { data, isLoading, error } = useActivityFeed(userId || null, range, byRecorded)
 
   const nameOf = (id: string | null | undefined) => (id ? profiles?.find((p) => p.id === id)?.name ?? '—' : '')
@@ -244,6 +277,8 @@ export function ActivityByUserReport() {
                 const ccKind = costCentreKind(r.cost_center)
                 const remark = remarks?.get(r.source_id)
                 const menu = [
+                  ...(isAdmin ? [{ label: 'Edit', onClick: () => setEditingRow(r) }] : []),
+                  ...(canDelete(r) ? [{ label: 'Delete', onClick: () => void deleteRow(r) }] : []),
                   { label: 'Open its screen', onClick: () => void openScreen(r) },
                   ...(canChangeOwed(r) ? [{ label: 'Change who is reimbursed', onClick: () => { setChanging(r); setNewOwed(owed ?? '') } }] : []),
                 ]
@@ -352,7 +387,8 @@ export function ActivityByUserReport() {
                           <div className="note">No more details are kept for this kind of entry.</div>
                         )
                       }
-                      onEdit={() => openScreen(r)}
+                      onEdit={isAdmin ? () => setEditingRow(r) : () => void openScreen(r)}
+                      onDelete={canDelete(r) ? () => void deleteRow(r) : undefined}
                       extraItems={
                         canChangeOwed(r)
                           ? [
@@ -413,6 +449,20 @@ export function ActivityByUserReport() {
           onEdit={() => {
             const r = panelRow
             setPanelRow(null)
+            if (isAdmin) setEditingRow(r)
+            else void openScreen(r)
+          }}
+          onDelete={canDelete(panelRow) ? () => void deleteRow(panelRow) : undefined}
+        />
+      )}
+      {editingRow && (
+        <EditEntryModal
+          context="list"
+          line={asLine(editingRow)}
+          onClose={() => setEditingRow(null)}
+          onOpenScreen={() => {
+            const r = editingRow
+            setEditingRow(null)
             void openScreen(r)
           }}
         />

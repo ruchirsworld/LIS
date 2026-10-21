@@ -9,11 +9,15 @@ import { ExpenseReimbursementForm } from '../expenses/ExpenseReimbursementForm'
 import { VendorBillPaymentForm } from '../purchases/VendorBillPaymentForm'
 import { EditInvoicePaymentFields } from '../invoices/InvoicePaymentForm'
 import { LoanForm } from '../loans/LoanForm'
+import { TransferForm } from '../transfers/TransferForm'
+import { CapitalForm } from '../capital/CapitalForm'
+import { VendorBillForm } from '../purchases/VendorBillForm'
+import { InvoiceForm } from '../invoices/InvoiceForm'
 
 type Tables = Database['public']['Tables']
 
-/** The kinds of entry that can be changed here, without leaving Bank reconciliation. */
-const EDITABLE = ['expenses', 'expense_reimbursements', 'vendor_bill_payments', 'invoice_payments', 'loans'] as const
+/** The kinds of entry that can be changed here, in a popup, without leaving the page. */
+const EDITABLE = ['expenses', 'expense_reimbursements', 'vendor_bill_payments', 'invoice_payments', 'loans', 'transfers', 'capital_transactions', 'vendor_bills', 'invoices'] as const
 type Editable = (typeof EDITABLE)[number]
 const isEditable = (t: string | null | undefined): t is Editable => !!t && (EDITABLE as readonly string[]).includes(t)
 
@@ -23,19 +27,25 @@ const NAME: Record<string, string> = {
   vendor_bill_payments: 'vendor payment',
   invoice_payments: 'client receipt',
   loans: 'loan',
+  transfers: 'transfer',
+  capital_transactions: 'capital entry',
+  vendor_bills: 'vendor bill',
+  invoices: 'invoice',
 }
 
-/** Change an entry of the books from inside Bank reconciliation. Saving re-posts the entry, so its tick is taken off
- * and it is matched again against the statement. Entry kinds with no form here (transfers, capital, advances and loan
- * repayments) are changed in their own screen. */
+/** Change an entry in a popup, without leaving the page. In Bank reconciliation, saving re-posts the entry, so its tick is taken off and it is
+ * matched again against the statement. In a list (`context="list"`, for example Activity by user) the lists simply refresh. Entry kinds with no
+ * form here (advances, wages, imprest, other receipts and loan repayments) are changed in their own screen. */
 export function EditEntryModal({
   line,
   onClose,
   onOpenScreen,
+  context = 'reconciliation',
 }: {
   line: { description: string; detail?: string; date: string; deposit: number; withdrawal: number; sourceTable?: string | null; sourceId?: string | null }
   onClose: () => void
   onOpenScreen: () => void
+  context?: 'reconciliation' | 'list'
 }) {
   const qc = useQueryClient()
   const table = line.sourceTable
@@ -52,10 +62,15 @@ export function EditEntryModal({
   })
 
   function done() {
-    // The entry was posted again, so its line in this account (and its tick) may be new.
-    qc.invalidateQueries({ queryKey: ['bank_lines'] })
-    qc.invalidateQueries({ queryKey: ['bank_reconciliations'] })
-    qc.invalidateQueries({ queryKey: ['bank_edit_row'] })
+    if (context === 'list') {
+      // Any list may show this entry, and the books behind it changed, so everything reads again.
+      qc.invalidateQueries()
+    } else {
+      // The entry was posted again, so its line in this account (and its tick) may be new.
+      qc.invalidateQueries({ queryKey: ['bank_lines'] })
+      qc.invalidateQueries({ queryKey: ['bank_reconciliations'] })
+      qc.invalidateQueries({ queryKey: ['bank_edit_row'] })
+    }
     onClose()
   }
 
@@ -86,15 +101,27 @@ export function EditEntryModal({
       case 'loans':
         form = <LoanForm editingLoan={row as Tables['loans']['Row']} onDoneEditing={done} />
         break
+      case 'transfers':
+        form = <TransferForm editing={row as Tables['transfers']['Row']} onDone={done} />
+        break
+      case 'capital_transactions':
+        form = <CapitalForm editing={row as Tables['capital_transactions']['Row']} onDone={done} />
+        break
+      case 'vendor_bills':
+        form = <VendorBillForm editingBill={row as Tables['vendor_bills']['Row']} onDoneEditing={done} inModal />
+        break
+      case 'invoices':
+        form = <InvoiceForm editingInvoice={row as Tables['invoices']['Row']} onDoneEditing={done} inModal />
+        break
     }
   }
 
   return (
-    <Modal title={`Edit this ${NAME[table ?? ''] ?? 'entry'}`} onClose={onClose}>
+    <Modal wide={context === 'list'} title={`Edit this ${NAME[table ?? ''] ?? 'entry'}`} onClose={onClose}>
       <div className="note" style={{ marginTop: 0 }}>
         <strong>
-          {fmtDate(line.date)} · {line.deposit > 0 ? '+' : '-'}
-          {fmt2(amount)}
+          {fmtDate(line.date)}
+          {amount > 0 ? ` · ${line.deposit > 0 ? '+' : '-'}${fmt2(amount)}` : ''}
         </strong>
         <div className="retention-note">{line.description}</div>
         {line.detail && <div className="retention-note">{line.detail}</div>}
@@ -103,7 +130,7 @@ export function EditEntryModal({
       {!editable && (
         <>
           <div className="note">
-            This kind of entry is changed in its own screen. Your bank statement stays loaded, and you can come back through Reports, then Bank reconciliation.
+            This kind of entry is changed in its own screen.{context === 'reconciliation' ? ' Your bank statement is saved, and you can come back through Finance, then Reconciliation.' : ''}
           </div>
           <Button type="button" onClick={onOpenScreen}>
             Open it in its screen
@@ -113,7 +140,7 @@ export function EditEntryModal({
       {editable && isLoading && <div className="note">Loading…</div>}
       {editable && !isLoading && (error || !row) && <div className="note" style={{ color: 'var(--red)' }}>Could not load this entry. It may have been deleted.</div>}
       {form}
-      {editable && !!row && <div className="note">Saving posts the entry again, so its tick is taken off and it is matched against the statement afresh.</div>}
+      {editable && !!row && context === 'reconciliation' && <div className="note">Saving posts the entry again, so its tick is taken off and it is matched against the statement afresh.</div>}
     </Modal>
   )
 }
