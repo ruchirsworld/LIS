@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { Check } from 'lucide-react'
 import { SearchableSelect } from '../../components/SearchableSelect'
 import { TableScroll } from '../../components/TableScroll'
@@ -71,6 +71,7 @@ export function ActivityByUserReport() {
   const [byRecorded, setByRecorded] = useState(true)
   const [kind, setKind] = useState('')
   const [onlyUnchecked, setOnlyUnchecked] = useState(false)
+  const [onlyReimbursable, setOnlyReimbursable] = useState(false)
   const [search, setSearch] = useState('')
   const [changing, setChanging] = useState<FeedRow | null>(null)
   const [newOwed, setNewOwed] = useState('')
@@ -89,16 +90,32 @@ export function ActivityByUserReport() {
     (r) =>
       (!kind || r.kind === kind) &&
       (!onlyUnchecked || !r.checked_at) &&
+      (!onlyReimbursable || r.reimbursable) &&
       matchesSearch(search, [r.display_id, r.description, r.kind, r.activity_date, r.recorded_at.slice(0, 10), r.amount, r.cost_center, r.project_name, r.trip_name, nameOf(r.entered_by), nameOf(r.on_behalf_of)])
   )
   // Newest entered first to begin with; the Entered on, Date and Amount headings sort the list either way.
   const { sorted, sortKey, direction, toggleSort } = useSort(
     shown,
-    { entered: (r) => r.recorded_at, date: (r) => r.activity_date, amount: (r) => (r.amount === null ? null : Number(r.amount)) },
+    { entered: (r) => r.recorded_at, date: (r) => r.activity_date, module: (r) => r.kind, amount: (r) => (r.amount === null ? null : Number(r.amount)) },
     'entered',
     'desc'
   )
-  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sorted ?? shown, `${search}|${kind}|${onlyUnchecked}|${userId}|${sortKey}|${direction}`)
+  const { pageRows, page, setPage, totalPages, totalCount } = usePagination(sorted ?? shown, `${search}|${kind}|${onlyUnchecked}|${onlyReimbursable}|${userId}|${sortKey}|${direction}`)
+
+  // Grouped by month while the list is in date order (by when entered, or by date): a heading per month with its count and money in and out.
+  // Every month starts folded; a search opens them all. Sorting by module or amount shows one plain list.
+  const [groupByMonth, setGroupByMonth] = useState(true)
+  const [openMonths, setOpenMonths] = useState<Set<string>>(new Set())
+  const grouped = groupByMonth && (sortKey === 'entered' || sortKey === 'date')
+  const monthOf = (r: FeedRow) => (sortKey === 'date' ? r.activity_date : r.recorded_at.slice(0, 10)).slice(0, 7)
+  const monthFolded = (month: string) => !search && !openMonths.has(month)
+  const monthTotals = (month: string) => {
+    const list = shown.filter((r) => monthOf(r) === month)
+    const sum = (d: string) => list.filter((r) => r.direction === d).reduce((s, r) => s + Number(r.amount ?? 0), 0)
+    return { count: list.length, moneyIn: sum('in'), moneyOut: sum('out') }
+  }
+  const monthLabel = (month: string) => new Date(`${month}-01T00:00:00`).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
+  const listRows = grouped ? sorted ?? shown : pageRows
   const uncheckedCount = rows.filter((r) => !r.checked_at).length
 
   async function openScreen(r: FeedRow) {
@@ -180,8 +197,16 @@ export function ActivityByUserReport() {
             </select>
           </div>
           <label className="check-inline" style={{ alignSelf: 'flex-end', paddingBottom: 8 }}>
+            <input type="checkbox" checked={groupByMonth} onChange={(e) => setGroupByMonth(e.target.checked)} />
+            Group by month
+          </label>
+          <label className="check-inline" style={{ alignSelf: 'flex-end', paddingBottom: 8 }}>
             <input type="checkbox" checked={onlyUnchecked} onChange={(e) => setOnlyUnchecked(e.target.checked)} />
             Unchecked only{rows.length > 0 ? ` (${uncheckedCount})` : ''}
+          </label>
+          <label className="check-inline" style={{ alignSelf: 'flex-end', paddingBottom: 8 }}>
+            <input type="checkbox" checked={onlyReimbursable} onChange={(e) => setOnlyReimbursable(e.target.checked)} />
+            To be reimbursed only{rows.length > 0 ? ` (${rows.filter((r) => r.reimbursable).length})` : ''}
           </label>
           <TableSearch value={search} onChange={setSearch} inline />
         </div>
@@ -195,7 +220,7 @@ export function ActivityByUserReport() {
       {data && shown.length > 0 && (
         <>
           <div className="note" style={{ fontWeight: 600 }}>
-            {totalCount} entr{totalCount === 1 ? 'y' : 'ies'}, sorted by {sortKey === 'date' ? 'date' : sortKey === 'amount' ? 'amount' : 'when entered'} ({direction === 'desc' ? sortKey === 'amount' ? 'largest' : 'newest' : sortKey === 'amount' ? 'smallest' : 'oldest'} first).
+            {totalCount} entr{totalCount === 1 ? 'y' : 'ies'}, sorted by {sortKey === 'date' ? 'date' : sortKey === 'amount' ? 'amount' : sortKey === 'module' ? 'module' : 'when entered'} ({sortKey === 'module' ? (direction === 'desc' ? 'Z to A' : 'A to Z') : direction === 'desc' ? (sortKey === 'amount' ? 'largest first' : 'newest first') : sortKey === 'amount' ? 'smallest first' : 'oldest first'}).
           </div>
           <TableScroll>
             <table className="data">
@@ -205,7 +230,7 @@ export function ActivityByUserReport() {
                   <th></th>
                   <SortableTh label="Entered on" sortKey="entered" activeKey={sortKey} direction={direction} onSort={toggleSort} />
                   <SortableTh label="Date" sortKey="date" activeKey={sortKey} direction={direction} onSort={toggleSort} />
-                  <th>Module</th>
+                  <SortableTh label="Module" sortKey="module" activeKey={sortKey} direction={direction} onSort={toggleSort} />
                   <th>Description</th>
                   <th>Cost centre / project / trip</th>
                   <SortableTh label="Amount" sortKey="amount" activeKey={sortKey} direction={direction} onSort={toggleSort} align="right" />
@@ -215,11 +240,32 @@ export function ActivityByUserReport() {
                 </tr>
               </thead>
               <tbody>
-                {pageRows?.map((r) => {
+                {listRows?.map((r, idx) => {
+                  const month = monthOf(r)
+                  const isNewMonth = grouped && (idx === 0 || monthOf((listRows ?? [])[idx - 1]) !== month)
+                  const folded = grouped && monthFolded(month)
+                  const totals = isNewMonth ? monthTotals(month) : null
                   const key = `${r.source_table}-${r.source_id}`
                   const owed = owedTo(r)
                   const ccKind = costCentreKind(r.cost_center)
                   return (
+                    <Fragment key={key}>
+                    {totals && (
+                      <tr className="expense-month-group-row" onClick={() => setOpenMonths((cur) => { const next = new Set(cur); if (next.has(month)) next.delete(month); else next.add(month); return next })} style={{ cursor: 'pointer' }}>
+                        <td colSpan={COLS}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
+                            <span>
+                              <span style={{ display: 'inline-block', width: 16, fontSize: 12, opacity: 0.6 }}>{folded ? '▸' : '▾'}</span>
+                              {monthLabel(month)}
+                            </span>
+                            <span style={{ whiteSpace: 'nowrap', fontSize: 13, fontWeight: 600 }}>
+                              {[`${totals.count} entr${totals.count === 1 ? 'y' : 'ies'}`, totals.moneyIn ? `in ${fmt(totals.moneyIn)}` : '', totals.moneyOut ? `out ${fmt(totals.moneyOut)}` : ''].filter(Boolean).join(' · ')}
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    {!folded && (
                     <RecordRow
                       key={key}
                       expanded={openRows.isOpen(key)}
@@ -274,12 +320,14 @@ export function ActivityByUserReport() {
                       <td>{nameOf(r.entered_by)}</td>
                       <td>{nameOf(r.on_behalf_of)}</td>
                     </RecordRow>
+                    )}
+                    </Fragment>
                   )
                 })}
               </tbody>
             </table>
           </TableScroll>
-          <Pagination page={page} totalPages={totalPages} totalCount={totalCount} onChange={setPage} />
+          {!grouped && <Pagination page={page} totalPages={totalPages} totalCount={totalCount} onChange={setPage} />}
         </>
       )}
 
