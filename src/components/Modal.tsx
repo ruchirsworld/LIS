@@ -2,7 +2,7 @@ import { useEffect, useRef, type ReactNode } from 'react'
 
 /** Centered popup with a backdrop — closes on backdrop click or Escape.
  * Focus moves into the popup when it opens and returns to where it was on close. */
-export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+export function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
   const panelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -22,7 +22,7 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-panel" ref={panelRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
+      <div className={wide ? 'modal-panel modal-wide' : 'modal-panel'} ref={panelRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <strong>{title}</strong>
           <button type="button" className="modal-close" onClick={onClose} aria-label="Close">

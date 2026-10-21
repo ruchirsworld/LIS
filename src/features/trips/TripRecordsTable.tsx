@@ -4,6 +4,7 @@ import { Fragment, useEffect, useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui'
 import { RowMenu } from '../../components/RowMenu'
 import { Modal } from '../../components/Modal'
+import { FactGrid } from '../../components/SidePanel'
 import { SearchableSelect } from '../../components/SearchableSelect'
 import { TableScroll } from '../../components/TableScroll'
 import { Pagination } from '../../components/Pagination'
@@ -181,6 +182,7 @@ export function TripRecordsTable() {
   const { data: banks } = useBankAccounts()
   const deleteTrip = useDeleteTrip()
   const deleteExpense = useDeleteExpense()
+  // The trip open in the popup (its details and entries).
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [range, setRange] = useState<DateRange | null>(null)
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null)
@@ -263,6 +265,8 @@ export function TripRecordsTable() {
 
   const expensesByTrip = (tripId: string) => (expenses ?? []).filter((e) => e.trip_id === tripId)
   const tripTotal = (tripId: string) => expensesByTrip(tripId).reduce((s, e) => s + Number(e.amount || 0), 0)
+  const openTrip = trips?.find((x) => x.id === expandedId) ?? null
+  const tripExpenses = openTrip ? expensesByTrip(openTrip.id) : []
 
   // The search also looks inside a trip, so a trip can be found by any entry logged on it.
   const rangeFilteredTrips = (trips ?? []).filter(
@@ -393,8 +397,6 @@ export function TripRecordsTable() {
               </tbody>
             )}
             {pageRows?.map((t, idx) => {
-              const isExpanded = expandedId === t.id
-              const tripExpenses = expensesByTrip(t.id)
               const month = monthOf(t.start_date)
               const isNewMonth = groupByMonth && (idx === 0 || monthOf(pageRows[idx - 1].start_date) !== month)
               const monthCollapsed = isMonthFolded(month)
@@ -427,18 +429,18 @@ export function TripRecordsTable() {
                       if (el) el.style.setProperty('--trip-h', `${el.querySelector<HTMLElement>('tr.trip-main')?.offsetHeight ?? 0}px`)
                     }}
                   >
-                  <tr className={`trip-main trip-seg-${tripSegment.get(t.id) ?? 0}`} {...activateProps(() => setExpandedId(isExpanded ? null : t.id))} style={{ cursor: 'pointer' }}>
+                  <tr className={`trip-main trip-seg-${tripSegment.get(t.id) ?? 0}`} {...activateProps(() => setExpandedId(t.id))} style={{ cursor: 'pointer' }}>
                     <td>
                       <button
                         type="button"
                         className="row-expand-btn"
                         onClick={(e) => {
                           e.stopPropagation()
-                          setExpandedId(isExpanded ? null : t.id)
+                          setExpandedId(t.id)
                         }}
-                        aria-label={isExpanded ? 'Hide entries' : 'Show entries'}
+                        aria-label="Open this trip"
                       >
-                        {isExpanded ? '▾' : '▸'}
+                        ▸
                       </button>
                     </td>
                     <td>
@@ -478,11 +480,33 @@ export function TripRecordsTable() {
                       )}
                     </td>
                   </tr>
-                  {isExpanded && (
-                    <tr className="pay-form-row">
-                      <td colSpan={COL_SPAN}>
+                  </tbody>
+                  )}
+                </Fragment>
+              )
+            })}
+        </table>
+      </TableScroll>
+      <Pagination page={page} totalPages={totalPages} totalCount={totalCount} onChange={setPage} />
+
+
+      {openTrip && (
+        <Modal wide title={`Trip ${openTrip.display_id ?? ''}: ${openTrip.name}`} onClose={() => setExpandedId(null)}>
+          <div className="trip-popup-facts">
+            <FactGrid
+              facts={[
+                { label: 'Purpose', value: openTrip.name },
+                { label: 'Location', value: locationOf(openTrip) },
+                { label: 'Dates', value: `${fmtDate(openTrip.start_date)} – ${openTrip.end_date ? fmtDate(openTrip.end_date) : 'ongoing'} (${tripDays(openTrip.start_date, openTrip.end_date)} day${tripDays(openTrip.start_date, openTrip.end_date) === 1 ? '' : 's'}${openTrip.end_date ? '' : ' so far'})` },
+                { label: 'Traveller', value: travellersOf(openTrip).join(', ') },
+                { label: 'Project', value: openTrip.project_id ? projectName(openTrip.project_id) : '' },
+                { label: 'Status', value: openTrip.status === 'open' ? 'Open' : 'Closed' },
+                { label: 'Total', value: fmt(tripTotal(openTrip.id)) },
+              ]}
+            />
+          </div>
                         {/* One slim heading: the title, what was spent from where, and the button to add an entry. */}
-                        <div className="trip-entries-head" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px 18px', marginBottom: 10 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px 18px', marginBottom: 10 }}>
                           <strong style={{ fontSize: 12, whiteSpace: 'nowrap' }}>Entries on this trip</strong>
                           <SpendBySource compact expenses={tripExpenses} label="Spent via" style={{ flex: 1, minWidth: 220 }} />
                           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -509,10 +533,10 @@ export function TripRecordsTable() {
                             <ExpenseForm
                               editingExpense={null}
                               onDoneEditing={() => {}}
-                              tripId={t.id}
+                              tripId={openTrip.id}
                               tripDate={entryDate}
-                              fixedCostCenter={t.cost_center}
-                              fixedProjectId={t.project_id}
+                              fixedCostCenter={openTrip.cost_center}
+                              fixedProjectId={openTrip.project_id}
                             />
                           </div>
                         )}
@@ -520,7 +544,7 @@ export function TripRecordsTable() {
                           <div className="empty-state">No entries on this trip.</div>
                         ) : (
                           <>
-                          <table className={`data entry-table trip-seg-${tripSegment.get(t.id) ?? 0}`}>
+                          <table className={`data entry-table trip-seg-0`}>
                             <thead>
                               <tr>
                                 <th>Date</th>
@@ -555,18 +579,9 @@ export function TripRecordsTable() {
                           </table>
                           </>
                         )}
-                      </td>
-                    </tr>
-                  )}
-                  </tbody>
-                  )}
-                </Fragment>
-              )
-            })}
-        </table>
-      </TableScroll>
-      <Pagination page={page} totalPages={totalPages} totalCount={totalCount} onChange={setPage} />
 
+        </Modal>
+      )}
       {editingTrip && <EditTripModal trip={editingTrip} onClose={() => setEditingTrip(null)} />}
       {viewingTrip && (
         <RecordDetailModal

@@ -3015,3 +3015,11 @@ table.data tr.row-clickable {
     animation: none;
   }
 }
+
+/* A popup for something with a table in it, such as a trip and its entries. */
+.modal-panel.modal-wide {
+  max-width: min(940px, 100%);
+}
+.trip-popup-facts {
+  margin-bottom: var(--space-3);
+}
