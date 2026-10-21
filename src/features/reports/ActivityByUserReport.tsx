@@ -13,7 +13,10 @@ import { resolveEntryTarget } from '../../lib/entryTarget'
 import { toast } from '../../lib/feedback'
 import { useGoTo } from '../../lib/navContext'
 import { useProfiles } from '../../lib/queries/admin'
-import { useActivityFeed, type FeedRow } from '../../lib/queries/activityFeed'
+import { useActivityFeed, useEntryRemarks, type FeedRow } from '../../lib/queries/activityFeed'
+import { useMediaQuery } from '../../lib/useMediaQuery'
+import { RowMenu } from '../../components/RowMenu'
+import { RecordPanel } from './RecordPanel'
 import { useSetReviewed } from '../../lib/queries/reviews'
 import { useAuth } from '../../lib/auth'
 import { useUpdateExpense } from '../../lib/queries/expenses'
@@ -76,6 +79,9 @@ export function ActivityByUserReport() {
   const [changing, setChanging] = useState<FeedRow | null>(null)
   const [newOwed, setNewOwed] = useState('')
   const openRows = useOpenRows()
+  // In a narrow window (a phone, or half a laptop screen) each entry is a card instead of a table row.
+  const compact = useMediaQuery('(max-width: 900px)')
+  const [panelRow, setPanelRow] = useState<FeedRow | null>(null)
   const { data, isLoading, error } = useActivityFeed(userId || null, range, byRecorded)
 
   const nameOf = (id: string | null | undefined) => (id ? profiles?.find((p) => p.id === id)?.name ?? '—' : '')
@@ -116,6 +122,8 @@ export function ActivityByUserReport() {
   }
   const monthLabel = (month: string) => new Date(`${month}-01T00:00:00`).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
   // Months run newest first (or oldest first when the order is reversed); the sort is stable, so each month keeps the order chosen.
+  const visibleRows = (grouped ? (sorted ?? shown) : pageRows ?? []).filter((r) => !grouped || !monthFolded(monthOf(r)))
+  const { data: remarks } = useEntryRemarks(visibleRows, compact)
   const listRows = grouped
     ? [...(sorted ?? shown)].sort((a, b) => (direction === 'desc' ? monthOf(b).localeCompare(monthOf(a)) : monthOf(a).localeCompare(monthOf(b))))
     : pageRows
@@ -225,6 +233,68 @@ export function ActivityByUserReport() {
           <div className="note" style={{ fontWeight: 600 }}>
             {totalCount} entr{totalCount === 1 ? 'y' : 'ies'}, sorted by {sortKey === 'date' ? 'date' : sortKey === 'amount' ? 'amount' : sortKey === 'module' ? 'module' : 'when entered'} ({sortKey === 'module' ? (direction === 'desc' ? 'Z to A' : 'A to Z') : direction === 'desc' ? (sortKey === 'amount' ? 'largest first' : 'newest first') : sortKey === 'amount' ? 'smallest first' : 'oldest first'}).
           </div>
+          {compact ? (
+            <div className="act-cards">
+              {(listRows ?? []).map((r, idx) => {
+                const month = monthOf(r)
+                const isNewMonth = grouped && (idx === 0 || monthOf((listRows ?? [])[idx - 1]) !== month)
+                const folded = grouped && monthFolded(month)
+                const totals = isNewMonth ? monthTotals(month) : null
+                const owed = owedTo(r)
+                const ccKind = costCentreKind(r.cost_center)
+                const remark = remarks?.get(r.source_id)
+                const menu = [
+                  { label: 'Open its screen', onClick: () => void openScreen(r) },
+                  ...(canChangeOwed(r) ? [{ label: 'Change who is reimbursed', onClick: () => { setChanging(r); setNewOwed(owed ?? '') } }] : []),
+                ]
+                return (
+                  <Fragment key={`${r.source_table}-${r.source_id}`}>
+                    {totals && (
+                      <button type="button" className="act-month" onClick={() => setOpenMonths((cur) => { const next = new Set(cur); if (next.has(month)) next.delete(month); else next.add(month); return next })}>
+                        <span>
+                          <span className="act-month-arrow">{folded ? '▸' : '▾'}</span>
+                          {monthLabel(month)}
+                        </span>
+                        <span className="act-month-sum">
+                          {[`${totals.count} entr${totals.count === 1 ? 'y' : 'ies'}`, totals.moneyIn ? `in ${fmt(totals.moneyIn)}` : '', totals.moneyOut ? `out ${fmt(totals.moneyOut)}` : ''].filter(Boolean).join(' · ')}
+                        </span>
+                      </button>
+                    )}
+                    {!folded && (
+                      <div className={r.reimbursable ? 'act-card act-card-reimb' : 'act-card'}>
+                        <div className="act-r1">
+                          <CheckTick row={r} />
+                          <span className="act-amt">{r.amount === null ? '—' : fmt(r.amount)}</span>
+                          <span className="act-date">{fmtDate(r.activity_date)}</span>
+                          <span className="act-cc">
+                            {ccKind && <CostCentreTag kind={ccKind} />}
+                            {whereText(r) && <span className="act-where">{whereText(r)}</span>}
+                          </span>
+                          <RowMenu items={menu} />
+                        </div>
+                        <button type="button" className="act-r2" onClick={() => setPanelRow(r)} aria-label={`Open ${r.display_id ?? 'this entry'}`}>
+                          <span className="tag">{r.kind}</span>
+                          <span className="act-desc">
+                            {r.display_id && <span className="mono act-id">{r.display_id}</span>}
+                            {r.description}
+                            {owed && <InitialsBadge name={nameOf(owed)} title={`To be reimbursed to ${nameOf(owed)}`} />}
+                          </span>
+                          {remark && <span className="act-remark">{remark}</span>}
+                        </button>
+                        <div className="act-r3">
+                          <span>
+                            Entered {fmtDate(r.recorded_at.slice(0, 10))}, {timeOf(r.recorded_at)}
+                          </span>
+                          {r.entered_by && <span>by {nameOf(r.entered_by)}</span>}
+                          {r.on_behalf_of && <span>for {nameOf(r.on_behalf_of)}</span>}
+                        </div>
+                      </div>
+                    )}
+                  </Fragment>
+                )
+              })}
+            </div>
+          ) : (
           <TableScroll>
             <table className="data">
               <thead>
@@ -330,10 +400,23 @@ export function ActivityByUserReport() {
               </tbody>
             </table>
           </TableScroll>
+          )}
           {!grouped && <Pagination page={page} totalPages={totalPages} totalCount={totalCount} onChange={setPage} />}
         </>
       )}
 
+      {panelRow && (
+        <RecordPanel
+          sourceTable={panelRow.source_table}
+          sourceId={panelRow.source_id}
+          onClose={() => setPanelRow(null)}
+          onEdit={() => {
+            const r = panelRow
+            setPanelRow(null)
+            void openScreen(r)
+          }}
+        />
+      )}
       {changing && (
         <Modal title="Who is this reimbursed to?" onClose={() => setChanging(null)}>
           <p style={{ marginTop: 0 }}>

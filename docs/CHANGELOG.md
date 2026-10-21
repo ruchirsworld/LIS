@@ -1,6 +1,6 @@
 # LIS changes since v2.0.1
 
-Version 2.0.1 was released on 3 September 2026. This list covers everything after it, up to 3.0.11. It is put together from the project history, grouped by area. Version numbers are shown where a release carried one.
+Version 2.0.1 was released on 3 September 2026. This list covers everything after it, up to 3.0.12. It is put together from the project history, grouped by area. Version numbers are shown where a release carried one.
 
 ## 2.0.2 – 2.0.3 (3 – 4 September)
 
@@ -180,6 +180,9 @@ Version 2.0.1 was released on 3 September 2026. This list covers everything afte
 ## 2.1.26 (17 October): sticky trip rows, and records grouped by month
 - **Trip Records:** while you scroll through an opened trip's entries, the table header, the trip's own row and the entries heading (with the spend split and + Add expense) stay at the top; they let go when the trip ends. The entries have a Remarks column after the sub-head.
 - **Admin and Project expense records, and Activity by user,** are grouped by month (a bold grey bar with the count and total) and, inside a month, by date. Both can be folded. Each date group is blue or green in turn, and its rows alternate a lighter and a slightly deeper tint; reimbursements stay amber. Month and day totals cover everything in them, not only the current page.
+
+## 3.0.12 (21 October): Activity by user cards
+- In a narrow window, each entry is a purpose-built card instead of a squeezed table row. Row 1: the Checked box, the amount, the date of the transaction and the cost centre (with the project or trip). Row 2: module, description and remarks (tap to open the entry). Row 3, small: when it was entered, by whom and for whom. Reimbursable entries have an amber edge and the initials badge. The remarks are read for the entries on screen (expenses and vendor bills).
 
 ## 3.0.11 (21 October): lists in a half-width window
 - **Cards at half a laptop screen:** lists turned into stacked cards only on a phone (640px). They now do so up to 900px wide, so a window on half of a 14-inch screen no longer runs wide tables off the side. On a card the Checked box is at the top left, the arrow and menu at the top right, then the date and amount, then each detail on its own labelled line.

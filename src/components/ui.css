@@ -3215,3 +3215,142 @@ tr.row-link:hover td {
     min-height: var(--tap);
   }
 }
+
+/* ===== Activity by user as cards (a phone, or half a laptop screen) =====
+   Row 1: the tick, the amount, the date of the transaction and the cost centre. Row 2: module, description and remarks (tap it to open the
+   entry). Row 3, small and quiet: when it was entered, by whom, and for whom. */
+.act-cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.act-month {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-3);
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--hover);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: inherit;
+  font-size: var(--text-section);
+  font-weight: 600;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.act-month-arrow {
+  display: inline-block;
+  width: 16px;
+  font-size: 12px;
+  opacity: 0.6;
+}
+.act-month-sum {
+  font-size: var(--text-label);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.act-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+.act-card-reimb {
+  background: color-mix(in srgb, var(--pending) 10%, var(--surface));
+  border-left: 3px solid var(--pending);
+}
+.act-r1 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: nowrap;
+}
+.act-r1 > .check-tick,
+.act-r1 > .act-amt,
+.act-r1 > .act-date {
+  flex: none;
+}
+.act-amt {
+  font-size: 18px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.act-date {
+  font-size: var(--text-body);
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+}
+.act-cc {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 0;
+}
+.act-where {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-label);
+  color: var(--muted);
+}
+.act-r1 .row-menu {
+  margin-left: auto;
+  flex: none;
+}
+.act-r1 .row-menu-btn {
+  min-width: 34px;
+  min-height: 34px;
+  padding: 4px;
+}
+.act-r2 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  width: 100%;
+  padding: 0;
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: var(--text-body);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.act-desc {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 160px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.act-id {
+  font-size: 12px;
+  color: var(--muted);
+}
+.act-remark {
+  flex: 1 1 140px;
+  min-width: 0;
+  font-size: var(--text-label);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.act-r3 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  font-size: 11.5px;
+  color: var(--muted);
+}

@@ -80,3 +80,27 @@ export function useDismissPair() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['possible_duplicates'] }),
   })
 }
+
+/** The remarks typed on expenses and vendor bills, for the entries on screen (the activity list does not carry them). */
+export function useEntryRemarks(rows: { source_table: string; source_id: string }[], enabled = true) {
+  const pick = (t: string) => [...new Set(rows.filter((r) => r.source_table === t).map((r) => r.source_id))].sort()
+  const expenseIds = pick('expenses')
+  const billIds = pick('vendor_bills')
+  return useQuery({
+    queryKey: ['entry_remarks', expenseIds.join(','), billIds.join(',')],
+    enabled: enabled && expenseIds.length + billIds.length > 0,
+    staleTime: 60_000,
+    queryFn: async (): Promise<Map<string, string>> => {
+      const out = new Map<string, string>()
+      const read = async (table: 'expenses' | 'vendor_bills', ids: string[]) => {
+        for (let i = 0; i < ids.length; i += 80) {
+          const { data, error } = await supabase.from(table).select('id, remarks').in('id', ids.slice(i, i + 80))
+          if (error) throw error
+          for (const r of data ?? []) if (r.remarks) out.set(r.id, r.remarks)
+        }
+      }
+      await Promise.all([read('expenses', expenseIds), read('vendor_bills', billIds)])
+      return out
+    },
+  })
+}
