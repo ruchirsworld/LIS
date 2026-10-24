@@ -50,6 +50,15 @@ export function fmtDate(dateStr: string | null | undefined): string {
   return `${d} ${month} ${y}`
 }
 
+/** Displays a stored YYYY-MM-DD date as DD/MM/YYYY (e.g. 31/08/2026) — used on the salary screens and slips. */
+export function fmtDateNum(dateStr: string | null | undefined): string {
+  if (!dateStr) return ''
+  const s = dateStr.length > 10 ? dateStr.slice(0, 10) : dateStr
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s)
+  if (!match) return dateStr
+  return `${match[3]}/${match[2]}/${match[1]}`
+}
+
 /** Short rupee figure for chart labels where space is tight: ₹1.2Cr, ₹3.4L, ₹56K. */
 export function fmtCompact(n: number | string | null | undefined): string {
   const num = Number(n || 0)

@@ -21,7 +21,9 @@ import {
 } from '../../lib/queries/hr'
 import { PaymentAccountPicker, bankAccountIdOf, CASH_ACCOUNT } from '../../components/PaymentAccountPicker'
 import { computeAccrualBreakdown, computeAccrualDays, nextAccrualStart, todayStr, type AccrualDay, type AttendanceDayType } from '../../lib/calc/payroll'
-import { fmt, fmtDate, parseINR } from '../../lib/calc/format'
+// Every date on the salary screens and slips reads DD/MM/YYYY.
+import { fmt, fmtDateNum as fmtDate, parseINR } from '../../lib/calc/format'
+import { monthSlip } from '../../lib/calc/salarySlip'
 import { getErrorMessage } from '../../lib/errors'
 import { TableSearch, matchesSearch } from '../../components/TableSearch'
 import { RecordRow, useOpenRows } from '../../components/RecordRow'
@@ -40,9 +42,9 @@ function Bi({ en, hi }: { en: string; hi: string }) {
   )
 }
 
-// "05 Sep" from "2026-09-05" — the year is already in the period shown beside it.
+// "05/09/2026" from "2026-09-05".
 function dayMonth(date: string): string {
-  return fmtDate(date).slice(0, 6)
+  return fmtDate(date)
 }
 
 /** The dates behind the day counts of a salary period: which days were Absent (unpaid), Leave (paid), Half days and Holidays. Days worked normally
@@ -57,6 +59,7 @@ function DayDates({ days, compact, bilingual }: { days: AccrualDay[]; compact?: 
   const rows = groups
     .map((g) => ({ ...g, dates: days.filter((d) => d.type === g.type).map((d) => dayMonth(d.date)) }))
     .filter((g) => g.dates.length > 0)
+  if (days.length === 0) return null
   if (rows.length === 0) return compact ? null : <div className="note" style={{ margin: 0 }}>Every day in this period was worked: no absence, half day or holiday.</div>
   if (compact) {
     return (
@@ -184,6 +187,7 @@ export function SalarySection() {
   // The staff member whose "Payable" breakup (runs accrued, payments made) is open.
   const [breakupStaffId, setBreakupStaffId] = useState<string | null>(null)
   const payslipRef = useRef<HTMLDivElement>(null)
+  const slipRef = useRef<HTMLDivElement>(null)
 
   async function handleDownloadImage() {
     if (!payslipRef.current || !viewingStaff) return
@@ -196,6 +200,24 @@ export function SalarySection() {
       })
       const link = document.createElement('a')
       link.download = `Payslip-${viewingStaff.name.replace(/\s+/g, '-')}-${viewingAccrual?.period_end ?? ''}.png`
+      link.href = canvas.toDataURL('image/png')
+      link.click()
+    } finally {
+      setDownloadingImage(false)
+    }
+  }
+
+  async function handleDownloadSlip() {
+    if (!slipRef.current || !breakupRow) return
+    setDownloadingImage(true)
+    try {
+      const canvas = await html2canvas(slipRef.current, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        ignoreElements: (el) => el.classList.contains('payslip-no-print') || el.classList.contains('modal-close'),
+      })
+      const link = document.createElement('a')
+      link.download = `Salary-slip-${breakupRow.staff.name.replace(/\s+/g, '-')}-${selectedMonth}.png`
       link.href = canvas.toDataURL('image/png')
       link.click()
     } finally {
@@ -547,30 +569,32 @@ export function SalarySection() {
     : 0
   const viewingNetPay = viewingAccrual ? viewingAccrual.amount - viewingAdvanceAdjustment - viewingPriorPaymentsAdjustment : 0
 
-  // The month statement for one staff member (the Month chosen above): what the month's salary is, what was paid during it, and what is due.
-  // A payroll run belongs to the month it ends in; a month not run yet shows its pending accrual instead.
-  // Wages are paid in arrears: what is paid during a month is the previous month's salary, so a month's salary is cleared by the payments made in the NEXT month.
-  const nextMonth = shiftMonth(selectedMonth, 1)
-  const nextMonthStart = `${nextMonth}-01`
-  const round2 = (n: number) => Math.round(n * 100) / 100
+  // The salary slip for one staff member and the chosen month: the salary worked out day by day, the payments made in the NEXT month against it
+  // (wages are paid in arrears), and what is still due, which carries into the next month's slip.
   const breakupRow = breakupStaffId ? rows.find((r) => r.staff.id === breakupStaffId) : undefined
-  const breakupRuns = breakupRow
-    ? (accruals ?? []).filter((a) => a.staff_id === breakupRow.staff.id && a.period_end.startsWith(selectedMonth)).sort((a, b) => a.period_end.localeCompare(b.period_end))
-    : []
-  const breakupPaidList = breakupRow
-    ? (payments ?? []).filter((p) => p.staff_id === breakupRow.staff.id && p.date.startsWith(nextMonth)).sort((a, b) => a.date.localeCompare(b.date))
-    : []
-  const breakupOpening = breakupRow
-    ? round2(
-        (accruals ?? []).filter((a) => a.staff_id === breakupRow.staff.id && a.period_end < monthStart).reduce((t, a) => t + Number(a.amount || 0), 0) -
-          (payments ?? []).filter((p) => p.staff_id === breakupRow.staff.id && p.date < nextMonthStart).reduce((t, p) => t + Number(p.amount || 0), 0)
-      )
-    : 0
-  const breakupRunTotal = round2(breakupRuns.reduce((t, a) => t + Number(a.amount || 0), 0))
-  const breakupPending = breakupRow ? breakupRow.pendingAccrual : 0
-  const breakupSalary = round2(breakupRunTotal + breakupPending)
-  const breakupPaidTotal = round2(breakupPaidList.reduce((t, p) => t + Number(p.amount || 0), 0))
-  const breakupDue = round2(breakupOpening + breakupSalary - breakupPaidTotal)
+  const slip = breakupRow
+    ? monthSlip({
+        staff: breakupRow.staff,
+        month: selectedMonth,
+        attendance: (allLeave ?? []).filter((a) => a.staff_id === breakupRow.staff.id).map((a) => ({ date: a.date, day_type: a.day_type as AttendanceDayType })),
+        holidayDates,
+        workedHolidayDates: (allAssignments ?? []).filter((a) => a.staff_id === breakupRow.staff.id && holidayDates.has(a.date)).map((a) => a.date),
+        runs: (accruals ?? [])
+          .filter((a) => a.staff_id === breakupRow.staff.id)
+          .map((a) => ({ id: a.id, display_id: a.display_id, period_start: a.period_start, period_end: a.period_end, amount: Number(a.amount || 0) })),
+        payments: (payments ?? [])
+          .filter((p) => p.staff_id === breakupRow.staff.id)
+          .map((p) => ({
+            id: p.id,
+            display_id: p.display_id,
+            date: p.date,
+            amount: Number(p.amount || 0),
+            advance_recovered: p.advance_recovered === null ? null : Number(p.advance_recovered),
+            bank_account_id: p.bank_account_id,
+            notes: p.notes,
+          })),
+      })
+    : null
 
   const accrualRows = (accruals ?? []).filter((a) => matchesSearch(accrualSearch, [a.display_id, staffName(a.staff_id), a.period_start, a.period_end, a.amount, a.notes]))
   const paymentRows = (payments ?? []).filter((p) =>
@@ -974,163 +998,254 @@ export function SalarySection() {
         </div>
       </div>
 
-      {breakupRow && (
-        <Modal title={breakupRow.staff.name} wide onClose={() => setBreakupStaffId(null)}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-              <button type="button" className="pay-btn" onClick={() => setSelectedMonth((m) => shiftMonth(m, -1))} aria-label="Previous month">
-                ‹
-              </button>
-              <strong style={{ minWidth: 140, textAlign: 'center' }}>{monthLabel(selectedMonth)}</strong>
-              <button type="button" className="pay-btn" onClick={() => setSelectedMonth((m) => shiftMonth(m, 1))} aria-label="Next month">
-                ›
+      {breakupRow && slip && (
+        <div className="modal-backdrop" onClick={() => setBreakupStaffId(null)}>
+          <div ref={slipRef} className="modal-panel payslip-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640 }}>
+            <div className="modal-header" style={{ justifyContent: 'flex-end' }}>
+              <button type="button" className="modal-close" onClick={() => setBreakupStaffId(null)}>
+                ×
               </button>
             </div>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div className="payslip-no-print" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                <button type="button" className="pay-btn" onClick={() => setSelectedMonth((m) => shiftMonth(m, -1))} aria-label="Previous month">
+                  ‹
+                </button>
+                <strong style={{ minWidth: 140, textAlign: 'center' }}>{monthLabel(selectedMonth)}</strong>
+                <button type="button" className="pay-btn" onClick={() => setSelectedMonth((m) => shiftMonth(m, 1))} aria-label="Next month">
+                  ›
+                </button>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, paddingBottom: 4 }}>
+                <img src={laavinLogo} alt="Laavin InfraScapes" style={{ height: 28, mixBlendMode: 'multiply' }} />
+                <strong style={{ fontSize: 14 }}>
+                  <Bi en="SALARY SLIP" hi="वेतन पर्ची" /> ({monthLabel(selectedMonth)})
+                </strong>
+              </div>
 
-            <table className="data table-compact keep-table">
-              <tbody>
-                {breakupOpening !== 0 && (
-                  <tr>
-                    <td>{breakupOpening > 0 ? 'Brought forward from earlier months (still due)' : 'Paid ahead in earlier months'}</td>
-                    <td className="amt">{fmt(breakupOpening)}</td>
-                  </tr>
-                )}
-                <tr>
-                  <td>
-                    <strong>Salary for {monthLabel(selectedMonth)}</strong>
-                  </td>
-                  <td className="amt">
-                    <strong>{fmt(breakupSalary)}</strong>
-                  </td>
-                </tr>
-                <tr>
-                  <td>Paid in {monthLabel(nextMonth)} (for {monthLabel(selectedMonth)})</td>
-                  <td className="amt" style={breakupPaidTotal > 0 ? { color: 'var(--red)' } : undefined}>
-                    {breakupPaidTotal > 0 ? '−' : ''}
-                    {fmt(breakupPaidTotal)}
-                  </td>
-                </tr>
-                <tr>
-                  <td>
-                    <strong>Due for {monthLabel(selectedMonth)}</strong>
-                  </td>
-                  <td className="amt">
-                    <strong style={{ fontSize: 16, color: breakupDue > 0 ? 'var(--red)' : undefined }}>{fmt(breakupDue)}</strong>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-
-            <div>
-              <h4 style={{ margin: '0 0 6px', fontSize: 13 }}>Salary</h4>
               <table className="data table-compact keep-table">
                 <tbody>
-                  {breakupRuns.length === 0 && breakupPending <= 0 && (
-                    <tr>
-                      <td colSpan={2} className="empty-row">
-                        No salary for this month
-                      </td>
-                    </tr>
-                  )}
-                  {breakupRuns.map((a) => (
-                    <tr key={a.id}>
-                      <td>
-                        {a.display_id ?? 'Payroll run'}{' '}
-                        <button
-                          type="button"
-                          className="btn link"
-                          onClick={() => {
-                            setBreakupStaffId(null)
-                            openViewAccrual(a)
-                          }}
-                        >
-                          {fmtDate(a.period_start)} – {fmtDate(a.period_end)}
-                        </button>
-                        {a.notes && <div className="retention-note">{a.notes}</div>}
-                      </td>
-                      <td className="amt">{fmt(a.amount)}</td>
-                    </tr>
-                  ))}
-                  {breakupPending > 0 && (
-                    <tr>
-                      <td>
-                        Not yet run through payroll
-                        <div className="retention-note">
-                          {fmtDate(breakupRow.effectiveStart)} – {fmtDate(periodEnd)} · {breakupRow.breakdown.totalDays} days ({breakupRow.breakdown.presentDays} present, {breakupRow.breakdown.paidOffDays} paid leave,{' '}
-                          {breakupRow.breakdown.holidayDays} holidays, {breakupRow.breakdown.halfDays} half, {breakupRow.breakdown.unpaidOffDays} unpaid)
-                        </div>
-                        <DayDates days={accrualDaysFor(breakupRow.staff, breakupRow.effectiveStart, periodEnd)} compact />
-                      </td>
-                      <td className="amt">{fmt(breakupPending)}</td>
-                    </tr>
-                  )}
+                  <tr>
+                    <td>
+                      <Bi en="Staff" hi="कर्मचारी" />
+                    </td>
+                    <td className="amt">
+                      <strong>{breakupRow.staff.name}</strong>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <Bi en="Period" hi="अवधि" />
+                    </td>
+                    <td className="amt">
+                      {slip.counts.total > 0 ? (
+                        <>
+                          {fmtDate(slip.days[0].date)} – {fmtDate(slip.days[slip.days.length - 1].date)} ({slip.counts.total} days)
+                        </>
+                      ) : (
+                        'Not on the job this month'
+                      )}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <Bi en="Daily rate" hi="दैनिक दर" />
+                    </td>
+                    <td className="amt">{fmt(breakupRow.staff.daily_rate)}</td>
+                  </tr>
                 </tbody>
               </table>
-            </div>
 
-            <div>
-              <h4 style={{ margin: '0 0 6px', fontSize: 13 }}>
-                Paid in {monthLabel(nextMonth)} for {monthLabel(selectedMonth)}
-              </h4>
               <table className="data table-compact keep-table">
                 <thead>
                   <tr>
-                    <th>Date</th>
-                    <th>Account</th>
-                    <th style={{ textAlign: 'right' }}>Amount</th>
+                    <th colSpan={2}>
+                      <Bi en="Days Breakdown" hi="दिनों का विवरण" />
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {breakupPaidList.length === 0 && (
+                  <tr>
+                    <td>
+                      <Bi en="Days worked (present)" hi="उपस्थित दिन" />
+                    </td>
+                    <td className="amt">{slip.counts.present}</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <Bi en="Leave — paid" hi="अवकाश — सशुल्क" />
+                    </td>
+                    <td className="amt">{slip.counts.paidLeave}</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <Bi en="Absent — unpaid" hi="अनुपस्थित — अवैतनिक" />
+                    </td>
+                    <td className="amt" style={slip.counts.unpaidLeave > 0 ? { color: 'var(--red)' } : undefined}>
+                      {slip.counts.unpaidLeave}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <Bi en="Half days" hi="आधे दिन" />
+                    </td>
+                    <td className="amt">{slip.counts.halfDays}</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <Bi en="Holidays" hi="छुट्टियाँ" />
+                    </td>
+                    <td className="amt">{slip.counts.holidays}</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <DayDates days={slip.days} bilingual />
+
+              <table className="data table-compact keep-table">
+                <thead>
+                  <tr>
+                    <th colSpan={2}>
+                      <Bi en="Salary for the month" hi="माह का वेतन" />
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>
+                      <Bi en="Gross" hi="सकल" /> ({slip.counts.total} days × {fmt(breakupRow.staff.daily_rate)})
+                    </td>
+                    <td className="amt">{fmt(slip.counts.total * breakupRow.staff.daily_rate)}</td>
+                  </tr>
+                  {slip.counts.unpaidLeave > 0 && (
                     <tr>
-                      <td colSpan={3} className="empty-row">
-                        Nothing paid yet
+                      <td>
+                        <Bi en="Less: Absent — unpaid" hi="घटाएं: अनुपस्थित" /> ({slip.counts.unpaidLeave} × {fmt(breakupRow.staff.daily_rate)})
+                      </td>
+                      <td className="amt" style={{ color: 'var(--red)' }}>
+                        −{fmt(slip.counts.unpaidLeave * breakupRow.staff.daily_rate)}
                       </td>
                     </tr>
                   )}
-                  {breakupPaidList.map((p) => (
+                  {slip.counts.halfDays > 0 && (
+                    <tr>
+                      <td>
+                        <Bi en="Less: Half days" hi="घटाएं: आधे दिन" /> ({slip.counts.halfDays} × {fmt(breakupRow.staff.daily_rate * 0.5)})
+                      </td>
+                      <td className="amt" style={{ color: 'var(--red)' }}>
+                        −{fmt(slip.counts.halfDays * breakupRow.staff.daily_rate * 0.5)}
+                      </td>
+                    </tr>
+                  )}
+                  {slip.extras !== 0 && (
+                    <tr>
+                      <td>
+                        <Bi en="Bonus, incentive, allowance, adjustments" hi="बोनस, प्रोत्साहन, भत्ता, समायोजन" />
+                        <div className="retention-note">{slip.runs.map((r) => r.display_id ?? 'Payroll run').join(', ')}</div>
+                      </td>
+                      <td className="amt" style={slip.extras < 0 ? { color: 'var(--red)' } : undefined}>
+                        {slip.extras < 0 ? '−' : '+'}
+                        {fmt(Math.abs(slip.extras))}
+                      </td>
+                    </tr>
+                  )}
+                  <tr>
+                    <td>
+                      <strong>
+                        <Bi en="Salary for the month" hi="माह का वेतन" />
+                      </strong>
+                    </td>
+                    <td className="amt">
+                      <strong style={{ fontSize: 16 }}>{fmt(slip.salary)}</strong>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              {slip.sharedRuns.length > 0 && (
+                <div className="note" style={{ margin: 0 }}>
+                  Payroll for this month was run together with other months ({slip.sharedRuns.map((r) => `${r.display_id ?? 'run'} ${fmtDate(r.period_start)} – ${fmtDate(r.period_end)}`).join('; ')}), so
+                  the salary above is worked out from the days alone.
+                </div>
+              )}
+
+              <table className="data table-compact keep-table">
+                <thead>
+                  <tr>
+                    <th colSpan={2}>
+                      <Bi en="Payment" hi="भुगतान" />
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {slip.broughtForward !== 0 && (
+                    <tr>
+                      <td>
+                        {slip.broughtForward > 0 ? (
+                          <Bi en="Due from earlier months" hi="पिछले महीनों का बकाया" />
+                        ) : (
+                          <Bi en="Paid ahead in earlier months" hi="पहले से अधिक भुगतान" />
+                        )}
+                      </td>
+                      <td className="amt">{fmt(slip.broughtForward)}</td>
+                    </tr>
+                  )}
+                  <tr>
+                    <td>
+                      <Bi en="Salary for the month" hi="माह का वेतन" />
+                    </td>
+                    <td className="amt">{fmt(slip.salary)}</td>
+                  </tr>
+                  {slip.paid.length === 0 && (
+                    <tr>
+                      <td>
+                        <Bi en={`Paid in ${monthLabel(slip.paidMonth)}`} hi="भुगतान" />
+                      </td>
+                      <td className="amt">{fmt(0)}</td>
+                    </tr>
+                  )}
+                  {slip.paid.map((p) => (
                     <tr key={p.id}>
                       <td>
-                        {fmtDate(p.date)} {p.display_id && <span className="note" style={{ margin: 0 }}>{p.display_id}</span>}
-                        {p.notes && <div className="retention-note">{p.notes}</div>}
+                        <Bi en="Paid" hi="भुगतान" /> {fmtDate(p.date)} <span className="note" style={{ margin: 0 }}>{p.display_id ?? ''}</span>
+                        <div className="retention-note">
+                          {bankAccountName(p.bank_account_id)}
+                          {Number(p.advance_recovered) > 0 ? ` · ${fmt(p.advance_recovered)} was an advance recovered` : ''}
+                          {p.notes ? ` · ${p.notes}` : ''}
+                        </div>
                       </td>
-                      <td>{bankAccountName(p.bank_account_id)}</td>
-                      <td className="amt">
-                        {fmt(p.amount)}
-                        {Number(p.advance_recovered) > 0 && <div className="retention-note">{fmt(p.advance_recovered)} was an advance recovered</div>}
+                      <td className="amt" style={{ color: 'var(--red)' }}>
+                        −{fmt(p.amount)}
                       </td>
                     </tr>
                   ))}
-                  {breakupPaidList.length > 0 && (
-                    <tr>
-                      <td colSpan={2}>
-                        <strong>Total paid</strong>
-                      </td>
-                      <td className="amt">
-                        <strong>{fmt(breakupPaidTotal)}</strong>
-                      </td>
-                    </tr>
-                  )}
+                  <tr>
+                    <td>
+                      <strong>
+                        <Bi en="Due" hi="बकाया" />
+                      </strong>
+                    </td>
+                    <td className="amt">
+                      <strong style={{ fontSize: 16, color: slip.due > 0 ? 'var(--red)' : undefined }}>{fmt(slip.due)}</strong>
+                    </td>
+                  </tr>
                 </tbody>
               </table>
-            </div>
+              <div className="note" style={{ margin: 0 }}>
+                Wages are paid a month later: what is paid in {monthLabel(slip.paidMonth)} counts against {monthLabel(slip.month)}.
+                {slip.due > 0 ? ` The ${fmt(slip.due)} still due is carried to the ${monthLabel(slip.paidMonth)} slip.` : ''}
+              </div>
 
-            <table className="data table-compact keep-table">
-              <tbody>
-                <tr>
-                  <td>Payable on the books today (payroll runs less all payments)</td>
-                  <td className="amt">{fmt(breakupRow.payable)}</td>
-                </tr>
-                {breakupRow.advanceOutstanding > 0 && (
-                  <tr>
-                    <td>Salary advance still outstanding (separate from the salary)</td>
-                    <td className="amt">{fmt(breakupRow.advanceOutstanding)}</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+              <div className="payslip-no-print" style={{ display: 'flex', gap: 8 }}>
+                <Button type="button" variant="secondary" onClick={handleDownloadSlip} disabled={downloadingImage}>
+                  {downloadingImage ? 'Capturing…' : 'Download screenshot'}
+                </Button>
+                <Button type="button" variant="secondary" onClick={() => window.print()}>
+                  Print / Save as PDF
+                </Button>
+              </div>
+            </div>
           </div>
-        </Modal>
+        </div>
       )}
 
       {editingAdvanceId && (salaryAdvances ?? []).find((x) => x.id === editingAdvanceId) && (
@@ -1323,7 +1438,7 @@ export function SalarySection() {
                 <img src={laavinLogo} alt="Laavin InfraScapes" style={{ height: 28, mixBlendMode: 'multiply' }} />
                 <strong style={{ fontSize: 14 }}>PAYSLIP ({monthLabel(viewingAccrual.period_end.slice(0, 7))})</strong>
               </div>
-              <table className="data table-compact">
+              <table className="data table-compact keep-table">
                 <tbody>
                   <tr>
                     <td>
@@ -1350,7 +1465,7 @@ export function SalarySection() {
                 </tbody>
               </table>
 
-              <table className="data table-compact">
+              <table className="data table-compact keep-table">
                 <thead>
                   <tr>
                     <th colSpan={2}>
@@ -1401,7 +1516,7 @@ export function SalarySection() {
                 const absentDeduction = viewingBreakdown.unpaidOffDays * viewingStaff.daily_rate
                 const halfDayDeduction = viewingBreakdown.halfDays * viewingStaff.daily_rate * 0.5
                 return (
-                  <table className="data table-compact">
+                  <table className="data table-compact keep-table">
                     <thead>
                       <tr>
                         <th colSpan={2}>
@@ -1443,7 +1558,7 @@ export function SalarySection() {
                 )
               })()}
 
-              <table className="data table-compact">
+              <table className="data table-compact keep-table">
                 <tbody>
                   <tr>
                     <td>
@@ -1492,7 +1607,7 @@ export function SalarySection() {
                 </tbody>
               </table>
 
-              <table className="data table-compact">
+              <table className="data table-compact keep-table">
                 <tbody>
                   {viewingPriorPaymentsTotal > 0 && (
                     <tr>

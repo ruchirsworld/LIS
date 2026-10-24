@@ -1,6 +1,6 @@
 # LIS changes since v2.0.1
 
-Version 2.0.1 was released on 3 September 2026. This list covers everything after it, up to 3.0.17. It is put together from the project history, grouped by area. Version numbers are shown where a release carried one.
+Version 2.0.1 was released on 3 September 2026. This list covers everything after it, up to 3.0.18. It is put together from the project history, grouped by area. Version numbers are shown where a release carried one.
 
 ## 2.0.2 – 2.0.3 (3 – 4 September)
 
@@ -180,6 +180,13 @@ Version 2.0.1 was released on 3 September 2026. This list covers everything afte
 ## 2.1.26 (17 October): sticky trip rows, and records grouped by month
 - **Trip Records:** while you scroll through an opened trip's entries, the table header, the trip's own row and the entries heading (with the spend split and + Add expense) stay at the top; they let go when the trip ends. The entries have a Remarks column after the sub-head.
 - **Admin and Project expense records, and Activity by user,** are grouped by month (a bold grey bar with the count and total) and, inside a month, by date. Both can be folded. Each date group is blue or green in turn, and its rows alternate a lighter and a slightly deeper tint; reimbursements stay amber. Month and day totals cover everything in them, not only the current page.
+
+## 3.0.18 (25 October): month-wise salary slips
+- Salary: pressing a staff name in Payable by staff opens that person's salary slip for the chosen month, with arrows to move between months. The slip shows the days worked, the dates of paid leave, unpaid absence, half days and holidays, the wage calculation (gross, less unpaid days and half days, plus any bonus, incentive, allowance or adjustment in the payroll run), the payments made in the following month (wages are paid in arrears, so October payments are for September), and what is still due.
+- Anything still due on a month's slip appears as "Due from earlier months" on the next month's slip.
+- The slip is in English and Hindi, can be downloaded as a picture or printed, and stays a plain table on a phone. The older payroll-run pay-slip also stays a table on a phone.
+- Dates on the salary screens and slips now read DD/MM/YYYY.
+- New: the slip maths (salary for the month, payments made next month, brought-forward due) is covered by unit tests.
 
 ## 3.0.17 (25 October): dates on the pay-slip
 - The pay-slip now has a Dates section, in English and Hindi, listing the exact dates of the absent (unpaid) days, the paid leave days, the half days and the holidays, so it is clear how the salary was worked out. The same dates appear under a month's salary that has not been run through payroll yet, in the staff month view.

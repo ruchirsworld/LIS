@@ -57,7 +57,7 @@ BT
 12.6499999999999986 TL
 0.439 0.424 0.384 rg
 56.6929133858267775 371.3388188976377364 Td
-(Laavin Internal System, version 3.0.17) Tj
+(Laavin Internal System, version 3.0.18) Tj
 ET
 BT
 /F1 11 Tf
@@ -3252,7 +3252,7 @@ endobj
 endobj
 34 0 obj
 <<
-/Length 3206
+/Length 3497
 >>
 stream
 0.5669291338582678 w
@@ -3308,25 +3308,28 @@ BT
 (Wages are worked out from the days worked and each person's daily rate. Record each payment and) Tj
 T* (any advance given to a worker. When you pay, you can take back part of an advance at the same time.) Tj
 T* (The history shows every amount earned, paid and advanced. Press a staff member's name in "Payable) Tj
-T* (by staff" to see their month: the salary for the month, what was paid for it, anything brought forward from) Tj
-T* (earlier months, and what is due for the month. Wages are paid a month later, so what you paid in) Tj
-T* (October counts against September salary. Use the arrows to move between months. Open a pay-slip) Tj
-T* (\(press a name in the wage accrual history\) to see how the pay was worked out: the days worked, and) Tj
-T* (the exact dates of any absent days, paid leave, half days and holidays. On a phone each person is a) Tj
-T* (card with the figures side by side and the buttons below.) Tj
+T* (by staff" to open their salary slip for the month chosen above. The slip shows the days worked, the) Tj
+T* (dates of paid leave, unpaid absence, half days and holidays, how the salary was worked out, what was) Tj
+T* (paid for it, and what is still due. Wages are paid a month later, so what you paid in October counts) Tj
+T* (against the September slip, and any amount still due is carried to the October slip as due from earlier) Tj
+T* (months. The slip can be downloaded as a picture or printed. Dates on the salary screens read) Tj
+T* (DD/MM/YYYY. Use the arrows to move between months. Open a pay-slip \(press a name in the wage) Tj
+T* (accrual history\) to see how the pay was worked out: the days worked, and the exact dates of any absent) Tj
+T* (days, paid leave, half days and holidays. On a phone each person is a card with the figures side by side) Tj
+T* (and the buttons below.) Tj
 ET
 BT
 /F2 13 Tf
 14.9499999999999993 TL
 0.141 0.275 0.227 rg
-56.6929133858267775 452.9199212598424538 Td
+56.6929133858267775 410.9529921259841672 Td
 (Imprest \(site advance money\)) Tj
 ET
 BT
 /F1 10.5 Tf
 12.0749999999999993 TL
 0.165 0.173 0.161 rg
-56.6929133858267775 429.8175590551180676 Td
+56.6929133858267775 387.8506299212597241 Td
 (Imprest is the money given to a supervisor to spend on site. Here you give an advance, record money) Tj
 T* (returned, and see requests waiting from supervisors. The balance shows how much each supervisor still) Tj
 T* (holds.) Tj
@@ -3335,14 +3338,14 @@ BT
 /F2 13 Tf
 14.9499999999999993 TL
 0.141 0.275 0.227 rg
-56.6929133858267775 369.850629921259781 Td
+56.6929133858267775 327.8837007874014944 Td
 (Check-ins) Tj
 ET
 BT
 /F1 10.5 Tf
 12.0749999999999993 TL
 0.165 0.173 0.161 rg
-56.6929133858267775 346.748267716535338 Td
+56.6929133858267775 304.7813385826769945 Td
 (Shows where and when each supervisor opened the app, so you know they are on site. Choose the) Tj
 T* (supervisor and the dates to see the history.) Tj
 ET
@@ -6842,7 +6845,7 @@ endobj
 74 0 obj
 <<
 /Producer (jsPDF 4.2.1)
-/CreationDate (D:20261025002845+05'30')
+/CreationDate (D:20261025005047+05'30')
 >>
 endobj
 75 0 obj
@@ -6856,8 +6859,8 @@ endobj
 xref
 0 76
 0000000000 65535 f 
-0000217220 00000 n 
-0000266581 00000 n 
+0000217511 00000 n 
+0000266872 00000 n 
 0000000015 00000 n 
 0000000152 00000 n 
 0000001383 00000 n 
@@ -6890,54 +6893,54 @@ xref
 0000097074 00000 n 
 0000105250 00000 n 
 0000105389 00000 n 
-0000108648 00000 n 
-0000108787 00000 n 
-0000119836 00000 n 
-0000119975 00000 n 
-0000133194 00000 n 
-0000133333 00000 n 
-0000144682 00000 n 
-0000144821 00000 n 
-0000154035 00000 n 
-0000154174 00000 n 
-0000163290 00000 n 
-0000163429 00000 n 
-0000173705 00000 n 
-0000173844 00000 n 
-0000178582 00000 n 
-0000178721 00000 n 
-0000184091 00000 n 
-0000184230 00000 n 
-0000198037 00000 n 
-0000198176 00000 n 
-0000205329 00000 n 
-0000205468 00000 n 
-0000210355 00000 n 
-0000210494 00000 n 
-0000217464 00000 n 
-0000217590 00000 n 
-0000217721 00000 n 
-0000217855 00000 n 
-0000217993 00000 n 
-0000218117 00000 n 
-0000218246 00000 n 
-0000218378 00000 n 
-0000218514 00000 n 
-0000218642 00000 n 
-0000218769 00000 n 
-0000218898 00000 n 
-0000219031 00000 n 
-0000219133 00000 n 
-0000219229 00000 n 
-0000266845 00000 n 
-0000266931 00000 n 
+0000108939 00000 n 
+0000109078 00000 n 
+0000120127 00000 n 
+0000120266 00000 n 
+0000133485 00000 n 
+0000133624 00000 n 
+0000144973 00000 n 
+0000145112 00000 n 
+0000154326 00000 n 
+0000154465 00000 n 
+0000163581 00000 n 
+0000163720 00000 n 
+0000173996 00000 n 
+0000174135 00000 n 
+0000178873 00000 n 
+0000179012 00000 n 
+0000184382 00000 n 
+0000184521 00000 n 
+0000198328 00000 n 
+0000198467 00000 n 
+0000205620 00000 n 
+0000205759 00000 n 
+0000210646 00000 n 
+0000210785 00000 n 
+0000217755 00000 n 
+0000217881 00000 n 
+0000218012 00000 n 
+0000218146 00000 n 
+0000218284 00000 n 
+0000218408 00000 n 
+0000218537 00000 n 
+0000218669 00000 n 
+0000218805 00000 n 
+0000218933 00000 n 
+0000219060 00000 n 
+0000219189 00000 n 
+0000219322 00000 n 
+0000219424 00000 n 
+0000219520 00000 n 
+0000267136 00000 n 
+0000267222 00000 n 
 trailer
 <<
 /Size 76
 /Root 75 0 R
 /Info 74 0 R
-/ID [ <1B35859478DB9A65038BAC02394ED871> <1B35859478DB9A65038BAC02394ED871> ]
+/ID [ <DD5FBD645FC336191C75DE1CCA0627E1> <DD5FBD645FC336191C75DE1CCA0627E1> ]
 >>
 startxref
-267035
+267326
 %%EOF
