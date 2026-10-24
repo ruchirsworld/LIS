@@ -484,18 +484,21 @@ export function SalarySection() {
 
   // The month statement for one staff member (the Month chosen above): what the month's salary is, what was paid during it, and what is due.
   // A payroll run belongs to the month it ends in; a month not run yet shows its pending accrual instead.
+  // Wages are paid in arrears: what is paid during a month is the previous month's salary, so a month's salary is cleared by the payments made in the NEXT month.
+  const nextMonth = shiftMonth(selectedMonth, 1)
+  const nextMonthStart = `${nextMonth}-01`
   const round2 = (n: number) => Math.round(n * 100) / 100
   const breakupRow = breakupStaffId ? rows.find((r) => r.staff.id === breakupStaffId) : undefined
   const breakupRuns = breakupRow
     ? (accruals ?? []).filter((a) => a.staff_id === breakupRow.staff.id && a.period_end.startsWith(selectedMonth)).sort((a, b) => a.period_end.localeCompare(b.period_end))
     : []
   const breakupPaidList = breakupRow
-    ? (payments ?? []).filter((p) => p.staff_id === breakupRow.staff.id && p.date.startsWith(selectedMonth)).sort((a, b) => a.date.localeCompare(b.date))
+    ? (payments ?? []).filter((p) => p.staff_id === breakupRow.staff.id && p.date.startsWith(nextMonth)).sort((a, b) => a.date.localeCompare(b.date))
     : []
   const breakupOpening = breakupRow
     ? round2(
         (accruals ?? []).filter((a) => a.staff_id === breakupRow.staff.id && a.period_end < monthStart).reduce((t, a) => t + Number(a.amount || 0), 0) -
-          (payments ?? []).filter((p) => p.staff_id === breakupRow.staff.id && p.date < monthStart).reduce((t, p) => t + Number(p.amount || 0), 0)
+          (payments ?? []).filter((p) => p.staff_id === breakupRow.staff.id && p.date < nextMonthStart).reduce((t, p) => t + Number(p.amount || 0), 0)
       )
     : 0
   const breakupRunTotal = round2(breakupRuns.reduce((t, a) => t + Number(a.amount || 0), 0))
@@ -936,7 +939,7 @@ export function SalarySection() {
                   </td>
                 </tr>
                 <tr>
-                  <td>Paid during the month</td>
+                  <td>Paid in {monthLabel(nextMonth)} (for {monthLabel(selectedMonth)})</td>
                   <td className="amt" style={breakupPaidTotal > 0 ? { color: 'var(--red)' } : undefined}>
                     {breakupPaidTotal > 0 ? '−' : ''}
                     {fmt(breakupPaidTotal)}
@@ -944,7 +947,7 @@ export function SalarySection() {
                 </tr>
                 <tr>
                   <td>
-                    <strong>Due at the end of {monthLabel(selectedMonth)}</strong>
+                    <strong>Due for {monthLabel(selectedMonth)}</strong>
                   </td>
                   <td className="amt">
                     <strong style={{ fontSize: 16, color: breakupDue > 0 ? 'var(--red)' : undefined }}>{fmt(breakupDue)}</strong>
@@ -1000,7 +1003,9 @@ export function SalarySection() {
             </div>
 
             <div>
-              <h4 style={{ margin: '0 0 6px', fontSize: 13 }}>Paid during {monthLabel(selectedMonth)}</h4>
+              <h4 style={{ margin: '0 0 6px', fontSize: 13 }}>
+                Paid in {monthLabel(nextMonth)} for {monthLabel(selectedMonth)}
+              </h4>
               <table className="data table-compact keep-table">
                 <thead>
                   <tr>
@@ -1013,7 +1018,7 @@ export function SalarySection() {
                   {breakupPaidList.length === 0 && (
                     <tr>
                       <td colSpan={3} className="empty-row">
-                        Nothing paid this month
+                        Nothing paid yet
                       </td>
                     </tr>
                   )}
