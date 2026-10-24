@@ -20,7 +20,7 @@ import {
   useDeleteStaffSalaryAdvance,
 } from '../../lib/queries/hr'
 import { PaymentAccountPicker, bankAccountIdOf, CASH_ACCOUNT } from '../../components/PaymentAccountPicker'
-import { computeAccrualBreakdown, nextAccrualStart, todayStr, type AttendanceDayType } from '../../lib/calc/payroll'
+import { computeAccrualBreakdown, computeAccrualDays, nextAccrualStart, todayStr, type AccrualDay, type AttendanceDayType } from '../../lib/calc/payroll'
 import { fmt, fmtDate, parseINR } from '../../lib/calc/format'
 import { getErrorMessage } from '../../lib/errors'
 import { TableSearch, matchesSearch } from '../../components/TableSearch'
@@ -37,6 +37,59 @@ function Bi({ en, hi }: { en: string; hi: string }) {
     <>
       {en} <span style={{ color: 'var(--ink-soft)', fontWeight: 400 }}>/ {hi}</span>
     </>
+  )
+}
+
+// "05 Sep" from "2026-09-05" — the year is already in the period shown beside it.
+function dayMonth(date: string): string {
+  return fmtDate(date).slice(0, 6)
+}
+
+/** The dates behind the day counts of a salary period: which days were Absent (unpaid), Leave (paid), Half days and Holidays. Days worked normally
+ * are not listed, they are simply every other day of the period. */
+function DayDates({ days, compact, bilingual }: { days: AccrualDay[]; compact?: boolean; bilingual?: boolean }) {
+  const groups: { type: AccrualDay['type']; en: string; hi: string; note: string }[] = [
+    { type: 'unpaid_off', en: 'Absent — unpaid', hi: 'अनुपस्थित — अवैतनिक', note: 'no pay for these days' },
+    { type: 'paid_off', en: 'Leave — paid', hi: 'अवकाश — सशुल्क', note: 'the free days each month, paid in full' },
+    { type: 'half_day', en: 'Half days', hi: 'आधे दिन', note: 'half pay' },
+    { type: 'holiday', en: 'Holidays', hi: 'छुट्टियाँ', note: 'paid in full' },
+  ]
+  const rows = groups
+    .map((g) => ({ ...g, dates: days.filter((d) => d.type === g.type).map((d) => dayMonth(d.date)) }))
+    .filter((g) => g.dates.length > 0)
+  if (rows.length === 0) return compact ? null : <div className="note" style={{ margin: 0 }}>Every day in this period was worked: no absence, half day or holiday.</div>
+  if (compact) {
+    return (
+      <>
+        {rows.map((g) => (
+          <div key={g.type} className="retention-note">
+            {g.en} ({g.dates.length}): {g.dates.join(', ')}
+          </div>
+        ))}
+      </>
+    )
+  }
+  return (
+    <table className="data table-compact keep-table">
+      <thead>
+        <tr>
+          <th colSpan={2}>{bilingual ? <Bi en="Dates" hi="तारीखें" /> : 'Dates'}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((g) => (
+          <tr key={g.type}>
+            <td style={{ whiteSpace: 'nowrap', verticalAlign: 'top' }}>
+              {bilingual ? <Bi en={g.en} hi={g.hi} /> : g.en} ({g.dates.length})
+            </td>
+            <td>
+              {g.dates.join(', ')}
+              <div className="retention-note">{g.note}</div>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   )
 }
 
@@ -450,6 +503,18 @@ export function SalarySection() {
             .map((a) => a.date)
         )
       : null
+
+  // The day-by-day list behind a period's pay (same attendance, holidays and compensatory leave the run itself used).
+  const accrualDaysFor = (st: NonNullable<typeof staff>[number], from: string, to: string): AccrualDay[] =>
+    computeAccrualDays(
+      st,
+      (allLeave ?? []).filter((a) => a.staff_id === st.id).map((a) => ({ date: a.date, day_type: a.day_type as AttendanceDayType })),
+      holidayDates,
+      from,
+      to,
+      (allAssignments ?? []).filter((a) => a.staff_id === st.id && holidayDates.has(a.date)).map((a) => a.date)
+    )
+  const viewingDays = viewingAccrual && viewingStaff ? accrualDaysFor(viewingStaff, viewingAccrual.period_start, viewingAccrual.period_end) : []
 
   // How much salary advance is still outstanding for this worker right now
   // — shown on the pay-slip as what this period's pay would clear if fully
@@ -994,6 +1059,7 @@ export function SalarySection() {
                           {fmtDate(breakupRow.effectiveStart)} – {fmtDate(periodEnd)} · {breakupRow.breakdown.totalDays} days ({breakupRow.breakdown.presentDays} present, {breakupRow.breakdown.paidOffDays} paid leave,{' '}
                           {breakupRow.breakdown.holidayDays} holidays, {breakupRow.breakdown.halfDays} half, {breakupRow.breakdown.unpaidOffDays} unpaid)
                         </div>
+                        <DayDates days={accrualDaysFor(breakupRow.staff, breakupRow.effectiveStart, periodEnd)} compact />
                       </td>
                       <td className="amt">{fmt(breakupPending)}</td>
                     </tr>
@@ -1327,6 +1393,8 @@ export function SalarySection() {
                   </tr>
                 </tbody>
               </table>
+
+              <DayDates days={viewingDays} bilingual />
 
               {(() => {
                 const gross = viewingBreakdown.totalDays * viewingStaff.daily_rate
