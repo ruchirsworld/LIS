@@ -57,7 +57,7 @@ BT
 12.6499999999999986 TL
 0.439 0.424 0.384 rg
 56.6929133858267775 371.3388188976377364 Td
-(Laavin Internal System, version 3.0.18) Tj
+(Laavin Internal System, version 3.0.19) Tj
 ET
 BT
 /F1 11 Tf
@@ -3252,7 +3252,7 @@ endobj
 endobj
 34 0 obj
 <<
-/Length 3497
+/Length 3509
 >>
 stream
 0.5669291338582678 w
@@ -3311,12 +3311,12 @@ T* (The history shows every amount earned, paid and advanced. Press a staff memb
 T* (by staff" to open their salary slip for the month chosen above. The slip shows the days worked, the) Tj
 T* (dates of paid leave, unpaid absence, half days and holidays, how the salary was worked out, what was) Tj
 T* (paid for it, and what is still due. Wages are paid a month later, so what you paid in October counts) Tj
-T* (against the September slip, and any amount still due is carried to the October slip as due from earlier) Tj
-T* (months. The slip can be downloaded as a picture or printed. Dates on the salary screens read) Tj
-T* (DD/MM/YYYY. Use the arrows to move between months. Open a pay-slip \(press a name in the wage) Tj
-T* (accrual history\) to see how the pay was worked out: the days worked, and the exact dates of any absent) Tj
-T* (days, paid leave, half days and holidays. On a phone each person is a card with the figures side by side) Tj
-T* (and the buttons below.) Tj
+T* (against the September slip, and any amount still due is carried to the October slip, where it shows as) Tj
+T* ("Due for September". The slip can be downloaded as a picture or printed. Dates on the salary screens) Tj
+T* (read DD/MM/YYYY. Use the arrows to move between months. Open a pay-slip \(press a name in the) Tj
+T* (wage accrual history\) to see how the pay was worked out: the days worked, and the exact dates of any) Tj
+T* (absent days, paid leave, half days and holidays. On a phone each person is a card with the figures side) Tj
+T* (by side and the buttons below.) Tj
 ET
 BT
 /F2 13 Tf
@@ -6845,7 +6845,7 @@ endobj
 74 0 obj
 <<
 /Producer (jsPDF 4.2.1)
-/CreationDate (D:20261025005047+05'30')
+/CreationDate (D:20261025005945+05'30')
 >>
 endobj
 75 0 obj
@@ -6859,8 +6859,8 @@ endobj
 xref
 0 76
 0000000000 65535 f 
-0000217511 00000 n 
-0000266872 00000 n 
+0000217523 00000 n 
+0000266884 00000 n 
 0000000015 00000 n 
 0000000152 00000 n 
 0000001383 00000 n 
@@ -6893,54 +6893,54 @@ xref
 0000097074 00000 n 
 0000105250 00000 n 
 0000105389 00000 n 
-0000108939 00000 n 
-0000109078 00000 n 
-0000120127 00000 n 
-0000120266 00000 n 
-0000133485 00000 n 
-0000133624 00000 n 
-0000144973 00000 n 
-0000145112 00000 n 
-0000154326 00000 n 
-0000154465 00000 n 
-0000163581 00000 n 
-0000163720 00000 n 
-0000173996 00000 n 
-0000174135 00000 n 
-0000178873 00000 n 
-0000179012 00000 n 
-0000184382 00000 n 
-0000184521 00000 n 
-0000198328 00000 n 
-0000198467 00000 n 
-0000205620 00000 n 
-0000205759 00000 n 
-0000210646 00000 n 
-0000210785 00000 n 
-0000217755 00000 n 
-0000217881 00000 n 
-0000218012 00000 n 
-0000218146 00000 n 
-0000218284 00000 n 
-0000218408 00000 n 
-0000218537 00000 n 
-0000218669 00000 n 
-0000218805 00000 n 
-0000218933 00000 n 
-0000219060 00000 n 
-0000219189 00000 n 
-0000219322 00000 n 
-0000219424 00000 n 
-0000219520 00000 n 
-0000267136 00000 n 
-0000267222 00000 n 
+0000108951 00000 n 
+0000109090 00000 n 
+0000120139 00000 n 
+0000120278 00000 n 
+0000133497 00000 n 
+0000133636 00000 n 
+0000144985 00000 n 
+0000145124 00000 n 
+0000154338 00000 n 
+0000154477 00000 n 
+0000163593 00000 n 
+0000163732 00000 n 
+0000174008 00000 n 
+0000174147 00000 n 
+0000178885 00000 n 
+0000179024 00000 n 
+0000184394 00000 n 
+0000184533 00000 n 
+0000198340 00000 n 
+0000198479 00000 n 
+0000205632 00000 n 
+0000205771 00000 n 
+0000210658 00000 n 
+0000210797 00000 n 
+0000217767 00000 n 
+0000217893 00000 n 
+0000218024 00000 n 
+0000218158 00000 n 
+0000218296 00000 n 
+0000218420 00000 n 
+0000218549 00000 n 
+0000218681 00000 n 
+0000218817 00000 n 
+0000218945 00000 n 
+0000219072 00000 n 
+0000219201 00000 n 
+0000219334 00000 n 
+0000219436 00000 n 
+0000219532 00000 n 
+0000267148 00000 n 
+0000267234 00000 n 
 trailer
 <<
 /Size 76
 /Root 75 0 R
 /Info 74 0 R
-/ID [ <DD5FBD645FC336191C75DE1CCA0627E1> <DD5FBD645FC336191C75DE1CCA0627E1> ]
+/ID [ <66E6BCD40EEA692A703993F725D04953> <66E6BCD40EEA692A703993F725D04953> ]
 >>
 startxref
-267326
+267338
 %%EOF

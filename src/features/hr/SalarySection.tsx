@@ -1047,12 +1047,6 @@ export function SalarySection() {
                       )}
                     </td>
                   </tr>
-                  <tr>
-                    <td>
-                      <Bi en="Daily rate" hi="दैनिक दर" />
-                    </td>
-                    <td className="amt">{fmt(breakupRow.staff.daily_rate)}</td>
-                  </tr>
                 </tbody>
               </table>
 
@@ -1181,10 +1175,11 @@ export function SalarySection() {
                     <tr>
                       <td>
                         {slip.broughtForward > 0 ? (
-                          <Bi en="Due from earlier months" hi="पिछले महीनों का बकाया" />
+                          <Bi en={`Due for ${monthLabel(shiftMonth(selectedMonth, -1))}`} hi="पिछले महीने का बकाया" />
                         ) : (
-                          <Bi en="Paid ahead in earlier months" hi="पहले से अधिक भुगतान" />
+                          <Bi en={`Paid ahead up to ${monthLabel(shiftMonth(selectedMonth, -1))}`} hi="पहले से अधिक भुगतान" />
                         )}
+                        <div className="retention-note">after the payments made in {monthLabel(selectedMonth)}</div>
                       </td>
                       <td className="amt">{fmt(slip.broughtForward)}</td>
                     </tr>
