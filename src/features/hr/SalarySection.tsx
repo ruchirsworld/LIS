@@ -128,6 +128,8 @@ export function SalarySection() {
   const [editAccrualError, setEditAccrualError] = useState<string | null>(null)
   const [editAccrualSubmitting, setEditAccrualSubmitting] = useState(false)
   const [downloadingImage, setDownloadingImage] = useState(false)
+  // The staff member whose "Payable" breakup (runs accrued, payments made) is open.
+  const [breakupStaffId, setBreakupStaffId] = useState<string | null>(null)
   const payslipRef = useRef<HTMLDivElement>(null)
 
   async function handleDownloadImage() {
@@ -480,6 +482,28 @@ export function SalarySection() {
     : 0
   const viewingNetPay = viewingAccrual ? viewingAccrual.amount - viewingAdvanceAdjustment - viewingPriorPaymentsAdjustment : 0
 
+  // The month statement for one staff member (the Month chosen above): what the month's salary is, what was paid during it, and what is due.
+  // A payroll run belongs to the month it ends in; a month not run yet shows its pending accrual instead.
+  const round2 = (n: number) => Math.round(n * 100) / 100
+  const breakupRow = breakupStaffId ? rows.find((r) => r.staff.id === breakupStaffId) : undefined
+  const breakupRuns = breakupRow
+    ? (accruals ?? []).filter((a) => a.staff_id === breakupRow.staff.id && a.period_end.startsWith(selectedMonth)).sort((a, b) => a.period_end.localeCompare(b.period_end))
+    : []
+  const breakupPaidList = breakupRow
+    ? (payments ?? []).filter((p) => p.staff_id === breakupRow.staff.id && p.date.startsWith(selectedMonth)).sort((a, b) => a.date.localeCompare(b.date))
+    : []
+  const breakupOpening = breakupRow
+    ? round2(
+        (accruals ?? []).filter((a) => a.staff_id === breakupRow.staff.id && a.period_end < monthStart).reduce((t, a) => t + Number(a.amount || 0), 0) -
+          (payments ?? []).filter((p) => p.staff_id === breakupRow.staff.id && p.date < monthStart).reduce((t, p) => t + Number(p.amount || 0), 0)
+      )
+    : 0
+  const breakupRunTotal = round2(breakupRuns.reduce((t, a) => t + Number(a.amount || 0), 0))
+  const breakupPending = breakupRow ? breakupRow.pendingAccrual : 0
+  const breakupSalary = round2(breakupRunTotal + breakupPending)
+  const breakupPaidTotal = round2(breakupPaidList.reduce((t, p) => t + Number(p.amount || 0), 0))
+  const breakupDue = round2(breakupOpening + breakupSalary - breakupPaidTotal)
+
   const accrualRows = (accruals ?? []).filter((a) => matchesSearch(accrualSearch, [a.display_id, staffName(a.staff_id), a.period_start, a.period_end, a.amount, a.notes]))
   const paymentRows = (payments ?? []).filter((p) =>
     matchesSearch(paymentSearch, [p.display_id, staffName(p.staff_id), p.date, bankAccountName(p.bank_account_id), p.amount, p.advance_recovered, p.notes])
@@ -517,16 +541,17 @@ export function SalarySection() {
             </button>
           </div>
         </div>
-        <div className="note" style={{ marginTop: -4, marginBottom: 12 }}>
+        <details className="note" style={{ marginTop: -4, marginBottom: 12 }}>
+          <summary style={{ cursor: 'pointer', fontWeight: 600 }}>How is this worked out?</summary>
           Salaries accrue one calendar month at a time. Pending accrual is what "Run payroll" would record right now
           for {monthLabel(selectedMonth)} — from the start of the month (or the last run, if that was later)
           through its end{periodEnd < lastDayOfMonth(selectedMonth) ? ` (capped at today, ${fmtDate(today)})` : ''} —
           holidays always paid; the first 4 absent/leave days each month are paid too, plus one more per Holiday
           actually worked, as compensatory leave. If an earlier month was never run, it shows up below as its own
           warning instead of being folded into this one.
-        </div>
+        </details>
         <div className="table-scroll">
-          <table className="data">
+          <table className="data payable-table">
             <thead>
               <tr>
                 <th>Staff</th>
@@ -557,7 +582,11 @@ export function SalarySection() {
                   {rowGroups.get(groupKey)!.map((r) => (
                     <Fragment key={r.staff.id}>
                   <tr className={r.hasPastMonthUnpaid || r.priorGap ? 'row-overdue' : undefined}>
-                    <td>{r.staff.name}</td>
+                    <td>
+                      <button type="button" className="btn link" title="Show how this payable is made up" onClick={() => setBreakupStaffId(r.staff.id)}>
+                        {r.staff.name}
+                      </button>
+                    </td>
                     <td
                       className="amt"
                       style={r.hasPastMonthUnpaid ? { color: 'var(--red)', fontWeight: 700 } : undefined}
@@ -876,6 +905,162 @@ export function SalarySection() {
           </table>
         </div>
       </div>
+
+      {breakupRow && (
+        <Modal title={breakupRow.staff.name} wide onClose={() => setBreakupStaffId(null)}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+              <button type="button" className="pay-btn" onClick={() => setSelectedMonth((m) => shiftMonth(m, -1))} aria-label="Previous month">
+                ‹
+              </button>
+              <strong style={{ minWidth: 140, textAlign: 'center' }}>{monthLabel(selectedMonth)}</strong>
+              <button type="button" className="pay-btn" onClick={() => setSelectedMonth((m) => shiftMonth(m, 1))} aria-label="Next month">
+                ›
+              </button>
+            </div>
+
+            <table className="data table-compact keep-table">
+              <tbody>
+                {breakupOpening !== 0 && (
+                  <tr>
+                    <td>{breakupOpening > 0 ? 'Brought forward from earlier months (still due)' : 'Paid ahead in earlier months'}</td>
+                    <td className="amt">{fmt(breakupOpening)}</td>
+                  </tr>
+                )}
+                <tr>
+                  <td>
+                    <strong>Salary for {monthLabel(selectedMonth)}</strong>
+                  </td>
+                  <td className="amt">
+                    <strong>{fmt(breakupSalary)}</strong>
+                  </td>
+                </tr>
+                <tr>
+                  <td>Paid during the month</td>
+                  <td className="amt" style={breakupPaidTotal > 0 ? { color: 'var(--red)' } : undefined}>
+                    {breakupPaidTotal > 0 ? '−' : ''}
+                    {fmt(breakupPaidTotal)}
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <strong>Due at the end of {monthLabel(selectedMonth)}</strong>
+                  </td>
+                  <td className="amt">
+                    <strong style={{ fontSize: 16, color: breakupDue > 0 ? 'var(--red)' : undefined }}>{fmt(breakupDue)}</strong>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div>
+              <h4 style={{ margin: '0 0 6px', fontSize: 13 }}>Salary</h4>
+              <table className="data table-compact keep-table">
+                <tbody>
+                  {breakupRuns.length === 0 && breakupPending <= 0 && (
+                    <tr>
+                      <td colSpan={2} className="empty-row">
+                        No salary for this month
+                      </td>
+                    </tr>
+                  )}
+                  {breakupRuns.map((a) => (
+                    <tr key={a.id}>
+                      <td>
+                        {a.display_id ?? 'Payroll run'}{' '}
+                        <button
+                          type="button"
+                          className="btn link"
+                          onClick={() => {
+                            setBreakupStaffId(null)
+                            openViewAccrual(a)
+                          }}
+                        >
+                          {fmtDate(a.period_start)} – {fmtDate(a.period_end)}
+                        </button>
+                        {a.notes && <div className="retention-note">{a.notes}</div>}
+                      </td>
+                      <td className="amt">{fmt(a.amount)}</td>
+                    </tr>
+                  ))}
+                  {breakupPending > 0 && (
+                    <tr>
+                      <td>
+                        Not yet run through payroll
+                        <div className="retention-note">
+                          {fmtDate(breakupRow.effectiveStart)} – {fmtDate(periodEnd)} · {breakupRow.breakdown.totalDays} days ({breakupRow.breakdown.presentDays} present, {breakupRow.breakdown.paidOffDays} paid leave,{' '}
+                          {breakupRow.breakdown.holidayDays} holidays, {breakupRow.breakdown.halfDays} half, {breakupRow.breakdown.unpaidOffDays} unpaid)
+                        </div>
+                      </td>
+                      <td className="amt">{fmt(breakupPending)}</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div>
+              <h4 style={{ margin: '0 0 6px', fontSize: 13 }}>Paid during {monthLabel(selectedMonth)}</h4>
+              <table className="data table-compact keep-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Account</th>
+                    <th style={{ textAlign: 'right' }}>Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {breakupPaidList.length === 0 && (
+                    <tr>
+                      <td colSpan={3} className="empty-row">
+                        Nothing paid this month
+                      </td>
+                    </tr>
+                  )}
+                  {breakupPaidList.map((p) => (
+                    <tr key={p.id}>
+                      <td>
+                        {fmtDate(p.date)} {p.display_id && <span className="note" style={{ margin: 0 }}>{p.display_id}</span>}
+                        {p.notes && <div className="retention-note">{p.notes}</div>}
+                      </td>
+                      <td>{bankAccountName(p.bank_account_id)}</td>
+                      <td className="amt">
+                        {fmt(p.amount)}
+                        {Number(p.advance_recovered) > 0 && <div className="retention-note">{fmt(p.advance_recovered)} was an advance recovered</div>}
+                      </td>
+                    </tr>
+                  ))}
+                  {breakupPaidList.length > 0 && (
+                    <tr>
+                      <td colSpan={2}>
+                        <strong>Total paid</strong>
+                      </td>
+                      <td className="amt">
+                        <strong>{fmt(breakupPaidTotal)}</strong>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <table className="data table-compact keep-table">
+              <tbody>
+                <tr>
+                  <td>Payable on the books today (payroll runs less all payments)</td>
+                  <td className="amt">{fmt(breakupRow.payable)}</td>
+                </tr>
+                {breakupRow.advanceOutstanding > 0 && (
+                  <tr>
+                    <td>Salary advance still outstanding (separate from the salary)</td>
+                    <td className="amt">{fmt(breakupRow.advanceOutstanding)}</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Modal>
+      )}
 
       {editingAdvanceId && (salaryAdvances ?? []).find((x) => x.id === editingAdvanceId) && (
         <Modal title="Edit salary advance" onClose={() => setEditingAdvanceId(null)}>

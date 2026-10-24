@@ -1,6 +1,6 @@
 # LIS changes since v2.0.1
 
-Version 2.0.1 was released on 3 September 2026. This list covers everything after it, up to 3.0.14. It is put together from the project history, grouped by area. Version numbers are shown where a release carried one.
+Version 2.0.1 was released on 3 September 2026. This list covers everything after it, up to 3.0.15. It is put together from the project history, grouped by area. Version numbers are shown where a release carried one.
 
 ## 2.0.2 – 2.0.3 (3 – 4 September)
 
@@ -180,6 +180,11 @@ Version 2.0.1 was released on 3 September 2026. This list covers everything afte
 ## 2.1.26 (17 October): sticky trip rows, and records grouped by month
 - **Trip Records:** while you scroll through an opened trip's entries, the table header, the trip's own row and the entries heading (with the spend split and + Add expense) stay at the top; they let go when the trip ends. The entries have a Remarks column after the sub-head.
 - **Admin and Project expense records, and Activity by user,** are grouped by month (a bold grey bar with the count and total) and, inside a month, by date. Both can be folded. Each date group is blue or green in turn, and its rows alternate a lighter and a slightly deeper tint; reimbursements stay amber. Month and day totals cover everything in them, not only the current page.
+
+## 3.0.15 (25 October): the month for each staff member, and tidier phone screens
+- Salary: press a staff member's name in Payable by staff to see their month. It shows the salary for the month (the payroll run, or the amount not yet run), what was paid during the month, anything brought forward from earlier months, and what is due at the end of the month. The arrows move between months.
+- Salary on a phone: each person is a card, with Payable, Pending accrual and Advance outstanding side by side and the buttons below, instead of the buttons sitting on top of the amounts. The long explanation under the month picker is folded away under "How is this worked out?".
+- Trips: in a narrow window the entries on a trip are cards, with the date, amount and description on the first line and the sub-head and remarks on the second.
 
 ## 3.0.14 (21 October): edit and delete in Activity by user
 - An Admin can change or delete an entry from Activity by user without leaving the page. Edit opens the entry in a popup with its own form: expenses, reimbursements, vendor bills and payments, invoices, client receipts, transfers, capital entries and loans. Delete (expenses, reimbursements, capital, transfers, other receipts, loans, loan payments) moves the entry to the Trash with an Undo. Available in the row menu (table or card) and in the side panel. Other kinds of entry still open their own screen to edit.

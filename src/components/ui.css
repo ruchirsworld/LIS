@@ -2581,15 +2581,15 @@ summary:focus-visible {
    Each cell carries its column heading in data-label (see useStackedTables). Date and amount come first. The trip table keeps its
    sticky layout, so it is left as a table. */
 @media (max-width: 900px) {
-  table.data:not(:has(tbody.trip-block)),
-  table.data:not(:has(tbody.trip-block)) > tbody {
+  table.data:not(:has(tbody.trip-block)):not(.keep-table),
+  table.data:not(:has(tbody.trip-block)):not(.keep-table) > tbody {
     display: block;
     background: none;
   }
-  table.data:not(:has(tbody.trip-block)) > thead {
+  table.data:not(:has(tbody.trip-block)):not(.keep-table) > thead {
     display: none;
   }
-  table.data:not(:has(tbody.trip-block)) tr {
+  table.data:not(:has(tbody.trip-block)):not(.keep-table) tr {
     display: flex;
     flex-direction: column;
     gap: 2px;
@@ -2600,11 +2600,11 @@ summary:focus-visible {
     border-radius: var(--radius);
     box-shadow: var(--shadow-sm);
   }
-  table.data:not(:has(tbody.trip-block)) tr.row-reimb {
+  table.data:not(:has(tbody.trip-block)):not(.keep-table) tr.row-reimb {
     background: color-mix(in srgb, var(--pending) 10%, var(--surface));
     border-left: 3px solid var(--pending);
   }
-  table.data:not(:has(tbody.trip-block)) td {
+  table.data:not(:has(tbody.trip-block)):not(.keep-table) td {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
@@ -2615,10 +2615,10 @@ summary:focus-visible {
     box-shadow: none !important;
     text-align: right;
   }
-  table.data:not(:has(tbody.trip-block)) td:empty {
+  table.data:not(:has(tbody.trip-block)):not(.keep-table) td:empty {
     display: none;
   }
-  table.data:not(:has(tbody.trip-block)) td[data-label]:not([data-label=''])::before {
+  table.data:not(:has(tbody.trip-block)):not(.keep-table) td[data-label]:not([data-label=''])::before {
     content: attr(data-label);
     flex: none;
     max-width: 45%;
@@ -2626,26 +2626,26 @@ summary:focus-visible {
     font-size: var(--text-label);
     color: var(--muted);
   }
-  table.data:not(:has(tbody.trip-block)) td[data-role='date'] {
+  table.data:not(:has(tbody.trip-block)):not(.keep-table) td[data-role='date'] {
     order: -2;
     font-weight: 600;
   }
-  table.data:not(:has(tbody.trip-block)) td[data-role='amount'],
-  table.data:not(:has(tbody.trip-block)) td.amt {
+  table.data:not(:has(tbody.trip-block)):not(.keep-table) td[data-role='amount'],
+  table.data:not(:has(tbody.trip-block)):not(.keep-table) td.amt {
     order: -1;
     font-weight: 600;
   }
   /* Month and date heading rows: a plain full-width bar, not a card. */
-  table.data:not(:has(tbody.trip-block)) tr.expense-month-group-row,
-  table.data:not(:has(tbody.trip-block)) tr.expense-date-group-row,
-  table.data:not(:has(tbody.trip-block)) tr.group-header-row {
+  table.data:not(:has(tbody.trip-block)):not(.keep-table) tr.expense-month-group-row,
+  table.data:not(:has(tbody.trip-block)):not(.keep-table) tr.expense-date-group-row,
+  table.data:not(:has(tbody.trip-block)):not(.keep-table) tr.group-header-row {
     padding: 0;
     background: var(--hover);
     box-shadow: none;
   }
-  table.data:not(:has(tbody.trip-block)) tr.expense-month-group-row > td,
-  table.data:not(:has(tbody.trip-block)) tr.expense-date-group-row > td,
-  table.data:not(:has(tbody.trip-block)) tr.group-header-row > td {
+  table.data:not(:has(tbody.trip-block)):not(.keep-table) tr.expense-month-group-row > td,
+  table.data:not(:has(tbody.trip-block)):not(.keep-table) tr.expense-date-group-row > td,
+  table.data:not(:has(tbody.trip-block)):not(.keep-table) tr.group-header-row > td {
     display: block;
     padding: 10px 12px;
     text-align: left;
@@ -2657,47 +2657,47 @@ summary:focus-visible {
 
 /* Card rows: the tick sits at the top left and the arrow and the menu button at the top right, instead of taking a line each. */
 @media (max-width: 900px) {
-  table.data:not(:has(tbody.trip-block)) td:has(> .check-tick) {
+  table.data:not(:has(tbody.trip-block)):not(.keep-table) td:has(> .check-tick) {
     position: absolute;
     top: 8px;
     left: 12px;
     padding: 0;
   }
-  table.data:not(:has(tbody.trip-block)) td:has(> .check-tick)::before {
+  table.data:not(:has(tbody.trip-block)):not(.keep-table) td:has(> .check-tick)::before {
     content: none !important;
   }
-  table.data:not(:has(tbody.trip-block)) tr:has(> td > .check-tick) td[data-role='date'] {
+  table.data:not(:has(tbody.trip-block)):not(.keep-table) tr:has(> td > .check-tick) td[data-role='date'] {
     padding-left: 40px;
   }
-  table.data:not(:has(tbody.trip-block)) td:has(> .row-expand-btn) {
+  table.data:not(:has(tbody.trip-block)):not(.keep-table) td:has(> .row-expand-btn) {
     position: absolute;
     top: 4px;
     right: 52px;
     padding: 0;
   }
-  table.data:not(:has(tbody.trip-block)) td:has(> .row-menu) {
+  table.data:not(:has(tbody.trip-block)):not(.keep-table) td:has(> .row-menu) {
     position: absolute;
     top: 4px;
     right: 8px;
     padding: 0;
   }
 
-  table.data:not(:has(tbody.trip-block)) tr {
+  table.data:not(:has(tbody.trip-block)):not(.keep-table) tr {
     position: relative;
   }
-  table.data:not(:has(tbody.trip-block)) td[data-label='']:first-child:not(:only-child) {
+  table.data:not(:has(tbody.trip-block)):not(.keep-table) td[data-label='']:first-child:not(:only-child) {
     position: absolute;
     top: 4px;
     right: 52px;
     padding: 0;
   }
-  table.data:not(:has(tbody.trip-block)) td[data-label='']:last-child:not(:only-child) {
+  table.data:not(:has(tbody.trip-block)):not(.keep-table) td[data-label='']:last-child:not(:only-child) {
     position: absolute;
     top: 4px;
     right: 8px;
     padding: 0;
   }
-  table.data:not(:has(tbody.trip-block)) td[data-role='date']:not(:only-child) {
+  table.data:not(:has(tbody.trip-block)):not(.keep-table) td[data-role='date']:not(:only-child) {
     padding-right: 104px;
   }
 }
@@ -3353,4 +3353,149 @@ tr.row-link:hover td {
   gap: 2px 14px;
   font-size: 11.5px;
   color: var(--muted);
+}
+
+/* ===== Entries on a trip (the trip popup), as cards in a narrow window =====
+   Row 1: date, amount and description. Row 2: sub-head and remarks, quieter. The menu button stays at the top right. */
+@media (max-width: 900px) {
+  table.data.entry-table:not(:has(tbody.trip-block)):not(.keep-table) > tbody > tr {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    align-items: baseline;
+    gap: 4px 14px;
+    padding-right: 52px;
+  }
+  table.data.entry-table:not(:has(tbody.trip-block)):not(.keep-table) > tbody > tr > td {
+    display: block;
+    min-width: 0;
+    padding: 0;
+    text-align: left;
+    overflow-wrap: anywhere;
+  }
+  table.data.entry-table:not(:has(tbody.trip-block)):not(.keep-table) > tbody > tr > td::before {
+    content: none;
+  }
+  table.data.entry-table:not(:has(tbody.trip-block)):not(.keep-table) > tbody > tr > td:nth-child(1) {
+    grid-area: 1 / 1;
+    padding-right: 0;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  table.data.entry-table:not(:has(tbody.trip-block)):not(.keep-table) > tbody > tr > td:nth-child(5) {
+    grid-area: 1 / 2;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  table.data.entry-table:not(:has(tbody.trip-block)):not(.keep-table) > tbody > tr > td:nth-child(2) {
+    grid-area: 1 / 3;
+  }
+  table.data.entry-table:not(:has(tbody.trip-block)):not(.keep-table) > tbody > tr > td:nth-child(3) {
+    grid-area: 2 / 1 / 3 / 3;
+    font-size: var(--text-label);
+    color: var(--muted);
+  }
+  table.data.entry-table:not(:has(tbody.trip-block)):not(.keep-table) > tbody > tr > td:nth-child(4) {
+    grid-area: 2 / 3;
+    font-size: var(--text-label);
+    color: var(--muted);
+  }
+  table.data.entry-table:not(:has(tbody.trip-block)):not(.keep-table) > tbody > tr > td:nth-child(6) {
+    position: absolute;
+    top: 4px;
+    right: 8px;
+  }
+}
+
+/* ===== Payable by staff, as cards in a narrow window =====
+   Row 1: the name. Row 2: payable, pending accrual and advance outstanding side by side. Row 3: the buttons. */
+@media (max-width: 900px) {
+  table.data.data.payable-table:not(:has(tbody.trip-block)):not(.keep-table) > tbody > tr:has(> td:nth-child(5)) {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px 8px;
+    padding: 12px;
+  }
+  table.data.data.payable-table:not(:has(tbody.trip-block)):not(.keep-table) > tbody > tr > td:nth-child(n + 2):nth-child(-n + 4) {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 2px;
+    padding: 0;
+    text-align: left;
+    font-size: 15px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  table.data.data.payable-table:not(:has(tbody.trip-block)):not(.keep-table) > tbody > tr > td:nth-child(n + 2):nth-child(-n + 4)::before {
+    max-width: none;
+    font-size: 11.5px;
+    font-weight: 400;
+    line-height: 1.3;
+  }
+  table.data.data.payable-table:not(:has(tbody.trip-block)):not(.keep-table) > tbody > tr > td:nth-child(1) {
+    grid-column: 1 / -1;
+    padding: 0;
+    font-size: 16px;
+    font-weight: 600;
+    text-align: left;
+  }
+  table.data.data.payable-table:not(:has(tbody.trip-block)):not(.keep-table) > tbody > tr > td:nth-child(1)::before {
+    content: none !important;
+  }
+  table.data.data.payable-table:not(:has(tbody.trip-block)):not(.keep-table) > tbody > tr > td:nth-child(5) {
+    position: static;
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 8px;
+    padding: 4px 0 0;
+  }
+  table.data.data.payable-table:not(:has(tbody.trip-block)):not(.keep-table) > tbody > tr > td:nth-child(5) > .pay-btn {
+    flex: 1 1 auto;
+    min-height: var(--tap);
+    margin: 0;
+  }
+}
+@media (max-width: 900px) {
+  .table-scroll:has(> table.payable-table) {
+    max-height: none;
+    overflow: visible;
+    border: none;
+  }
+  table.data.data.payable-table:not(:has(tbody.trip-block)):not(.keep-table) > tbody > tr > td:nth-child(1) {
+    grid-row: 1;
+  }
+  table.data.data.payable-table:not(:has(tbody.trip-block)):not(.keep-table) > tbody > tr > td:nth-child(n + 2):nth-child(-n + 4) {
+    grid-row: 2;
+    order: 0;
+  }
+  table.data.data.payable-table:not(:has(tbody.trip-block)):not(.keep-table) > tbody > tr > td:nth-child(2) {
+    grid-column: 1;
+  }
+  table.data.data.payable-table:not(:has(tbody.trip-block)):not(.keep-table) > tbody > tr > td:nth-child(3) {
+    grid-column: 2;
+  }
+  table.data.data.payable-table:not(:has(tbody.trip-block)):not(.keep-table) > tbody > tr > td:nth-child(4) {
+    grid-column: 3;
+  }
+  table.data.data.payable-table:not(:has(tbody.trip-block)):not(.keep-table) > tbody > tr > td:nth-child(5) {
+    grid-row: 3;
+  }
+}
+@media (max-width: 900px) {
+  table.data.data.payable-table:not(:has(tbody.trip-block)):not(.keep-table) > tbody > tr > td:nth-child(n + 2):nth-child(-n + 4)::before {
+    flex: 0 1 auto;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  table.data.data.payable-table:not(:has(tbody.trip-block)):not(.keep-table) > tbody > tr > td:nth-child(1) > .btn.link {
+    padding: 0;
+    min-height: 0;
+    font-size: 16px;
+    font-weight: 600;
+    text-align: left;
+  }
 }
