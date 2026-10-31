@@ -47,28 +47,28 @@ function dayMonth(date: string): string {
   return fmtDate(date)
 }
 
-/** The dates behind the day counts of a salary period: which days were Absent (unpaid), Leave (paid), Half days and Holidays. Days worked normally
- * are not listed, they are simply every other day of the period. */
+/** How a salary period's days fell: the count of each kind of day and, for absent, leave, half and holiday days, the dates. Days worked normally are
+ * only counted, they are simply every other day of the period. `compact` gives just the dates, as small lines. */
 function DayDates({ days, compact, bilingual }: { days: AccrualDay[]; compact?: boolean; bilingual?: boolean }) {
-  const groups: { type: AccrualDay['type']; en: string; hi: string; note: string }[] = [
-    { type: 'unpaid_off', en: 'Absent — unpaid', hi: 'अनुपस्थित — अवैतनिक', note: 'no pay for these days' },
+  if (days.length === 0) return null
+  const kinds: { type: AccrualDay['type']; en: string; hi: string; note: string }[] = [
+    { type: 'present', en: 'Days worked (present)', hi: 'उपस्थित दिन', note: '' },
     { type: 'paid_off', en: 'Leave — paid', hi: 'अवकाश — सशुल्क', note: 'the free days each month, paid in full' },
+    { type: 'unpaid_off', en: 'Absent — unpaid', hi: 'अनुपस्थित — अवैतनिक', note: 'no pay for these days' },
     { type: 'half_day', en: 'Half days', hi: 'आधे दिन', note: 'half pay' },
     { type: 'holiday', en: 'Holidays', hi: 'छुट्टियाँ', note: 'paid in full' },
   ]
-  const rows = groups
-    .map((g) => ({ ...g, dates: days.filter((d) => d.type === g.type).map((d) => dayMonth(d.date)) }))
-    .filter((g) => g.dates.length > 0)
-  if (days.length === 0) return null
-  if (rows.length === 0) return compact ? null : <div className="note" style={{ margin: 0 }}>Every day in this period was worked: no absence, half day or holiday.</div>
+  const rows = kinds.map((k) => ({ ...k, dates: days.filter((d) => d.type === k.type).map((d) => dayMonth(d.date)) }))
   if (compact) {
     return (
       <>
-        {rows.map((g) => (
-          <div key={g.type} className="retention-note">
-            {g.en} ({g.dates.length}): {g.dates.join(', ')}
-          </div>
-        ))}
+        {rows
+          .filter((k) => k.type !== 'present' && k.dates.length > 0)
+          .map((k) => (
+            <div key={k.type} className="retention-note">
+              {k.en} ({k.dates.length}): {k.dates.join(', ')}
+            </div>
+          ))}
       </>
     )
   }
@@ -76,18 +76,24 @@ function DayDates({ days, compact, bilingual }: { days: AccrualDay[]; compact?: 
     <table className="data table-compact keep-table">
       <thead>
         <tr>
-          <th colSpan={2}>{bilingual ? <Bi en="Dates" hi="तारीखें" /> : 'Dates'}</th>
+          <th colSpan={2}>{bilingual ? <Bi en="Days Breakdown" hi="दिनों का विवरण" /> : 'Days Breakdown'}</th>
         </tr>
       </thead>
       <tbody>
-        {rows.map((g) => (
-          <tr key={g.type}>
-            <td style={{ whiteSpace: 'nowrap', verticalAlign: 'top' }}>
-              {bilingual ? <Bi en={g.en} hi={g.hi} /> : g.en} ({g.dates.length})
-            </td>
+        {rows.map((k) => (
+          <tr key={k.type}>
             <td>
-              {g.dates.join(', ')}
-              <div className="retention-note">{g.note}</div>
+              {bilingual ? <Bi en={k.en} hi={k.hi} /> : k.en}
+              {k.type !== 'present' && k.dates.length > 0 && (
+                <div className="retention-note">
+                  {k.dates.join(', ')}
+                  <br />
+                  {k.note}
+                </div>
+              )}
+            </td>
+            <td className="amt" style={{ verticalAlign: 'top', ...(k.type === 'unpaid_off' && k.dates.length > 0 ? { color: 'var(--red)' } : {}) }}>
+              {k.dates.length}
             </td>
           </tr>
         ))}
@@ -1050,50 +1056,6 @@ export function SalarySection() {
                 </tbody>
               </table>
 
-              <table className="data table-compact keep-table">
-                <thead>
-                  <tr>
-                    <th colSpan={2}>
-                      <Bi en="Days Breakdown" hi="दिनों का विवरण" />
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>
-                      <Bi en="Days worked (present)" hi="उपस्थित दिन" />
-                    </td>
-                    <td className="amt">{slip.counts.present}</td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <Bi en="Leave — paid" hi="अवकाश — सशुल्क" />
-                    </td>
-                    <td className="amt">{slip.counts.paidLeave}</td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <Bi en="Absent — unpaid" hi="अनुपस्थित — अवैतनिक" />
-                    </td>
-                    <td className="amt" style={slip.counts.unpaidLeave > 0 ? { color: 'var(--red)' } : undefined}>
-                      {slip.counts.unpaidLeave}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <Bi en="Half days" hi="आधे दिन" />
-                    </td>
-                    <td className="amt">{slip.counts.halfDays}</td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <Bi en="Holidays" hi="छुट्टियाँ" />
-                    </td>
-                    <td className="amt">{slip.counts.holidays}</td>
-                  </tr>
-                </tbody>
-              </table>
-
               <DayDates days={slip.days} bilingual />
 
               <table className="data table-compact keep-table">
@@ -1456,50 +1418,6 @@ export function SalarySection() {
                       <Bi en="Salary" hi="वेतन" />
                     </td>
                     <td className="amt">{fmt(viewingStaff.daily_rate * 30)}</td>
-                  </tr>
-                </tbody>
-              </table>
-
-              <table className="data table-compact keep-table">
-                <thead>
-                  <tr>
-                    <th colSpan={2}>
-                      <Bi en="Days Breakdown" hi="दिनों का विवरण" />
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>
-                      <Bi en="Days worked (present)" hi="उपस्थित दिन" />
-                    </td>
-                    <td className="amt">{viewingBreakdown.presentDays}</td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <Bi en="Leave — paid" hi="अवकाश — सशुल्क" />
-                    </td>
-                    <td className="amt">{viewingBreakdown.paidOffDays}</td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <Bi en="Absent — unpaid" hi="अनुपस्थित — अवैतनिक" />
-                    </td>
-                    <td className="amt" style={viewingBreakdown.unpaidOffDays > 0 ? { color: 'var(--red)' } : undefined}>
-                      {viewingBreakdown.unpaidOffDays}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <Bi en="Half days" hi="आधे दिन" />
-                    </td>
-                    <td className="amt">{viewingBreakdown.halfDays}</td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <Bi en="Holidays" hi="छुट्टियाँ" />
-                    </td>
-                    <td className="amt">{viewingBreakdown.holidayDays}</td>
                   </tr>
                 </tbody>
               </table>
